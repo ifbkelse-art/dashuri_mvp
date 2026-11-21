@@ -22,8 +22,9 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_bloc: ^9.1.1
+  flutter_cashfree_pg_sdk: ^2.7.0+55
   get_it: ^9.2.1
-  in_app_purchase: ^3.2.0
+  in_app_purchase: ^3.3.1
 
 dev_dependencies:
   bloc_test: ^10.0.0

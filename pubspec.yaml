@@ -28,6 +28,7 @@ workspace:
   - packages/features/safety
   - packages/features/notifications
   - packages/features/settings
+  - packages/features/location
 
 dev_dependencies:
   melos: ^8.9.0

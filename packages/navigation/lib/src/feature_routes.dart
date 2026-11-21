@@ -12,3 +12,10 @@ abstract interface class RouteGuard {
   /// Returns a redirect path, or null to allow navigation.
   String? redirect(GoRouterState state);
 }
+
+/// Implemented by features that own a root tab of a role shell (FL06).
+/// [tabRoutes] are placed inside the shell's branch for that tab (they keep
+/// the navigation bar/rail visible); [FeatureRoutes.routes] stay full-screen.
+abstract interface class TabFeatureRoutes implements FeatureRoutes {
+  List<RouteBase> get tabRoutes;
+}

@@ -4,6 +4,7 @@ import 'package:feature_chat/feature_chat.dart';
 import 'package:feature_discovery/feature_discovery.dart';
 import 'package:feature_free_call/feature_free_call.dart';
 import 'package:feature_host/feature_host.dart';
+import 'package:feature_location/feature_location.dart';
 import 'package:feature_notifications/feature_notifications.dart';
 import 'package:feature_profile/feature_profile.dart';
 import 'package:feature_purchases/feature_purchases.dart';
@@ -30,6 +31,7 @@ GoRouter buildRouter({required SessionCubit session}) {
     SafetyRoutes(),
     NotificationsRoutes(),
     SettingsRoutes(),
+    LocationRoutes(),
   ];
   final featureRoutes = [for (final f in features) ...f.routes];
   final guard = SessionRouteGuard(session);

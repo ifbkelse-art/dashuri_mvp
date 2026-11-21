@@ -32,6 +32,8 @@ dependencies:
     path: ../../packages/features/free_call
   feature_host:
     path: ../../packages/features/host
+  feature_location:
+    path: ../../packages/features/location
   feature_notifications:
     path: ../../packages/features/notifications
   feature_profile:
