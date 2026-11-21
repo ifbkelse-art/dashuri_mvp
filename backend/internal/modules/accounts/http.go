@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"net/http"
+	"strconv"
 
 	"dashuri/backend/internal/platform/auth"
 	"dashuri/backend/internal/platform/httpx"
@@ -18,6 +19,9 @@ func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 	mux.Handle("PATCH /v1/me/profile", mw.User(s.handleUpdateMyProfile))
 	mux.Handle("GET /v1/profiles/{userId}", mw.User(s.handleGetProfile))
 	mux.Handle("POST /v1/me/photos/upload-tickets", mw.User(idempotency.Require(mw.Idempotency, s.handleRequestPhotoUpload)))
+	mux.Handle("DELETE /v1/me/photos/{photoId}", mw.User(s.handleDeleteMyPhoto))
+	mux.Handle("GET /v1/admin/photos/pending", mw.User(auth.Require(s.handleListPendingPhotos, auth.RoleModerator, auth.RoleAdmin)))
+	mux.Handle("POST /v1/admin/photos/{photoId}/decision", mw.User(auth.Require(s.handleDecidePhoto, auth.RoleModerator, auth.RoleAdmin)))
 	mux.Handle("GET /v1/me/age", mw.User(s.handleGetAgeStatus))
 	mux.Handle("POST /v1/me/age/declaration", mw.User(idempotency.Require(mw.Idempotency, s.handleSubmitAgeDeclaration)))
 	mux.Handle("GET /v1/me/consents", mw.User(s.handleGetConsents))
@@ -126,4 +130,36 @@ func (s *Service) handleRequestAccountDeletion(w http.ResponseWriter, r *http.Re
 func (s *Service) handleRequestDataExport(w http.ResponseWriter, r *http.Request) {
 	out, err := s.RequestDataExport(r.Context(), principal(r))
 	write(w, r, http.StatusAccepted, out, err)
+}
+
+func (s *Service) handleDeleteMyPhoto(w http.ResponseWriter, r *http.Request) {
+	if err := s.DeleteMyPhoto(r.Context(), principal(r), r.PathValue("photoId")); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Service) handleListPendingPhotos(w http.ResponseWriter, r *http.Request) {
+	limit := 20
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 100 {
+			httpx.WriteError(w, r, validationError(map[string]string{"limit": "must_be_1_to_100"}))
+			return
+		}
+		limit = n
+	}
+	out, err := s.ListPendingPhotos(r.Context(), principal(r), r.URL.Query().Get("cursor"), limit)
+	write(w, r, http.StatusOK, out, err)
+}
+
+func (s *Service) handleDecidePhoto(w http.ResponseWriter, r *http.Request) {
+	var in PhotoDecisionRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	out, err := s.DecidePhoto(r.Context(), principal(r), r.PathValue("photoId"), in)
+	write(w, r, http.StatusOK, out, err)
 }

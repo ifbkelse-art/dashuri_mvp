@@ -19,7 +19,9 @@ import (
 
 type fakeStorage struct{ configured bool }
 
-func (f fakeStorage) Configured() bool { return f.configured }
+func (f fakeStorage) Configured() bool                                    { return f.configured }
+func (f fakeStorage) List(context.Context, string, int) ([]string, error) { return nil, nil }
+func (f fakeStorage) Delete(context.Context, string) error                { return nil }
 func (f fakeStorage) SignUpload(_ context.Context, path string) (string, error) {
 	return "https://storage.test/upload/" + path + "?token=t", nil
 }

@@ -101,3 +101,25 @@ func TestCursorRoundTrip(t *testing.T) {
 		t.Fatal("bad cursor accepted")
 	}
 }
+
+// Security review finding 1: the customer switching their camera off must
+// not pause billing while the host is live.
+func TestCustomerCameraOffKeepsBilling(t *testing.T) {
+	t0 := time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC)
+	es := []MediaEvent{
+		{Kind: EventJoined, UserID: "a", At: t0},
+		{Kind: EventJoined, UserID: "b", At: t0},
+		{Kind: EventVideoPublished, UserID: "a", At: t0},
+		{Kind: EventVideoPublished, UserID: "b", At: t0},
+		{Kind: EventVideoUnpublished, UserID: "a", At: t0.Add(10 * time.Second)},
+	}
+	changes := Timeline(es, "a", "b")
+	if got := BillableSeconds(changes, t0.Add(120*time.Second), 10*time.Second); got != 120 {
+		t.Fatalf("billable = %d, want 120 (customer camera off must not pause billing)", got)
+	}
+	// The host switching video off does pause billing.
+	es = append(es[:4], MediaEvent{Kind: EventVideoUnpublished, UserID: "b", At: t0.Add(30 * time.Second)})
+	if got := BillableSeconds(Timeline(es, "a", "b"), t0.Add(120*time.Second), 10*time.Second); got != 30 {
+		t.Fatalf("billable = %d, want 30 when the host stops video", got)
+	}
+}

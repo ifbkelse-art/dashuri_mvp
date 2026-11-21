@@ -33,6 +33,8 @@ type HostCard struct {
 type HostDetail struct {
 	HostCard
 	Bio *string `json:"bio"`
+	// PhotoUrls are all approved photos, signed, in profile order.
+	PhotoUrls []string `json:"photo_urls"`
 }
 
 // Summary is GET /v1/discovery/summary.

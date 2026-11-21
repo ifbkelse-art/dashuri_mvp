@@ -276,3 +276,43 @@ func (r RulesAcceptanceRequest) validate() map[string]string {
 	}
 	return errs
 }
+
+// PendingPhotoItem is one entry of GET /v1/admin/photos/pending.
+type PendingPhotoItem struct {
+	PhotoId   string    `json:"photo_id"`
+	UserId    string    `json:"user_id"`
+	ReadUrl   *string   `json:"read_url"` // null until the object is uploaded
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// PhotoDecisionRequest: POST /v1/admin/photos/{photoId}/decision.
+type PhotoDecisionRequest struct {
+	Decision string  `json:"decision"`
+	Reason   *string `json:"reason,omitempty"`
+}
+
+// MaxDecisionReason bounds the moderator's reason.
+const MaxDecisionReason = 500
+
+func (r PhotoDecisionRequest) validate() map[string]string {
+	errs := map[string]string{}
+	if r.Decision != "approve" && r.Decision != "reject" {
+		errs["decision"] = "invalid_value"
+	}
+	if r.Reason != nil && utf8.RuneCountInString(*r.Reason) > MaxDecisionReason {
+		errs["reason"] = "too_long"
+	}
+	return errs
+}
+
+// PhotoDecision is the decision response.
+type PhotoDecision struct {
+	PhotoId string `json:"photo_id"`
+	Status  string `json:"status"`
+}
+
+// Page is the list envelope {items, next_cursor}.
+type Page[T any] struct {
+	Items      []T     `json:"items"`
+	NextCursor *string `json:"next_cursor,omitempty"`
+}

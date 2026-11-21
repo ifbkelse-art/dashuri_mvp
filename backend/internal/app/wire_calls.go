@@ -26,6 +26,8 @@ func BuildCalls(env wiring.Env) *calls.Service {
 	}
 	if env.Pool != nil {
 		d.Repo = postgres.CallsRepo{Pool: env.Pool, Tx: env.Tx}
+		// BE-identity: peer.photo_url from the first approved profile photo.
+		d.Photos = postgres.ProfilePhotoURLs{Pool: env.Pool, Signer: profilePhotoStorage(env)}
 	}
 	return calls.NewService(d)
 }

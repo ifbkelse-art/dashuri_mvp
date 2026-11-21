@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"testing"
+	"time"
 
 	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/platform/apperr"
@@ -80,7 +81,12 @@ func (f fakeRepo) ListHosts(_ context.Context, q ListQuery) ([]HostRow, error) {
 	}
 	return f.rows, nil
 }
-func (f fakeRepo) Host(context.Context, string, string) (HostRow, error) {
+func (f fakeRepo) Host(_ context.Context, _, id string) (HostRow, error) {
+	for _, r := range f.rows {
+		if r.UserID == id {
+			return r, nil
+		}
+	}
 	return HostRow{}, ErrNotFound
 }
 func (f fakeRepo) OnlineCount(context.Context, string) (int, error) { return len(f.rows), nil }
@@ -109,5 +115,33 @@ func TestListPagination(t *testing.T) {
 	}
 	if _, err := NewService(Deps{}).GetSummary(context.Background(), auth.Principal{}); apperr.As(err).Kind != apperr.KindUnavailable {
 		t.Fatal(err)
+	}
+}
+
+type signAll struct{}
+
+func (signAll) SignRead(_ context.Context, paths []string, _ time.Duration) map[string]string {
+	out := map[string]string{}
+	for _, p := range paths {
+		if p != "u/missing.jpg" {
+			out[p] = "https://signed/" + p
+		}
+	}
+	return out
+}
+
+func TestHostDetailPhotoURLs(t *testing.T) {
+	first := "u/1.jpg"
+	row := HostRow{UserID: id1, DisplayName: "A", PhotoPath: &first, PhotoPaths: []string{"u/1.jpg", "u/missing.jpg", "u/2.jpg"}}
+	s := NewService(Deps{Repo: fakeRepo{[]HostRow{row}}, Photos: signAll{}, Rules: economy.Founder()})
+	d, err := s.GetHost(context.Background(), auth.Principal{}, id1)
+	if err != nil || len(d.PhotoUrls) != 2 || d.PhotoUrls[0] != "https://signed/u/1.jpg" || d.PhotoUrls[1] != "https://signed/u/2.jpg" ||
+		d.PhotoUrl == nil || *d.PhotoUrl != d.PhotoUrls[0] || d.Availability != "offline" {
+		t.Fatalf("%+v %v", d, err)
+	}
+	// No photos: an empty array, never null.
+	s = NewService(Deps{Repo: fakeRepo{[]HostRow{{UserID: id1}}}, Rules: economy.Founder()})
+	if d, _ := s.GetHost(context.Background(), auth.Principal{}, id1); d.PhotoUrls == nil || len(d.PhotoUrls) != 0 {
+		t.Fatalf("%+v", d.PhotoUrls)
 	}
 }

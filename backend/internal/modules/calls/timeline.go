@@ -7,15 +7,20 @@ import (
 	"dashuri/backend/internal/modules/economy"
 )
 
-// Timeline derives the "both participants live with video" timeline from
-// stored provider events.
+// Timeline derives the billable "connected" timeline from stored provider
+// events. caller is the paying customer, receiver the host.
 //
-// A participant is live while joined and publishing video. If the provider
+// The call is live while the customer is joined and the host is joined and
+// publishing video. The customer's own camera is irrelevant: otherwise a
+// customer could stop paying by switching off their camera while still
+// watching the host (security review finding 1). The host is live while
+// joined and publishing video. If the provider
 // sent no track events at all for this call (Stream does not always deliver
 // track webhooks), joining counts as publishing; once any track event exists
 // for the call, video must be explicitly published. A call_ended event makes
 // both participants not live.
-func Timeline(events []MediaEvent, a, b string) []LiveChange {
+func Timeline(events []MediaEvent, caller, receiver string) []LiveChange {
+	a, b := caller, receiver
 	es := append([]MediaEvent(nil), events...)
 	sort.SliceStable(es, func(i, j int) bool { return es[i].At.Before(es[j].At) })
 	trackEvents := false
@@ -51,7 +56,7 @@ func Timeline(events []MediaEvent, a, b string) []LiveChange {
 				s.video = -1
 			}
 		}
-		now := live(st[a]) && live(st[b])
+		now := st[a].joined && live(st[b])
 		if now != both {
 			out = append(out, LiveChange{At: e.At, BothLive: now})
 			both = now

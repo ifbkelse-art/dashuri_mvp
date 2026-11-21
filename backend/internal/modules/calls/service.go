@@ -419,7 +419,7 @@ func (s *Service) ListCallHistory(ctx context.Context, p auth.Principal, page Pa
 	for _, c := range rows {
 		ids = append(ids, peerOf(c, p.UserID))
 	}
-	peers, err := s.deps.Repo.Peers(ctx, ids)
+	peers, err := s.peers(ctx, ids)
 	if err != nil {
 		return Page[CallSession]{}, mapErr(err)
 	}
@@ -449,6 +449,22 @@ func decodeCursor(s string) (time.Time, string, error) {
 	}
 	t, err := time.Parse(time.RFC3339Nano, at)
 	return t, id, err
+}
+
+// peers loads display names and, when configured, signed photo URLs.
+func (s *Service) peers(ctx context.Context, ids []string) (map[string]Peer, error) {
+	out, err := s.deps.Repo.Peers(ctx, ids)
+	if err != nil || s.deps.Photos == nil || len(out) == 0 {
+		return out, err
+	}
+	urls := s.deps.Photos.FirstPhotoURLs(ctx, ids)
+	for id, p := range out {
+		if u, ok := urls[id]; ok {
+			p.PhotoURL = &u
+			out[id] = p
+		}
+	}
+	return out, nil
 }
 
 func peerOf(c Call, viewer string) string {
@@ -487,7 +503,7 @@ func toSession(c Call, viewer string, peers map[string]Peer) CallSession {
 }
 
 func (s *Service) session(ctx context.Context, c Call, viewer string) (CallSession, error) {
-	peers, err := s.deps.Repo.Peers(ctx, []string{peerOf(c, viewer)})
+	peers, err := s.peers(ctx, []string{peerOf(c, viewer)})
 	if err != nil {
 		return CallSession{}, mapErr(err)
 	}
@@ -501,7 +517,7 @@ func (s *Service) publishCall(ctx context.Context, c Call) {
 	if s.deps.Realtime == nil {
 		return
 	}
-	peers, err := s.deps.Repo.Peers(ctx, []string{c.CallerID, c.ReceiverID})
+	peers, err := s.peers(ctx, []string{c.CallerID, c.ReceiverID})
 	if err != nil {
 		peers = map[string]Peer{}
 	}

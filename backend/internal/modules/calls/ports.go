@@ -115,6 +115,13 @@ type Peer struct {
 	PhotoURL    *string `json:"photo_url"`
 }
 
+// PeerPhotos resolves a signed URL of each user's first approved profile
+// photo (identity.profile_photos in a private bucket). Users without one are
+// missing from the map. Implemented outside the module; optional.
+type PeerPhotos interface {
+	FirstPhotoURLs(ctx context.Context, userIDs []string) map[string]string
+}
+
 // MediaEvent is a stored calls.media_events row.
 type MediaEvent struct {
 	UserID string

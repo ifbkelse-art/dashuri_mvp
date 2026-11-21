@@ -83,7 +83,21 @@ func (s *Service) GetHost(ctx context.Context, p auth.Principal, userID string) 
 	if err != nil {
 		return HostDetail{}, apperr.Internal(err)
 	}
-	return HostDetail{HostCard: s.card(h, s.sign(ctx, []HostRow{h})), Bio: h.Bio}, nil
+	paths := h.PhotoPaths
+	if h.PhotoPath != nil && len(paths) == 0 {
+		paths = []string{*h.PhotoPath}
+	}
+	var photos map[string]string
+	if s.deps.Photos != nil && len(paths) > 0 {
+		photos = s.deps.Photos.SignRead(ctx, paths, PhotoTTL)
+	}
+	d := HostDetail{HostCard: s.card(h, photos), Bio: h.Bio, PhotoUrls: []string{}}
+	for _, p := range paths {
+		if u, ok := photos[p]; ok {
+			d.PhotoUrls = append(d.PhotoUrls, u)
+		}
+	}
+	return d, nil
 }
 
 // GetSummary: GET /v1/discovery/summary.

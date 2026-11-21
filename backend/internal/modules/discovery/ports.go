@@ -15,7 +15,8 @@ type HostRow struct {
 	DisplayName   string
 	Bio           *string
 	Languages     []string
-	PhotoPath     *string // first approved photo
+	PhotoPath     *string  // first approved photo
+	PhotoPaths    []string // all approved photos in order (Host only)
 	City          *City
 	RatePerMinute int64
 	KYCApproved   bool

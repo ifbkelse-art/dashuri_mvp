@@ -24,6 +24,8 @@ type Deps struct {
 	ProviderName string
 	// APIKey is the provider's public key returned with call credentials.
 	APIKey string
+	// Photos fills peer.photo_url (optional; nil leaves it null).
+	Photos PeerPhotos
 }
 
 // Timing rules of the call lifecycle (video-call-architecture.md).

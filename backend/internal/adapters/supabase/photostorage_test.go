@@ -30,6 +30,27 @@ func TestPhotoStorageSigning(t *testing.T) {
 			}
 			_, _ = w.Write([]byte(`[{"path":"u1/a.jpg","signedURL":"/object/sign/profile-photos/u1/a.jpg?token=r","error":null},
 				{"path":"u1/missing.jpg","signedURL":null,"error":"Either the object does not exist or you do not have access to it"}]`))
+		case "/storage/v1/object/list/profile-photos":
+			var in struct {
+				Prefix string `json:"prefix"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&in)
+			if in.Prefix != "u1/" {
+				t.Errorf("prefix %q", in.Prefix)
+			}
+			_, _ = w.Write([]byte(`[{"name":"a.jpg","id":"x1"},{"name":"sub","id":null}]`))
+		case "/storage/v1/object/profile-photos":
+			if r.Method != http.MethodDelete {
+				t.Errorf("method %s", r.Method)
+			}
+			var in struct {
+				Prefixes []string `json:"prefixes"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&in)
+			if len(in.Prefixes) != 1 || in.Prefixes[0] != "u1/a.jpg" {
+				t.Errorf("delete %v", in.Prefixes)
+			}
+			_, _ = w.Write([]byte(`[]`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -44,6 +65,13 @@ func TestPhotoStorageSigning(t *testing.T) {
 	m := s.SignRead(ctx, []string{"u1/a.jpg", "u1/missing.jpg"}, time.Hour)
 	if len(m) != 1 || m["u1/a.jpg"] != srv.URL+"/storage/v1/object/sign/profile-photos/u1/a.jpg?token=r" {
 		t.Fatalf("read: %v", m)
+	}
+	names, err := s.List(ctx, "u1/", 100)
+	if err != nil || len(names) != 1 || names[0] != "u1/a.jpg" {
+		t.Fatalf("list: %v %v", names, err)
+	}
+	if err := s.Delete(ctx, "u1/a.jpg"); err != nil {
+		t.Fatalf("delete: %v", err)
 	}
 	if _, err := (PhotoStorage{Bucket: "x"}).SignUpload(ctx, "p"); !errors.Is(err, ErrStorageNotConfigured) {
 		t.Fatal(err)

@@ -44,7 +44,7 @@ func (s PhotoStorage) SignUpload(ctx context.Context, path string) (string, erro
 		URL string `json:"url"`
 	}
 	endpoint := s.storageBase() + "/object/upload/sign/" + url.PathEscape(s.Bucket) + "/" + escapePath(path)
-	if err := s.do(ctx, endpoint, map[string]any{}, &out); err != nil {
+	if err := s.do(ctx, http.MethodPost, endpoint, map[string]any{}, &out); err != nil {
 		return "", err
 	}
 	if out.URL == "" {
@@ -74,7 +74,7 @@ func (s PhotoStorage) SignRead(ctx context.Context, paths []string, ttl time.Dur
 	}
 	endpoint := s.storageBase() + "/object/sign/" + url.PathEscape(s.Bucket)
 	body := map[string]any{"expiresIn": int(ttl.Seconds()), "paths": paths}
-	if err := s.do(ctx, endpoint, body, &res); err != nil {
+	if err := s.do(ctx, http.MethodPost, endpoint, body, &res); err != nil {
 		slog.WarnContext(ctx, "photo url signing failed", "err", err)
 		return out
 	}
@@ -84,6 +84,48 @@ func (s PhotoStorage) SignRead(ctx context.Context, paths []string, ttl time.Dur
 		}
 	}
 	return out
+}
+
+// List returns the object paths directly under prefix (e.g. "<user id>/"),
+// as full paths inside the bucket. At most limit objects.
+// POST {SUPABASE_URL}/storage/v1/object/list/{bucket} {prefix, limit, offset}
+func (s PhotoStorage) List(ctx context.Context, prefix string, limit int) ([]string, error) {
+	if !s.Configured() {
+		return nil, ErrStorageNotConfigured
+	}
+	var res []struct {
+		Name string  `json:"name"`
+		ID   *string `json:"id"` // null for folders
+	}
+	endpoint := s.storageBase() + "/object/list/" + url.PathEscape(s.Bucket)
+	body := map[string]any{"prefix": prefix, "limit": limit, "offset": 0}
+	if err := s.do(ctx, http.MethodPost, endpoint, body, &res); err != nil {
+		return nil, err
+	}
+	dir := strings.TrimSuffix(prefix, "/")
+	out := make([]string, 0, len(res))
+	for _, r := range res {
+		if r.ID == nil || r.Name == "" {
+			continue
+		}
+		if dir == "" {
+			out = append(out, r.Name)
+		} else {
+			out = append(out, dir+"/"+r.Name)
+		}
+	}
+	return out, nil
+}
+
+// Delete removes one object. A missing object is not an error.
+// DELETE {SUPABASE_URL}/storage/v1/object/{bucket}  {prefixes: [path]}
+func (s PhotoStorage) Delete(ctx context.Context, path string) error {
+	if !s.Configured() {
+		return ErrStorageNotConfigured
+	}
+	var res []json.RawMessage
+	endpoint := s.storageBase() + "/object/" + url.PathEscape(s.Bucket)
+	return s.do(ctx, http.MethodDelete, endpoint, map[string]any{"prefixes": []string{path}}, &res)
 }
 
 func (s PhotoStorage) storageBase() string { return strings.TrimRight(s.BaseURL, "/") + "/storage/v1" }
@@ -98,14 +140,14 @@ func (s PhotoStorage) absolute(u string) string {
 	return s.storageBase() + u
 }
 
-func (s PhotoStorage) do(ctx context.Context, endpoint string, body, out any) error {
+func (s PhotoStorage) do(ctx context.Context, method, endpoint string, body, out any) error {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}

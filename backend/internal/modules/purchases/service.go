@@ -153,7 +153,21 @@ func (s *Service) playReady() error {
 //     obfuscatedExternalAccountId = sha256(user id) when present.
 //  3. purchaseState 0 → credit once; 2 → pending (no credit); else rejected.
 //  4. Acknowledge server-side after the credit.
+// purchaseAllowed refuses minors and restricted accounts (security review finding 2).
+func purchaseAllowed(p auth.Principal) error {
+	if !p.AgeEligible {
+		return apperr.BusinessRule("not_age_eligible", "confirm you are 18 or older first")
+	}
+	if p.Restricted() {
+		return apperr.BusinessRule("account_restricted", "purchases are restricted on this account")
+	}
+	return nil
+}
+
 func (s *Service) VerifyGooglePlayPurchase(ctx context.Context, p auth.Principal, in VerifyGooglePlayRequest) (PurchaseVerification, error) {
+	if err := purchaseAllowed(p); err != nil {
+		return PurchaseVerification{}, err
+	}
 	if err := s.playReady(); err != nil {
 		return PurchaseVerification{}, err
 	}
@@ -492,6 +506,9 @@ func wireOrder(o CashfreeOrderRecord) CashfreeOrder {
 // CreateCashfreeOrder: POST /v1/purchases/cashfree/orders. The amount comes
 // from the package table; the app receives only payment_session_id.
 func (s *Service) CreateCashfreeOrder(ctx context.Context, p auth.Principal, in CreateCashfreeOrderRequest) (CashfreeOrder, error) {
+	if err := purchaseAllowed(p); err != nil {
+		return CashfreeOrder{}, err
+	}
 	if err := s.cashfreeReady(); err != nil {
 		return CashfreeOrder{}, err
 	}

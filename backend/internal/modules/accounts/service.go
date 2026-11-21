@@ -207,7 +207,7 @@ func (s *Service) RequestPhotoUpload(ctx context.Context, p auth.Principal, in P
 	photoID := newUUID()
 	path := fmt.Sprintf("%s/%s.%s", p.UserID, photoID, photoExtensions[in.ContentType])
 	now := s.deps.Clock.Now()
-	url, err := repo.CreatePhoto(ctx, p.UserID, photoID, path, MaxPhotos, func(path string) (string, error) {
+	url, err := repo.CreatePhoto(ctx, p.UserID, photoID, path, MaxPhotos, s.slotPolicy(ctx, p.UserID), func(path string) (string, error) {
 		return s.deps.Storage.SignUpload(ctx, path)
 	})
 	switch {

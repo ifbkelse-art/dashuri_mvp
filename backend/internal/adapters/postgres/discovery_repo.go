@@ -107,6 +107,12 @@ func (r DiscoveryRepo) Host(ctx context.Context, viewerID, hostID string) (disco
 	if errors.Is(err, pgx.ErrNoRows) {
 		return h, discovery.ErrNotFound
 	}
+	if err != nil {
+		return h, err
+	}
+	err = r.Pool.QueryRow(ctx, `
+		select coalesce(array_agg(storage_path order by position, created_at), '{}')
+		  from identity.profile_photos where user_id = $1 and status = 'approved'`, hostID).Scan(&h.PhotoPaths)
 	return h, err
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dashuri/backend/internal/modules/accounts"
+	"dashuri/backend/internal/modules/keyset"
 )
 
 // AccountsRepo implements accounts.Repository on identity.*.
@@ -143,14 +144,30 @@ func (r AccountsRepo) AcceptRules(ctx context.Context, userID, version string) e
 	return err
 }
 
-func (r AccountsRepo) CreatePhoto(ctx context.Context, userID, photoID, path string, max int, sign func(string) (string, error)) (string, error) {
+func (r AccountsRepo) CreatePhoto(ctx context.Context, userID, photoID, path string, max int, pol accounts.SlotPolicy, sign func(string) (string, error)) (string, error) {
 	var url string
 	err := idTx(ctx, r.Pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `select 1 from identity.accounts where id = $1 for update`, userID); err != nil {
 			return err
 		}
-		var n int
-		if err := tx.QueryRow(ctx, `select count(*) from identity.profile_photos where user_id = $1 and status in ('pending_review','approved')`, userID).Scan(&n); err != nil {
+		if pol.Uploaded != nil {
+			// Abandoned tickets: expired and never uploaded. They free their slot.
+			uploaded := make([]string, 0, len(pol.Uploaded))
+			for p := range pol.Uploaded {
+				uploaded = append(uploaded, p)
+			}
+			if _, err := tx.Exec(ctx, `
+				delete from identity.profile_photos
+				 where user_id = $1 and status = 'pending_review'
+				   and created_at < now() - make_interval(secs => $2)
+				   and not (storage_path = any($3::text[]))`, userID, pol.TicketTTL.Seconds(), uploaded); err != nil {
+				return err
+			}
+		}
+		var n, nextPos int
+		if err := tx.QueryRow(ctx, `
+			select count(*) filter (where status in ('pending_review','approved')), coalesce(max(position) + 1, 0)
+			  from identity.profile_photos where user_id = $1`, userID).Scan(&n, &nextPos); err != nil {
 			return err
 		}
 		if n >= max {
@@ -162,10 +179,95 @@ func (r AccountsRepo) CreatePhoto(ctx context.Context, userID, photoID, path str
 		}
 		url = u
 		_, err = tx.Exec(ctx, `insert into identity.profile_photos (id, user_id, storage_path, status, position) values ($1, $2, $3, 'pending_review', $4)`,
-			photoID, userID, path, n)
+			photoID, userID, path, nextPos)
 		return err
 	})
 	return url, err
+}
+
+func (r AccountsRepo) DeletePhoto(ctx context.Context, userID, photoID string) (string, error) {
+	var path string
+	err := r.Pool.QueryRow(ctx, `delete from identity.profile_photos where id = $1 and user_id = $2 returning storage_path`, photoID, userID).Scan(&path)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", accounts.ErrNotFound
+	}
+	return path, err
+}
+
+func (r AccountsRepo) ListPendingPhotos(ctx context.Context, after *keyset.Cursor, limit int) ([]accounts.PendingPhoto, error) {
+	var at *time.Time
+	afterID := "00000000-0000-0000-0000-000000000000"
+	if after != nil {
+		at, afterID = &after.At, after.ID
+	}
+	rows, err := r.Pool.Query(ctx, `
+		select ph.id, ph.user_id, ph.storage_path, ph.created_at
+		  from identity.profile_photos ph join identity.accounts a on a.id = ph.user_id
+		 where ph.status = 'pending_review' and a.status <> 'deleted'
+		   and ($1::timestamptz is null or (ph.created_at, ph.id) > ($1::timestamptz, $2::uuid))
+		 order by ph.created_at, ph.id limit $3`, at, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []accounts.PendingPhoto
+	for rows.Next() {
+		var p accounts.PendingPhoto
+		if err := rows.Scan(&p.PhotoID, &p.UserID, &p.Path, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (r AccountsRepo) PendingPhoto(ctx context.Context, photoID string) (accounts.PendingPhoto, error) {
+	var p accounts.PendingPhoto
+	var status string
+	err := r.Pool.QueryRow(ctx, `select id, user_id, storage_path, created_at, status from identity.profile_photos where id = $1`, photoID).
+		Scan(&p.PhotoID, &p.UserID, &p.Path, &p.CreatedAt, &status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return p, accounts.ErrNotFound
+	}
+	if err == nil && status != "pending_review" {
+		return p, accounts.ErrPhotoNotPending
+	}
+	return p, err
+}
+
+func (r AccountsRepo) DecidePhoto(ctx context.Context, moderatorID, photoID string, approve bool, reason *string) error {
+	status := "rejected"
+	if approve {
+		status = "approved"
+	}
+	return idTx(ctx, r.Pool, func(tx pgx.Tx) error {
+		var owner string
+		err := tx.QueryRow(ctx, `
+			update identity.profile_photos set status = $2
+			 where id = $1 and status = 'pending_review' returning user_id`, photoID, status).Scan(&owner)
+		if errors.Is(err, pgx.ErrNoRows) {
+			var exists bool
+			if err := tx.QueryRow(ctx, `select exists (select 1 from identity.profile_photos where id = $1)`, photoID).Scan(&exists); err != nil {
+				return err
+			}
+			if exists {
+				return accounts.ErrPhotoNotPending
+			}
+			return accounts.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		details := map[string]any{"owner_user_id": owner}
+		if reason != nil {
+			details["reason"] = *reason
+		}
+		return idAudit(ctx, tx, moderatorID, "photo."+status, photoID, details)
+	})
+}
+
+func (r AccountsRepo) Audit(ctx context.Context, actor, action, target string) error {
+	return idAudit(ctx, r.Pool, actor, action, target, nil)
 }
 
 func (r AccountsRepo) DeclareAge(ctx context.Context, userID string, dob time.Time, eligible bool) error {
@@ -274,4 +376,52 @@ func (r AccountsRepo) RequestExport(ctx context.Context, userID string) (account
 			Scan(&d.RequestId, &d.Status)
 	})
 	return d, err
+}
+
+// PhotoReadSigner signs read URLs for the private profile-photos bucket.
+type PhotoReadSigner interface {
+	SignRead(ctx context.Context, paths []string, ttl time.Duration) map[string]string
+}
+
+// ProfilePhotoURLs resolves signed URLs of users' first approved photo
+// (calls.PeerPhotos and similar ports).
+type ProfilePhotoURLs struct {
+	Pool   *pgxpool.Pool
+	Signer PhotoReadSigner
+	TTL    time.Duration // default 1 hour
+}
+
+func (p ProfilePhotoURLs) FirstPhotoURLs(ctx context.Context, userIDs []string) map[string]string {
+	out := map[string]string{}
+	if p.Pool == nil || p.Signer == nil || len(userIDs) == 0 {
+		return out
+	}
+	rows, err := p.Pool.Query(ctx, `
+		select distinct on (user_id) user_id::text, storage_path from identity.profile_photos
+		 where user_id = any($1::uuid[]) and status = 'approved'
+		 order by user_id, position, created_at`, userIDs)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	byPath := map[string]string{}
+	var paths []string
+	for rows.Next() {
+		var uid, path string
+		if rows.Scan(&uid, &path) == nil {
+			byPath[path] = uid
+			paths = append(paths, path)
+		}
+	}
+	if rows.Err() != nil || len(paths) == 0 {
+		return out
+	}
+	ttl := p.TTL
+	if ttl == 0 {
+		ttl = time.Hour
+	}
+	for path, u := range p.Signer.SignRead(ctx, paths, ttl) {
+		out[byPath[path]] = u
+	}
+	return out
 }
