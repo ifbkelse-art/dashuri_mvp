@@ -24,13 +24,19 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Set DASHURI_PLAY_CLOUD_PROJECT_NUMBER in gradle.properties or the environment (0 = unset).
+        manifestPlaceholders["playCloudProjectNumber"] =
+            (project.findProperty("DASHURI_PLAY_CLOUD_PROJECT_NUMBER") ?: System.getenv("DASHURI_PLAY_CLOUD_PROJECT_NUMBER") ?: "0").toString()
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // TODO(release): replace with the upload key; Play App Signing holds the app key.
+            // Debug signing keeps `flutter build apk --release` working locally only.
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
@@ -43,4 +49,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.android.play:integrity:1.4.0")
 }
