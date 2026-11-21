@@ -5,7 +5,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
-PORT=55432
+PORT="${DASHURI_MIGRATION_PG_PORT:-55432}"
 trap 'pg_ctl -D "$TMP/data" stop -m fast >/dev/null 2>&1 || true; rm -rf "$TMP"' EXIT
 
 initdb -D "$TMP/data" -U postgres -A trust >/dev/null
