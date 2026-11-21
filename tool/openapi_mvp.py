@@ -50,6 +50,9 @@ PATHS = {
  "/v1/calls/history": op("get", "listCallHistory", "calls", "Own calls, newest first.", 200, "CallSessionPage", params=PAGE),
  "/v1/calls/{callId}/moderation-frames": op("post", "submitModerationFrame", "calls", "Own-camera JPEG during the first 180 s (S7, ADR-013).", 202, "FrameAccepted", "ModerationFrameRequest", errors="moderation_window_closed, not_participant", params=path_param("callId")),
  "/v1/conversations/{conversationId}/read": op("post", "markConversationRead", "chat", "Mark the conversation read up to now.", 204, params=path_param("conversationId")),
+ "/v1/me/photos/{photoId}": op("delete", "deleteMyPhoto", "accounts", "Delete an own profile photo (frees a slot; removes the Storage object).", 204, params=path_param("photoId")),
+ "/v1/admin/photos/pending": op("get", "listPendingPhotos", "admin", "Profile photos awaiting moderation, oldest first (moderator/admin; audited).", 200, "PendingPhotoPage", params=PAGE),
+ "/v1/admin/photos/{photoId}/decision": op("post", "decidePhoto", "admin", "Approve or reject a pending profile photo (moderator/admin; audited).", 200, "PhotoDecision", "PhotoDecisionRequest", errors="photo_not_pending, photo_not_uploaded", params=path_param("photoId")),
  "/v1/admin/hosts/{userId}/kyc-decision": op("post", "decideHostKyc", "admin", "Moderator decision for manual KYC (MVP provider).", 200, "HostStatus", "KycDecisionRequest", params=path_param("userId")),
 }
 
@@ -86,6 +89,38 @@ SCHEMAS = """    City:
         - type: object
           properties:
             bio: {type: [string, "null"]}
+            photo_urls:
+              type: array
+              items: {type: string}
+    PendingPhotoItem:
+      type: object
+      required: [photo_id, user_id, read_url, created_at]
+      properties:
+        photo_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        read_url: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+    PendingPhotoPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/PendingPhotoItem"}
+        next_cursor: {type: [string, "null"]}
+    PhotoDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approve, reject]}
+        reason: {type: [string, "null"], maxLength: 500}
+    PhotoDecision:
+      type: object
+      required: [photo_id, status]
+      properties:
+        photo_id: {type: string, format: uuid}
+        status: {type: string, enum: [approved, rejected]}
     DiscoverySummary:
       type: object
       required: [online_count]

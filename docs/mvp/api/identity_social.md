@@ -47,7 +47,33 @@ Request `{ "content_type": "image/jpeg" }` (`image/jpeg|image/png|image/webp`) �
   "expires_at": "2026-11-21T12:00:00Z", "status": "pending_review" }
 ```
 The app uploads the file to `upload_url` with an HTTP PUT. The photo stays private and `pending_review` until it is moderated.
-Errors: 409 `photo_limit_reached` (6 pending or approved photos); 503 `storage_not_configured` (the server has no `SUPABASE_STORAGE_SERVICE_KEY`).
+Errors: 409 `photo_limit_reached` (6 live photos); 503 `storage_not_configured` (the server has no `SUPABASE_STORAGE_SERVICE_KEY`).
+
+**Slot counting.** Approved photos and pending photos count toward the 6. A pending photo stops counting when both of these are true:
+- its upload ticket is older than **2 hours**, the fixed lifetime of a Supabase signed upload URL, so it can no longer be used; and
+- its object is not in Storage.
+
+The server finds out which objects exist by listing `profile-photos/<user id>/` before issuing each ticket. It deletes abandoned rows at that point, so they also leave the moderation queue. We use 2 h instead of 1 h because a ticket is still usable until it expires. A row deleted at 1 h could get an upload later and leave an orphan object. If Storage cannot be listed, every pending photo counts (the conservative choice).
+
+### DELETE /v1/me/photos/{photoId} → 204
+Owner only: someone else's photo, or an unknown id, returns 404. The photo can be pending, approved or rejected. It frees a slot immediately. When Storage is configured, the server also deletes the object (`DELETE /storage/v1/object/profile-photos {prefixes:[path]}`). If that delete fails, the error is logged, and the photo is never shown again because its row is gone.
+
+### Moderator: GET /v1/admin/photos/pending?cursor=&limit=
+Role `moderator` or `admin` (otherwise 403 `role_required`). Each read writes the audit event `photos.review_queue_viewed`. The queue is oldest first:
+```json
+{ "items": [ { "photo_id": "…", "user_id": "…", "read_url": "https://…signed, 10 min…", "created_at": "…" } ], "next_cursor": "…" }
+```
+`read_url` is null while the file has not been uploaded yet.
+
+### Moderator: POST /v1/admin/photos/{photoId}/decision
+Request `{ "decision": "approve|reject", "reason": "optional, ≤ 500 chars" }` → 200 `{ "photo_id": "…", "status": "approved|rejected" }`. Each decision writes the audit event `photo.approved` or `photo.rejected`, with `owner_user_id` and `reason` in the details.
+Errors:
+- 404: unknown photo.
+- 409 `photo_not_pending`: the photo was already decided.
+- 409 `photo_not_uploaded`: approving a photo whose file doesn't exist.
+- 503 `storage_not_configured`: approving while Storage is not configured.
+
+Approved photos appear in public profiles, discovery and call peers.
 
 ### GET /v1/me/age → `{ "eligible": false, "method": null, "declared": false }`
 
@@ -89,11 +115,14 @@ Lists approved hosts with active accounts that are **available** (`is_available`
 ```
 `age` comes only from a KYC-verified date of birth (otherwise null). `is_verified` means KYC is approved. Errors: 422 `language|city_id|sort|limit|cursor`.
 
-### GET /v1/discovery/hosts/{userId} → HostCard + `bio`
-This also returns offline hosts (`availability: "offline"`). 404 when the user is not an approved host or either user has blocked the other.
+### GET /v1/discovery/hosts/{userId} → HostCard + `bio` + `photo_urls`
+`photo_urls` lists all approved photos, signed, in profile order (`[]` when there are none). `photo_url` stays the first of them. This endpoint also returns offline hosts (`availability: "offline"`). 404 when the user is not an approved host or either user has blocked the other.
 
 ### GET /v1/discovery/summary → `{ "online_count": 42 }`
 The number of hosts the caller would see in the list (available or busy).
+
+## Calls (peer photo)
+`CallSession.peer.photo_url` is a signed URL (1 h) of the peer's first approved profile photo, or null. It is filled wherever `CallSession` is returned or published (`call.updated`). The URL comes from the `calls.PeerPhotos` port, implemented by `postgres.ProfilePhotoURLs` and wired in `internal/app/wire_calls.go`.
 
 ## Chat
 `Conversation`:

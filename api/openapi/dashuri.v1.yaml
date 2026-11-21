@@ -2622,6 +2622,100 @@ paths:
           $ref: "#/components/responses/Problem"
         "503":
           $ref: "#/components/responses/Problem"
+  /v1/me/photos/{photoId}:
+    delete:
+      operationId: deleteMyPhoto
+      tags:
+        - accounts
+      summary: "Delete an own profile photo (frees a slot; removes the Storage object)."
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/photos/pending:
+    get:
+      operationId: listPendingPhotos
+      tags:
+        - admin
+      summary: "Profile photos awaiting moderation, oldest first (moderator/admin; audited)."
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingPhotoPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/photos/{photoId}/decision:
+    post:
+      operationId: decidePhoto
+      tags:
+        - admin
+      summary: "Approve or reject a pending profile photo (moderator/admin; audited)."
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoDecisionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoDecision"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: photo_not_pending, photo_not_uploaded"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     bearerAuth:
@@ -2647,6 +2741,35 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    PendingPhotoItem:
+      type: object
+      required: [photo_id, user_id, read_url, created_at]
+      properties:
+        photo_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        read_url: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+    PendingPhotoPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/PendingPhotoItem"}
+        next_cursor: {type: [string, "null"]}
+    PhotoDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approve, reject]}
+        reason: {type: [string, "null"], maxLength: 500}
+    PhotoDecision:
+      type: object
+      required: [photo_id, status]
+      properties:
+        photo_id: {type: string, format: uuid}
+        status: {type: string, enum: [approved, rejected]}
     City:
       type: object
       required: [id, name, state]
@@ -2680,6 +2803,9 @@ components:
         - type: object
           properties:
             bio: {type: [string, "null"]}
+            photo_urls:
+              type: array
+              items: {type: string}
     DiscoverySummary:
       type: object
       required: [online_count]
