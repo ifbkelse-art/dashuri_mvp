@@ -104,7 +104,6 @@ final class HostRepositoryImpl implements HostRepository {
   }
 
   @override
-  Future<Result<Page<HostCall>>> listCallHistory({
-    required PageRequest page,
-  }) => _profile.listCallHistory(page: page);
+  Future<Result<Page<HostCall>>> listCallHistory({required PageRequest page}) =>
+      _profile.listCallHistory(page: page);
 }

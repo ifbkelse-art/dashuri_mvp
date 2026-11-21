@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:dashuri_core/dashuri_core.dart';
 import 'package:dashuri_network/dashuri_network.dart';
+import 'package:feature_wallet/feature_wallet.dart';
 import 'package:feature_wallet/src/data/datasources/wallet_remote_data_source.dart';
 import 'package:feature_wallet/src/data/models/wallet_entry_json.dart';
 import 'package:feature_wallet/src/data/models/wallet_summary_json.dart';
 import 'package:feature_wallet/src/data/repositories/wallet_repository_impl.dart';
-import 'package:feature_wallet/feature_wallet.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -15,6 +15,7 @@ class _Remote extends Mock implements WalletRemoteDataSource {}
 class _Session extends Mock implements SessionGateway {}
 
 class _Realtime implements RealtimeGateway {
+  // ignore: close_sinks, closed in tearDown.
   final controller = StreamController<RealtimeEvent>.broadcast();
   final channels = <String>[];
 

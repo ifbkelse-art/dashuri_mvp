@@ -22,7 +22,8 @@ String hostFailureMessage(Failure failure) => switch (failure.code) {
   'photo_limit_reached' => "You've reached the maximum of 6 photos.",
   'photo_upload_failed' => "We couldn't upload that photo. Please try again.",
   'payouts_not_enabled' => "Withdrawals aren't available yet.",
-  'below_minimum_withdrawal' => 'The minimum withdrawal is ₹500 (1,00,000 Beans).',
+  'below_minimum_withdrawal' =>
+    'The minimum withdrawal is ₹500 (1,00,000 Beans).',
   'insufficient_available_beans' =>
     "You don't have that many withdrawable Beans. We've refreshed your balance.",
   'kyc_required' => 'Finish identity verification before withdrawing.',
@@ -30,7 +31,8 @@ String hostFailureMessage(Failure failure) => switch (failure.code) {
   'account_restricted' =>
     'Your account is restricted. See Settings → Account status for details.',
   'rate_limited' => 'Too many attempts. Please wait a moment and try again.',
-  'validation_failed' => 'Some details need fixing. Check the form and try again.',
+  'validation_failed' =>
+    'Some details need fixing. Check the form and try again.',
   _ when failure is ForbiddenFailure =>
     "You don't have access to this yet. Finish your host application first.",
   _ => 'Something went wrong on our side. Please try again.',
@@ -40,8 +42,18 @@ String hostFailureMessage(Failure failure) => switch (failure.code) {
 /// approximate and always shown with "≈".
 abstract final class HostFormat {
   static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 

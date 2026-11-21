@@ -1,4 +1,5 @@
 import 'package:dashuri_core/dashuri_core.dart';
+import 'package:dashuri_network/dashuri_network.dart';
 
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/conversation.dart';
@@ -10,9 +11,35 @@ import '../datasources/chat_remote_data_source.dart';
 /// Idempotency keys arrive from the caller: the BLoC creates one per user
 /// intent and reuses it for retries (docs/architecture/flutter-architecture.md).
 final class ChatRepositoryImpl implements ChatRepository {
-  const ChatRepositoryImpl(this._remote);
+  const ChatRepositoryImpl(
+    this._remote, {
+    required RealtimeGateway realtime,
+    required SessionGateway session,
+  }) : _realtime = realtime,
+       _session = session;
 
   final ChatRemoteDataSource _remote;
+  final RealtimeGateway _realtime;
+  final SessionGateway _session;
+
+  @override
+  Future<Result<void>> markRead(String conversationId) =>
+      _remote.markRead(conversationId);
+
+  @override
+  String? currentUserId() => _session.currentSession?.userId;
+
+  @override
+  Stream<String> chatHints() {
+    final userId = currentUserId();
+    if (userId == null) return const Stream.empty();
+    return _realtime
+        .subscribe('user:$userId')
+        .where((e) => e.type == 'chat.message')
+        .map((e) => e.payload['conversation_id'])
+        .where((id) => id is String)
+        .cast<String>();
+  }
 
   @override
   Future<Result<Page<Conversation>>> listConversations({

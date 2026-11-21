@@ -30,3 +30,7 @@ Read-only view of the account's Diamond and Bean balances and ledger history. Ba
 
 - WalletPage (RoutePaths.wallet)
 - Transaction history section
+
+## Pages
+
+- W01 `WalletPage` (tab route `RoutePaths.wallet`, live refresh on `wallet.updated`), W08 `TransactionHistoryPage`, W09 `TransactionDetailPage` (entry via `extra`, fallback scan of `/v1/wallet/entries`).

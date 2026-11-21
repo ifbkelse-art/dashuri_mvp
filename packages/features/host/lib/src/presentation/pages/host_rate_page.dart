@@ -32,7 +32,10 @@ class HostRatePage extends StatelessWidget {
             if (fromApplication) {
               context.go(RoutePaths.hostVerification);
             } else {
-              showHostSnack(context, 'Rate saved. It applies from your next call.');
+              showHostSnack(
+                context,
+                'Rate saved. It applies from your next call.',
+              );
               if (context.canPop()) context.pop();
             }
           } else if (state.status == HostRateStatus.ready &&
@@ -65,6 +68,7 @@ class HostRatePage extends StatelessWidget {
                       Text(
                         'Changes apply from your next call.',
                         style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: DashuriTokens.space2),
                       PrimaryButton(

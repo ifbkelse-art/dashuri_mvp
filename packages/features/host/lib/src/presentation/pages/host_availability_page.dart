@@ -12,33 +12,33 @@ class HostAvailabilityPage extends StatelessWidget {
   const HostAvailabilityPage({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      BlocConsumer<HostDashboardCubit, HostDashboardState>(
-        listenWhen: (a, b) =>
-            b is HostDashboardStateLoaded &&
-            b.actionFailure != null &&
-            (a is! HostDashboardStateLoaded ||
-                a.actionFailure != b.actionFailure),
-        listener: (context, state) => showHostSnack(
-          context,
-          hostFailureMessage((state as HostDashboardStateLoaded).actionFailure!),
-        ),
-        builder: (context, state) {
-          final cubit = context.read<HostDashboardCubit>();
-          return Scaffold(
-            appBar: AppBar(title: const Text('Availability')),
-            body: switch (state) {
-              HostDashboardStateInitial() ||
-              HostDashboardStateLoading() => const LoadingView(),
-              HostDashboardStateFailed(:final failure) => ErrorStateView(
-                message: hostFailureMessage(failure),
-                onRetry: cubit.load,
-              ),
-              final HostDashboardStateLoaded s => _Body(state: s),
-            },
-          );
+  Widget build(
+    BuildContext context,
+  ) => BlocConsumer<HostDashboardCubit, HostDashboardState>(
+    listenWhen: (a, b) =>
+        b is HostDashboardStateLoaded &&
+        b.actionFailure != null &&
+        (a is! HostDashboardStateLoaded || a.actionFailure != b.actionFailure),
+    listener: (context, state) => showHostSnack(
+      context,
+      hostFailureMessage((state as HostDashboardStateLoaded).actionFailure!),
+    ),
+    builder: (context, state) {
+      final cubit = context.read<HostDashboardCubit>();
+      return Scaffold(
+        appBar: AppBar(title: const Text('Availability')),
+        body: switch (state) {
+          HostDashboardStateInitial() ||
+          HostDashboardStateLoading() => const LoadingView(),
+          HostDashboardStateFailed(:final failure) => ErrorStateView(
+            message: hostFailureMessage(failure),
+            onRetry: cubit.load,
+          ),
+          final HostDashboardStateLoaded s => _Body(state: s),
         },
       );
+    },
+  );
 }
 
 class _Body extends StatelessWidget {

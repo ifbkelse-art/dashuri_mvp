@@ -48,8 +48,11 @@ class HostProfileSetupPage extends StatelessWidget {
             }
           }
         },
-        buildWhen: (a, b) => a.status != b.status || a.profile != b.profile ||
-            a.fieldErrors != b.fieldErrors || a.uploadingPhoto != b.uploadingPhoto ||
+        buildWhen: (a, b) =>
+            a.status != b.status ||
+            a.profile != b.profile ||
+            a.fieldErrors != b.fieldErrors ||
+            a.uploadingPhoto != b.uploadingPhoto ||
             a.photosSubmitted != b.photosSubmitted,
         builder: (context, state) => switch (state.status) {
           HostProfileSetupStatus.loading => Scaffold(
@@ -132,14 +135,15 @@ class _ProfileFormState extends State<_ProfileForm> {
     return Scaffold(
       appBar: AppBar(
         title: widget.fromApplication ? null : const Text('Photos & bio'),
-        bottom: widget.fromApplication
-            ? const HostStepProgress(step: 4)
-            : null,
+        bottom: widget.fromApplication ? const HostStepProgress(step: 4) : null,
       ),
       body: HostFormBody(
         children: [
           if (widget.fromApplication) ...[
-            Text('Make your profile shine', style: theme.textTheme.displaySmall),
+            Text(
+              'Make your profile shine',
+              style: theme.textTheme.displaySmall,
+            ),
             const SizedBox(height: DashuriTokens.space4),
           ],
           Text('Photos', style: theme.textTheme.titleMedium),

@@ -16,6 +16,7 @@ abstract interface class ChatRepository {
     required IdempotencyKey idempotencyKey,
   });
 
+  /// Newest first.
   Future<Result<Page<ChatMessage>>> listMessages({
     required String conversationId,
     required PageRequest page,
@@ -27,9 +28,19 @@ abstract interface class ChatRepository {
     required IdempotencyKey idempotencyKey,
   });
 
+  /// POST /v1/conversations/{id}/read
+  Future<Result<void>> markRead(String conversationId);
+
   Future<Result<MessagingPrivacy>> getMessagingPrivacy();
 
   Future<Result<MessagingPrivacy>> updateMessagingPrivacy({
     required String whoCanMessage,
   });
+
+  /// Signed-in user id (to tell own messages apart); null when signed out.
+  String? currentUserId();
+
+  /// Conversation ids from `chat.message` hints on `user:<id>`. Hints only:
+  /// callers re-fetch from the API.
+  Stream<String> chatHints();
 }

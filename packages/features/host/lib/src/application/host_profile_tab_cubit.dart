@@ -70,7 +70,9 @@ final class HostProfileTabCubit extends Cubit<HostProfileTabState> {
   /// Goes offline first (so customers can't call a host who left host
   /// mode), stops heartbeats, then runs the app's [switchToCustomer].
   /// Returns false when going offline failed; the mode is not switched.
-  Future<bool> switchToCustomer(Future<void> Function() switchToCustomer) async {
+  Future<bool> switchToCustomer(
+    Future<void> Function() switchToCustomer,
+  ) async {
     final current = state;
     if (current.status != HostProfileTabStatus.loaded) return false;
     emit(

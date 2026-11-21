@@ -14,70 +14,69 @@ class HostOnboardingPage extends StatelessWidget {
   const HostOnboardingPage({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      BlocConsumer<HostApplicationCubit, HostApplicationState>(
-        listenWhen: (a, b) =>
-            a.appliedNow != b.appliedNow || a.failure != b.failure,
-        listener: (context, state) {
-          if (state.appliedNow) {
-            context.go(RoutePaths.hostAgreement);
-          } else if (state.status == HostApplicationStatus.ready &&
-              state.failure != null) {
-            showHostSnack(context, hostFailureMessage(state.failure!));
-          }
-        },
-        builder: (context, state) {
-          final cubit = context.read<HostApplicationCubit>();
-          final Widget body;
-          Widget? bottom;
-          switch (state.status) {
-            case HostApplicationStatus.loading:
-              body = const LoadingView();
-            case HostApplicationStatus.loadFailed:
-              body = ErrorStateView(
-                message: hostFailureMessage(state.failure!),
-                onRetry: cubit.load,
-              );
-            case HostApplicationStatus.ready ||
-                HostApplicationStatus.submitting:
-              final host = state.host ?? HostStatus.notApplied;
-              if (!host.hasApplied) {
-                body = const _Intro();
-                bottom = HostBottomBar(
-                  children: [
-                    PrimaryButton(
-                      label: 'Start application',
-                      busy: state.status == HostApplicationStatus.submitting,
-                      onPressed: cubit.apply,
-                    ),
-                    const SizedBox(height: DashuriTokens.space2),
-                    Text(
-                      'Women 18+ · Government ID and selfie verification required',
-                      style: Theme.of(context).textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                );
-              } else {
-                body = _Steps(host: host);
-                bottom = HostBottomBar(
-                  children: [
-                    PrimaryButton(
-                      label: 'Continue',
-                      onPressed: () =>
-                          context.go(_routeFor(state.nextStep)),
-                    ),
-                  ],
-                );
-              }
-          }
-          return Scaffold(
-            appBar: AppBar(),
-            body: body,
-            bottomNavigationBar: bottom,
+  Widget build(
+    BuildContext context,
+  ) => BlocConsumer<HostApplicationCubit, HostApplicationState>(
+    listenWhen: (a, b) =>
+        a.appliedNow != b.appliedNow || a.failure != b.failure,
+    listener: (context, state) {
+      if (state.appliedNow) {
+        context.go(RoutePaths.hostAgreement);
+      } else if (state.status == HostApplicationStatus.ready &&
+          state.failure != null) {
+        showHostSnack(context, hostFailureMessage(state.failure!));
+      }
+    },
+    builder: (context, state) {
+      final cubit = context.read<HostApplicationCubit>();
+      final Widget body;
+      Widget? bottom;
+      switch (state.status) {
+        case HostApplicationStatus.loading:
+          body = const LoadingView();
+        case HostApplicationStatus.loadFailed:
+          body = ErrorStateView(
+            message: hostFailureMessage(state.failure!),
+            onRetry: cubit.load,
           );
-        },
+        case HostApplicationStatus.ready || HostApplicationStatus.submitting:
+          final host = state.host ?? HostStatus.notApplied;
+          if (!host.hasApplied) {
+            body = const _Intro();
+            bottom = HostBottomBar(
+              children: [
+                PrimaryButton(
+                  label: 'Start application',
+                  busy: state.status == HostApplicationStatus.submitting,
+                  onPressed: cubit.apply,
+                ),
+                const SizedBox(height: DashuriTokens.space2),
+                Text(
+                  'Women 18+ · Government ID and selfie verification required',
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            );
+          } else {
+            body = _Steps(host: host);
+            bottom = HostBottomBar(
+              children: [
+                PrimaryButton(
+                  label: 'Continue',
+                  onPressed: () => context.go(_routeFor(state.nextStep)),
+                ),
+              ],
+            );
+          }
+      }
+      return Scaffold(
+        appBar: AppBar(),
+        body: body,
+        bottomNavigationBar: bottom,
       );
+    },
+  );
 
   static String _routeFor(HostApplicationStep step) => switch (step) {
     HostApplicationStep.apply => RoutePaths.hostOnboarding,
@@ -217,7 +216,10 @@ class _Steps extends StatelessWidget {
                 subtitle: host.kycRejected
                     ? 'Needs attention'
                     : 'Government ID, PAN and a live selfie, checked by our team',
-                state: s(host.kycApproved, host.kycInProgress || host.kycRejected),
+                state: s(
+                  host.kycApproved,
+                  host.kycInProgress || host.kycRejected,
+                ),
               ),
               HostTimelineStep(
                 title: 'Profile & rate',

@@ -34,3 +34,7 @@ Conversations, messages and the user's messaging-privacy setting.
 - ConversationsPage (RoutePaths.conversations)
 - ConversationPage (RoutePaths.conversation)
 - Messaging privacy section in settings
+
+## Pages
+
+- CH01/CH03 `ConversationsPage` (tab route `RoutePaths.conversations`; two-pane on expanded windows), CH02/CH04/CH05 `ConversationPage` (`/messages/new?peerUserId=&name=` starts a conversation and replaces the route). Uses `POST /v1/conversations/{id}/read`.

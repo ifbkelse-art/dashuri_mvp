@@ -6,7 +6,6 @@ import '../../application/host_payouts_cubit.dart';
 import '../../application/paged_list_state.dart';
 import '../../domain/entities/withdrawal.dart';
 import '../widgets/host_copy.dart';
-import '../widgets/host_widgets.dart';
 
 /// H19 payout history (RoutePaths.hostPayoutHistory).
 class HostPayoutHistoryPage extends StatelessWidget {
@@ -96,9 +95,7 @@ class _Row extends StatelessWidget {
         DashuriFormat.rupees(withdrawal.amountPaise),
         style: theme.textTheme.titleMedium,
       ),
-      subtitle: Text(
-        '$when · ${DashuriFormat.count(withdrawal.beans)} Beans',
-      ),
+      subtitle: Text('$when · ${DashuriFormat.count(withdrawal.beans)} Beans'),
       trailing: StatusTag(label: label, tone: tone),
     );
   }

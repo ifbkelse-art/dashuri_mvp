@@ -11,7 +11,8 @@ import '../models/messaging_privacy_json.dart';
 /// HTTP access to the chat endpoints of the Go API.
 /// Value-moving or create calls take an [IdempotencyKey] from the caller so
 /// retries of the same user intent reuse it.
-final class ChatRemoteDataSource {
+// Not final: repository tests mock it.
+class ChatRemoteDataSource {
   const ChatRemoteDataSource(this._api);
 
   final ApiClient _api;
@@ -53,6 +54,9 @@ final class ChatRemoteDataSource {
     body: {'body': body},
     idempotencyKey: idempotencyKey,
   );
+
+  Future<Result<void>> markRead(String conversationId) =>
+      _api.post<void>('/v1/conversations/$conversationId/read', decode: (_) {});
 
   Future<Result<MessagingPrivacy>> getMessagingPrivacy() => _api.get(
     '/v1/me/messaging-privacy',

@@ -11,6 +11,5 @@ class GetMyHostProfile implements UseCase<HostProfile, NoInput> {
   final HostRepository _repository;
 
   @override
-  Future<Result<HostProfile>> call(NoInput input) =>
-      _repository.getMyProfile();
+  Future<Result<HostProfile>> call(NoInput input) => _repository.getMyProfile();
 }

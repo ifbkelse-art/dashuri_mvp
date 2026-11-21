@@ -39,7 +39,8 @@ class HostWithdrawPage extends StatelessWidget {
               HostBottomBar(
                 children: [
                   PrimaryButton(
-                    label: 'Withdraw ${DashuriFormat.rupees(state.amountPaise)}',
+                    label:
+                        'Withdraw ${DashuriFormat.rupees(state.amountPaise)}',
                     busy: state.phase == WithdrawPhase.submitting,
                     onPressed: state.amountError == null
                         ? () => _confirm(context, state)

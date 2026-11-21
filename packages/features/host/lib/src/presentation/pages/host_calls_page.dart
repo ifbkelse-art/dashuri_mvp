@@ -32,7 +32,9 @@ class HostCallsPage extends StatelessWidget {
                 children: [
                   for (final f in HostCallFilter.values)
                     Padding(
-                      padding: const EdgeInsets.only(right: DashuriTokens.space2),
+                      padding: const EdgeInsets.only(
+                        right: DashuriTokens.space2,
+                      ),
                       child: ChoiceChip(
                         label: Text(switch (f) {
                           HostCallFilter.all => 'All',

@@ -41,11 +41,10 @@ final class HostProfileRemoteDataSource {
     idempotencyKey: idempotencyKey,
   );
 
-  Future<Result<Page<HostCall>>> listCallHistory({
-    required PageRequest page,
-  }) => _api.get(
-    '/v1/calls/history',
-    decode: pageDecoder(hostCallFromJson),
-    query: page.toQuery(),
-  );
+  Future<Result<Page<HostCall>>> listCallHistory({required PageRequest page}) =>
+      _api.get(
+        '/v1/calls/history',
+        decode: pageDecoder(hostCallFromJson),
+        query: page.toQuery(),
+      );
 }

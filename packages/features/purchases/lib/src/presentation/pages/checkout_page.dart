@@ -54,7 +54,7 @@ class CheckoutPage extends StatelessWidget {
       context,
       title: 'Leave checkout?',
       message:
-          "Your payment is still being confirmed. If you paid, your Diamonds "
+          'Your payment is still being confirmed. If you paid, your Diamonds '
           'will be added automatically.',
       confirmLabel: 'Leave',
     );

@@ -1,19 +1,37 @@
 /// Becoming a host, verification (KYC) status, availability, rate setting, Free Call pool opt-in, earnings and withdrawal requests.
 ///
-/// Public API: entities, repository contract, use cases, cubits, DI
+/// Public API: entities, repository contract, use cases, cubits, pages, DI
 /// registration and routes. `src/data` stays private to this package.
 library;
 
+export 'src/application/host_application_cubit.dart';
+export 'src/application/host_application_flow.dart';
+export 'src/application/host_calls_cubit.dart';
 export 'src/application/host_dashboard_cubit.dart';
+export 'src/application/host_earnings_cubit.dart';
+export 'src/application/host_payouts_cubit.dart';
+export 'src/application/host_presence_controller.dart';
+export 'src/application/host_profile_setup_cubit.dart';
+export 'src/application/host_profile_tab_cubit.dart';
+export 'src/application/host_rate_cubit.dart';
+export 'src/application/host_verification_cubit.dart';
+export 'src/application/host_withdraw_cubit.dart';
+export 'src/application/paged_list_state.dart';
 export 'src/di/host_module.dart';
+export 'src/domain/entities/host_call.dart';
 export 'src/domain/entities/host_earnings.dart';
+export 'src/domain/entities/host_photo.dart';
+export 'src/domain/entities/host_profile.dart';
 export 'src/domain/entities/host_status.dart';
 export 'src/domain/entities/kyc_session.dart';
 export 'src/domain/entities/withdrawal.dart';
+export 'src/domain/ports/host_photo_picker.dart';
 export 'src/domain/repositories/host_repository.dart';
 export 'src/domain/usecases/apply_as_host.dart';
 export 'src/domain/usecases/get_earnings.dart';
 export 'src/domain/usecases/get_host_status.dart';
+export 'src/domain/usecases/get_my_host_profile.dart';
+export 'src/domain/usecases/list_host_calls.dart';
 export 'src/domain/usecases/list_withdrawals.dart';
 export 'src/domain/usecases/request_withdrawal.dart';
 export 'src/domain/usecases/send_heartbeat.dart';
@@ -21,4 +39,22 @@ export 'src/domain/usecases/set_availability.dart';
 export 'src/domain/usecases/set_free_call_opt_in.dart';
 export 'src/domain/usecases/set_rate.dart';
 export 'src/domain/usecases/start_kyc.dart';
+export 'src/domain/usecases/update_host_profile.dart';
+export 'src/domain/usecases/upload_host_photo.dart';
+export 'src/presentation/host_paths.dart';
+export 'src/presentation/pages/beans_explainer_page.dart';
+export 'src/presentation/pages/host_agreement_page.dart';
+export 'src/presentation/pages/host_availability_page.dart';
+export 'src/presentation/pages/host_calls_page.dart';
+export 'src/presentation/pages/host_dashboard_page.dart';
+export 'src/presentation/pages/host_earnings_page.dart';
+export 'src/presentation/pages/host_onboarding_page.dart';
+export 'src/presentation/pages/host_payout_history_page.dart';
+export 'src/presentation/pages/host_payout_method_page.dart';
+export 'src/presentation/pages/host_profile_setup_page.dart';
+export 'src/presentation/pages/host_profile_tab_page.dart';
+export 'src/presentation/pages/host_rate_page.dart';
+export 'src/presentation/pages/host_settings_page.dart';
+export 'src/presentation/pages/host_verification_page.dart';
+export 'src/presentation/pages/host_withdraw_page.dart';
 export 'src/routes/host_routes.dart';

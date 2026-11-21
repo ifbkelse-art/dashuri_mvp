@@ -16,12 +16,28 @@ final class ConversationsStateLoading extends ConversationsState {
 }
 
 final class ConversationsStateLoaded extends ConversationsState {
-  const ConversationsStateLoaded(this.data);
+  const ConversationsStateLoaded(
+    this.data, {
+    this.myUserId,
+    this.refreshing = false,
+    this.loadingMore = false,
+  });
 
   final Page<Conversation> data;
+  final String? myUserId;
+  final bool refreshing;
+  final bool loadingMore;
+
+  ConversationsStateLoaded copyWith({bool? refreshing, bool? loadingMore}) =>
+      ConversationsStateLoaded(
+        data,
+        myUserId: myUserId,
+        refreshing: refreshing ?? this.refreshing,
+        loadingMore: loadingMore ?? this.loadingMore,
+      );
 
   @override
-  List<Object?> get props => [data];
+  List<Object?> get props => [data, myUserId, refreshing, loadingMore];
 }
 
 final class ConversationsStateFailed extends ConversationsState {

@@ -53,7 +53,11 @@ final class HostRateCubit extends Cubit<HostRateState> {
   final GetHostStatus _getHostStatus;
   final SetRate _setRate;
 
-  static RateError? validate(int rate, {required int floor, required int limit}) {
+  static RateError? validate(
+    int rate, {
+    required int floor,
+    required int limit,
+  }) {
     if (rate < BeanRules.minRate || rate < floor) return RateError.belowMinimum;
     if (rate > BeanRules.maxRate) return RateError.abovePlatformMaximum;
     if (rate > limit) return RateError.aboveLevelLimit;
@@ -90,11 +94,17 @@ final class HostRateCubit extends Cubit<HostRateState> {
   }
 
   void increment() => setRate(
-    (state.rate + BeanRules.rateStep).clamp(BeanRules.minRate, BeanRules.maxRate),
+    (state.rate + BeanRules.rateStep).clamp(
+      BeanRules.minRate,
+      BeanRules.maxRate,
+    ),
   );
 
   void decrement() => setRate(
-    (state.rate - BeanRules.rateStep).clamp(BeanRules.minRate, BeanRules.maxRate),
+    (state.rate - BeanRules.rateStep).clamp(
+      BeanRules.minRate,
+      BeanRules.maxRate,
+    ),
   );
 
   Future<void> save() async {
@@ -113,7 +123,11 @@ final class HostRateCubit extends Cubit<HostRateState> {
       return;
     }
     emit(
-      HostRateState(status: HostRateStatus.saving, host: host, rate: state.rate),
+      HostRateState(
+        status: HostRateStatus.saving,
+        host: host,
+        rate: state.rate,
+      ),
     );
     final result = await _setRate(state.rate);
     if (isClosed) return;

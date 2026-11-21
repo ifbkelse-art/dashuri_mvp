@@ -101,14 +101,27 @@ class HostBottomBar extends StatelessWidget {
     color: Theme.of(context).colorScheme.surface,
     child: SafeArea(
       top: false,
-      child: ResponsiveCenter(
-        padding: EdgeInsets.fromLTRB(
-          context.pageGutter,
-          DashuriTokens.space3,
-          context.pageGutter,
-          DashuriTokens.space3,
+      // Not ResponsiveCenter: its Align would expand to the full height.
+      child: Center(
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: DashuriTokens.maxContentWidth,
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              context.pageGutter,
+              DashuriTokens.space3,
+              context.pageGutter,
+              DashuriTokens.space3,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
         ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: children),
       ),
     ),
   );
@@ -132,14 +145,14 @@ class HostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: color ?? scheme.surfaceContainerLowest,
+    return Material(
+      color: color ?? scheme.surfaceContainerLowest,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DashuriTokens.radiusLarge),
-        border: Border.all(color: borderColor ?? scheme.outlineVariant),
+        side: BorderSide(color: borderColor ?? scheme.outlineVariant),
       ),
-      child: child,
+      child: Padding(padding: padding, child: child),
     );
   }
 }
@@ -249,25 +262,31 @@ class BeansHeroCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: DashuriTokens.space3),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: DashuriTokens.space2,
-            children: [
-              CurrencyAmount.beans(
-                beans,
-                style: theme.textTheme.displaySmall?.copyWith(
-                  color: onDark,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              if (suffix != null)
-                Text(
-                  suffix!,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: onDark.withValues(alpha: .7),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CurrencyAmount.beans(
+                  beans,
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    color: onDark,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-            ],
+                if (suffix != null) ...[
+                  const SizedBox(width: DashuriTokens.space2),
+                  Text(
+                    suffix!,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: onDark.withValues(alpha: .7),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           if (caption != null) ...[
             const SizedBox(height: DashuriTokens.space2),
@@ -590,10 +609,7 @@ class HostLargeTitle extends StatelessWidget {
     child: Row(
       children: [
         Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.displaySmall,
-          ),
+          child: Text(title, style: Theme.of(context).textTheme.displaySmall),
         ),
         ?trailing,
       ],

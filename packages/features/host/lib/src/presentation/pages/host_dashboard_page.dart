@@ -28,49 +28,49 @@ class _HostDashboardPageState extends State<HostDashboardPage> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      BlocConsumer<HostDashboardCubit, HostDashboardState>(
-        listenWhen: (a, b) =>
-            b is HostDashboardStateLoaded &&
-            b.actionFailure != null &&
-            (a is! HostDashboardStateLoaded ||
-                a.actionFailure != b.actionFailure),
-        listener: (context, state) => showHostSnack(
-          context,
-          hostFailureMessage((state as HostDashboardStateLoaded).actionFailure!),
-        ),
-        builder: (context, state) {
-          final cubit = context.read<HostDashboardCubit>();
-          return Scaffold(
-            body: SafeArea(
-              child: switch (state) {
-                HostDashboardStateInitial() ||
-                HostDashboardStateLoading() => const LoadingView(),
-                HostDashboardStateFailed(:final failure) => ErrorStateView(
-                  message: hostFailureMessage(failure),
-                  onRetry: cubit.load,
-                ),
-                final HostDashboardStateLoaded loaded => HostWideBody(
-                  onRefresh: cubit.refresh,
-                  children: [
-                    _Header(state: loaded),
-                    if (!loaded.data.isApproved)
-                      _ApplicationCard(host: loaded.data)
-                    else
-                      HostCardGrid(
-                        children: [
-                          _AvailabilityCard(state: loaded),
-                          _TodayCard(host: loaded.data),
-                          _QuickLinks(host: loaded.data),
-                        ],
-                      ),
-                  ],
-                ),
-              },
+  Widget build(
+    BuildContext context,
+  ) => BlocConsumer<HostDashboardCubit, HostDashboardState>(
+    listenWhen: (a, b) =>
+        b is HostDashboardStateLoaded &&
+        b.actionFailure != null &&
+        (a is! HostDashboardStateLoaded || a.actionFailure != b.actionFailure),
+    listener: (context, state) => showHostSnack(
+      context,
+      hostFailureMessage((state as HostDashboardStateLoaded).actionFailure!),
+    ),
+    builder: (context, state) {
+      final cubit = context.read<HostDashboardCubit>();
+      return Scaffold(
+        body: SafeArea(
+          child: switch (state) {
+            HostDashboardStateInitial() ||
+            HostDashboardStateLoading() => const LoadingView(),
+            HostDashboardStateFailed(:final failure) => ErrorStateView(
+              message: hostFailureMessage(failure),
+              onRetry: cubit.load,
             ),
-          );
-        },
+            final HostDashboardStateLoaded loaded => HostWideBody(
+              onRefresh: cubit.refresh,
+              children: [
+                _Header(state: loaded),
+                if (!loaded.data.isApproved)
+                  _ApplicationCard(host: loaded.data)
+                else
+                  HostCardGrid(
+                    children: [
+                      _AvailabilityCard(state: loaded),
+                      _TodayCard(host: loaded.data),
+                      _QuickLinks(host: loaded.data),
+                    ],
+                  ),
+              ],
+            ),
+          },
+        ),
       );
+    },
+  );
 }
 
 class _Header extends StatelessWidget {

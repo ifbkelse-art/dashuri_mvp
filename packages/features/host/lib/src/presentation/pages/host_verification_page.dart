@@ -30,143 +30,146 @@ class _HostVerificationPageState extends State<HostVerificationPage> {
   bool _firstStart = false;
 
   @override
-  Widget build(BuildContext context) =>
-      BlocConsumer<HostVerificationCubit, HostVerificationState>(
-        listenWhen: (a, b) =>
-            a.sessionStartedNow != b.sessionStartedNow ||
-            a.failure != b.failure,
-        listener: (context, state) {
-          if (state.sessionStartedNow && _firstStart) {
-            context.go(HostPaths.inApplication(RoutePaths.hostProfileSetup));
-          } else if (state.status == HostVerificationStatus.ready &&
-              state.failure != null) {
-            showHostSnack(context, hostFailureMessage(state.failure!));
-          }
-        },
-        builder: (context, state) {
-          final cubit = context.read<HostVerificationCubit>();
-          final host = state.host;
-          final starting = state.status == HostVerificationStatus.starting;
-          Widget body;
-          Widget? bottom;
-          if (state.status == HostVerificationStatus.loading) {
-            body = const LoadingView();
-          } else if (state.status == HostVerificationStatus.loadFailed ||
-              host == null) {
-            body = ErrorStateView(
-              message: hostFailureMessage(
-                state.failure ?? const UnexpectedFailure(),
-              ),
-              onRetry: cubit.load,
+  Widget build(
+    BuildContext context,
+  ) => BlocConsumer<HostVerificationCubit, HostVerificationState>(
+    listenWhen: (a, b) =>
+        a.sessionStartedNow != b.sessionStartedNow || a.failure != b.failure,
+    listener: (context, state) {
+      if (state.sessionStartedNow && _firstStart) {
+        context.go(HostPaths.inApplication(RoutePaths.hostProfileSetup));
+      } else if (state.status == HostVerificationStatus.ready &&
+          state.failure != null) {
+        showHostSnack(context, hostFailureMessage(state.failure!));
+      }
+    },
+    builder: (context, state) {
+      final cubit = context.read<HostVerificationCubit>();
+      final host = state.host;
+      final starting = state.status == HostVerificationStatus.starting;
+      Widget body;
+      Widget? bottom;
+      if (state.status == HostVerificationStatus.loading) {
+        body = const LoadingView();
+      } else if (state.status == HostVerificationStatus.loadFailed ||
+          host == null) {
+        body = ErrorStateView(
+          message: hostFailureMessage(
+            state.failure ?? const UnexpectedFailure(),
+          ),
+          onRetry: cubit.load,
+        );
+      } else {
+        switch (state.step!) {
+          case HostApplicationStep.apply:
+            body = const EmptyStateView(
+              icon: Icons.badge_outlined,
+              title: 'Start your host application first',
+              message: 'Identity verification opens after you apply to host.',
             );
-          } else {
-            switch (state.step!) {
-              case HostApplicationStep.apply:
-                body = const EmptyStateView(
-                  icon: Icons.badge_outlined,
-                  title: 'Start your host application first',
-                  message:
-                      'Identity verification opens after you apply to host.',
-                );
-                bottom = HostBottomBar(
-                  children: [
-                    PrimaryButton(
-                      label: 'Start application',
-                      onPressed: () => context.go(RoutePaths.hostOnboarding),
+            bottom = HostBottomBar(
+              children: [
+                PrimaryButton(
+                  label: 'Start application',
+                  onPressed: () => context.go(RoutePaths.hostOnboarding),
+                ),
+              ],
+            );
+          case HostApplicationStep.agreement ||
+              HostApplicationStep.verification:
+            body = const _ManualVerification();
+            bottom = HostBottomBar(
+              children: [
+                PrimaryButton(
+                  label: 'Request verification',
+                  busy: starting,
+                  onPressed: () {
+                    _firstStart = true;
+                    cubit.startVerification();
+                  },
+                ),
+              ],
+            );
+          case HostApplicationStep.review:
+            body = _UnderReview(
+              host: host,
+              sessionId: state.session?.sessionId,
+            );
+            bottom = HostBottomBar(
+              children: [
+                OutlinedButton(
+                  onPressed: () => context.push(RoutePaths.hostProfileSetup),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(
+                      DashuriTokens.buttonHeight,
                     ),
-                  ],
-                );
-              case HostApplicationStep.agreement ||
-                  HostApplicationStep.verification:
-                body = const _ManualVerification();
-                bottom = HostBottomBar(
-                  children: [
-                    PrimaryButton(
-                      label: 'Request verification',
-                      busy: starting,
-                      onPressed: () {
-                        _firstStart = true;
-                        cubit.startVerification();
-                      },
-                    ),
-                  ],
-                );
-              case HostApplicationStep.review:
-                body = _UnderReview(host: host, sessionId: state.session?.sessionId);
-                bottom = HostBottomBar(
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => context.push(RoutePaths.hostProfileSetup),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(
-                          DashuriTokens.buttonHeight,
-                        ),
-                      ),
-                      child: const Text('Edit my profile'),
-                    ),
-                    TextButton(
-                      onPressed: cubit.load,
-                      child: const Text('Refresh status'),
-                    ),
-                  ],
-                );
-              case HostApplicationStep.attention:
-                body = _Attention(reason: host.kycRejectionReason);
-                bottom = HostBottomBar(
-                  children: [
-                    PrimaryButton(
-                      label: 'Request verification again',
-                      busy: starting,
-                      onPressed: () {
-                        _firstStart = false;
-                        cubit.startVerification();
-                      },
-                    ),
-                  ],
-                );
-              case HostApplicationStep.approved:
-                body = const EmptyStateView(
-                  icon: Icons.verified_rounded,
-                  title: "You're approved",
-                  message: 'Welcome to hosting. Go online whenever you like.',
-                );
-                bottom = HostBottomBar(
-                  children: [
-                    PrimaryButton(
-                      label: 'Go to host home',
-                      onPressed: () => context.go(RoutePaths.hostDashboard),
-                    ),
-                  ],
-                );
-              case HostApplicationStep.suspended:
-                body = const EmptyStateView(
-                  icon: Icons.block_rounded,
-                  title: 'Your host account is suspended',
-                  message: 'See your account status for the reason and how to appeal.',
-                );
-                bottom = HostBottomBar(
-                  children: [
-                    PrimaryButton(
-                      label: 'View account status',
-                      onPressed: () => context.push(RoutePaths.enforcement),
-                    ),
-                  ],
-                );
-            }
-          }
-          final showProgress =
-              host != null &&
-              (state.step == HostApplicationStep.agreement ||
-                  state.step == HostApplicationStep.verification);
-          return Scaffold(
-            appBar: AppBar(
-              bottom: showProgress ? const HostStepProgress(step: 3) : null,
-            ),
-            body: body,
-            bottomNavigationBar: bottom,
-          );
-        },
+                  ),
+                  child: const Text('Edit my profile'),
+                ),
+                TextButton(
+                  onPressed: cubit.load,
+                  child: const Text('Refresh status'),
+                ),
+              ],
+            );
+          case HostApplicationStep.attention:
+            body = _Attention(reason: host.kycRejectionReason);
+            bottom = HostBottomBar(
+              children: [
+                PrimaryButton(
+                  label: 'Request verification again',
+                  busy: starting,
+                  onPressed: () {
+                    _firstStart = false;
+                    cubit.startVerification();
+                  },
+                ),
+              ],
+            );
+          case HostApplicationStep.approved:
+            body = const EmptyStateView(
+              icon: Icons.verified_rounded,
+              title: "You're approved",
+              message: 'Welcome to hosting. Go online whenever you like.',
+            );
+            bottom = HostBottomBar(
+              children: [
+                PrimaryButton(
+                  label: 'Go to host home',
+                  onPressed: () => context.go(RoutePaths.hostDashboard),
+                ),
+              ],
+            );
+          case HostApplicationStep.suspended:
+            body = const EmptyStateView(
+              icon: Icons.block_rounded,
+              title: 'Your host account is suspended',
+              message:
+                  'See your account status for the reason and how to appeal.',
+            );
+            bottom = HostBottomBar(
+              children: [
+                PrimaryButton(
+                  label: 'View account status',
+                  onPressed: () => context.push(RoutePaths.enforcement),
+                ),
+              ],
+            );
+        }
+      }
+      final showProgress =
+          host != null &&
+          (state.step == HostApplicationStep.agreement ||
+              state.step == HostApplicationStep.verification);
+      return Scaffold(
+        appBar: AppBar(
+          bottom: showProgress ? const HostStepProgress(step: 3) : null,
+        ),
+        body: body,
+        bottomNavigationBar: bottom,
       );
+    },
+  );
 }
 
 class _ManualVerification extends StatelessWidget {
@@ -218,7 +221,10 @@ class _ManualVerification extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
-                  const StatusTag(label: 'Manual review', tone: StatusTone.info),
+                  const StatusTag(
+                    label: 'Manual review',
+                    tone: StatusTone.info,
+                  ),
                 ],
               ),
               const SizedBox(height: DashuriTokens.space3),

@@ -146,8 +146,8 @@ final class HostProfileSetupCubit extends Cubit<HostProfileSetupState> {
         status: HostProfileSetupStatus.saved,
         profile: value,
       ),
-      Err(failure: ValidationFailure(:final fieldErrors)) when fieldErrors
-          .isNotEmpty =>
+      Err(failure: ValidationFailure(:final fieldErrors))
+          when fieldErrors.isNotEmpty =>
         state.copyWith(
           status: HostProfileSetupStatus.ready,
           fieldErrors: fieldErrors,

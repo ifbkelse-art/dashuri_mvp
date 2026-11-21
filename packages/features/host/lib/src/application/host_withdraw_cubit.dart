@@ -50,8 +50,7 @@ final class HostWithdrawState extends Equatable {
 
   /// Approximate ₹ for the selected Beans. Uses the server's paise value when
   /// the whole available balance is selected.
-  int get amountPaise =>
-      earnings != null && beans == earnings!.beansAvailable
+  int get amountPaise => earnings != null && beans == earnings!.beansAvailable
       ? earnings!.availableInrPaise
       : BeanRules.beansToPaise(beans);
 

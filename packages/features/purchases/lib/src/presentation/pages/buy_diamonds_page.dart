@@ -138,7 +138,7 @@ class BuyDiamondsPage extends StatelessWidget {
                                     ),
                                   ),
                                 const SizedBox(height: DashuriTokens.space2),
-                                _Note(
+                                const _Note(
                                   icon: Icons.receipt_outlined,
                                   text:
                                       'Prices include GST · Purchased Diamonds never expire',

@@ -28,10 +28,17 @@ final class HostVerificationState extends Equatable {
   /// continues to profile setup (H09).
   final bool sessionStartedNow;
 
-  HostApplicationStep? get step => host == null ? null : nextApplicationStep(host!);
+  HostApplicationStep? get step =>
+      host == null ? null : nextApplicationStep(host!);
 
   @override
-  List<Object?> get props => [status, host, session, failure, sessionStartedNow];
+  List<Object?> get props => [
+    status,
+    host,
+    session,
+    failure,
+    sessionStartedNow,
+  ];
 }
 
 /// H03–H05 (manual identity review), H07 (under review) and H08 (needs
