@@ -68,7 +68,7 @@ type Config struct {
 // value must be present; development tolerates gaps so the API can boot.
 func Load() (Config, error) {
 	c := Config{
-		Env:                    get("DASHURI_ENV", "development"),
+		Env:                    get("DASHURI_ENV", "production"), // fail safe: dev relaxations need an explicit DASHURI_ENV=development
 		Port:                   get("PORT", "8080"),
 		DatabaseURL:            os.Getenv("DATABASE_URL"),
 		SupabaseURL:            os.Getenv("SUPABASE_URL"),

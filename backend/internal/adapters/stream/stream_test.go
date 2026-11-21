@@ -128,7 +128,7 @@ func TestVerifyWebhook(t *testing.T) {
 		t.Fatalf("%v %v", evs, err)
 	}
 	e := evs[0]
-	if e.Kind != calls.EventJoined || e.UserID != "u1" || e.ProviderCallID != "3f1c7b1e-0000-4000-8000-000000000001" || e.EventID != "stream:w-1" {
+	if e.Kind != calls.EventJoined || e.UserID != "u1" || e.ProviderCallID != "3f1c7b1e-0000-4000-8000-000000000001" || !strings.HasPrefix(e.EventID, "sha256:") {
 		t.Fatalf("event %+v", e)
 	}
 

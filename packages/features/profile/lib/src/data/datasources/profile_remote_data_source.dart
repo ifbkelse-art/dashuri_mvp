@@ -9,8 +9,6 @@ import '../models/photo_upload_ticket_json.dart';
 import '../models/profile_json.dart';
 
 /// HTTP access to the profile endpoints of the Go API.
-/// Value-moving or create calls take an [IdempotencyKey] from the caller so
-/// retries of the same user intent reuse it.
 final class ProfileRemoteDataSource {
   const ProfileRemoteDataSource(this._api);
 
@@ -19,21 +17,24 @@ final class ProfileRemoteDataSource {
   Future<Result<Profile>> getMyProfile() =>
       _api.get('/v1/me/profile', decode: objectDecoder(profileFromJson));
 
-  Future<Result<Profile>> updateMyProfile({
-    required String? displayName,
-    required String? bio,
-    required List<String>? languages,
-  }) => _api.patch(
+  Future<Result<Profile>> updateMyProfile(ProfileUpdate update) => _api.patch(
     '/v1/me/profile',
     decode: objectDecoder(profileFromJson),
-    body: {'display_name': ?displayName, 'bio': ?bio, 'languages': ?languages},
+    body: profileUpdateToJson(update),
   );
 
-  Future<Result<Profile>> getProfile({required String userId}) =>
-      _api.get('/v1/profiles/$userId', decode: objectDecoder(profileFromJson));
+  Future<Result<Profile>> getProfile({required String userId}) => _api.get(
+    '/v1/profiles/${Uri.encodeComponent(userId)}',
+    decode: objectDecoder(profileFromJson),
+  );
 
   Future<Result<LevelProgress>> getMyLevel() =>
       _api.get('/v1/me/level', decode: objectDecoder(levelProgressFromJson));
+
+  Future<Result<int>> getAvailableDiamonds() => _api.get(
+    '/v1/wallet',
+    decode: objectDecoder((json) => json['available_diamonds']! as int),
+  );
 
   Future<Result<PhotoUploadTicket>> requestPhotoUpload({
     required String contentType,
@@ -43,5 +44,15 @@ final class ProfileRemoteDataSource {
     decode: objectDecoder(photoUploadTicketFromJson),
     body: {'content_type': contentType},
     idempotencyKey: idempotencyKey,
+  );
+
+  Future<Result<void>> uploadBytes({
+    required String uploadUrl,
+    required List<int> bytes,
+    required String contentType,
+  }) => _api.uploadToSignedUrl(
+    Uri.parse(uploadUrl),
+    bytes,
+    contentType: contentType,
   );
 }

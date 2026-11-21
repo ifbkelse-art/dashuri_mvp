@@ -78,7 +78,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		p.Errors = append(p.Errors, FieldError{Field: f, Reason: reason})
 	}
 	if status >= 500 && e.Kind == apperr.KindInternal {
-		slog.ErrorContext(r.Context(), "request failed", "err", err, "path", r.URL.Path)
+		slog.ErrorContext(r.Context(), "request failed", "err", err, "route", r.Pattern)
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)

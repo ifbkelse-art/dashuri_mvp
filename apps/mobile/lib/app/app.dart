@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'di/injector.dart';
+import 'experience/app_experience_controller.dart';
 import 'router/app_router.dart';
 
 /// Root widget: app-wide BLoCs, theme and router. No pages here.
@@ -17,12 +18,25 @@ class DashuriApp extends StatefulWidget {
 
 class _DashuriAppState extends State<DashuriApp> {
   late final SessionCubit _session = sl<SessionCubit>();
-  late final GoRouter _router = buildRouter(session: _session);
+  late final AppExperienceController _experience =
+      sl<AppExperienceController>();
+  late final GoRouter _router = buildRouter(
+    session: _session,
+    experience: _experience,
+    backendConfigured: backendConfigured,
+  );
 
   @override
   void initState() {
     super.initState();
+    _experience.bind(_session);
     _session.start();
+  }
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
   }
 
   @override

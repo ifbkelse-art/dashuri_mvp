@@ -1,0 +1,23 @@
+{
+  "pins" : [
+    {
+      "identity" : "core-ios-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/cashfree/core-ios-sdk",
+      "state" : {
+        "revision" : "173208a2154ad733841346ff8b94cd63cac13905",
+        "version" : "2.5.3"
+      }
+    },
+    {
+      "identity" : "stream-video-swift-webrtc",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/GetStream/stream-video-swift-webrtc.git",
+      "state" : {
+        "revision" : "e313c8689d98c4bf8ef9d77e2574d3e9115dce38",
+        "version" : "156.0.7"
+      }
+    }
+  ],
+  "version" : 2
+}

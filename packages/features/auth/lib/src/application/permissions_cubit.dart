@@ -6,7 +6,7 @@ import '../domain/entities/device_permission.dart';
 import '../domain/usecases/device_permissions.dart';
 
 /// A14 permissions primer and A15 denied state.
-final class PermissionsCubit extends Cubit<PermissionsState> {
+class PermissionsCubit extends Cubit<PermissionsState> {
   PermissionsCubit(
     this._get,
     this._request,

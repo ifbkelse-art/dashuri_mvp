@@ -9,7 +9,7 @@ import '../domain/usecases/verify_otp.dart';
 part 'sign_in_state.dart';
 
 /// Phone OTP flow (A03–A06). Phone OTP is the only method (D-02).
-final class SignInCubit extends Cubit<SignInState> {
+class SignInCubit extends Cubit<SignInState> {
   SignInCubit(this._requestOtp, this._verifyOtp) : super(const SignInState());
 
   final RequestOtp _requestOtp;

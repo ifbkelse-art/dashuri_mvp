@@ -5,22 +5,12 @@ import '../repositories/profile_repository.dart';
 
 /// PATCH /v1/me/profile
 // Not final: application tests mock use cases.
-class UpdateMyProfile
-    implements
-        UseCase<
-          Profile,
-          ({String? displayName, String? bio, List<String>? languages})
-        > {
+class UpdateMyProfile implements UseCase<Profile, ProfileUpdate> {
   const UpdateMyProfile(this._repository);
 
   final ProfileRepository _repository;
 
   @override
-  Future<Result<Profile>> call(
-    ({String? displayName, String? bio, List<String>? languages}) input,
-  ) => _repository.updateMyProfile(
-    displayName: input.displayName,
-    bio: input.bio,
-    languages: input.languages,
-  );
+  Future<Result<Profile>> call(ProfileUpdate input) =>
+      _repository.updateMyProfile(input);
 }

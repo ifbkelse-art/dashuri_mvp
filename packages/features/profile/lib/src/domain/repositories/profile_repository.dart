@@ -9,18 +9,24 @@ import '../entities/profile.dart';
 abstract interface class ProfileRepository {
   Future<Result<Profile>> getMyProfile();
 
-  Future<Result<Profile>> updateMyProfile({
-    required String? displayName,
-    required String? bio,
-    required List<String>? languages,
-  });
+  Future<Result<Profile>> updateMyProfile(ProfileUpdate update);
 
   Future<Result<Profile>> getProfile({required String userId});
 
   Future<Result<LevelProgress>> getMyLevel();
 
+  /// Available Diamonds from GET /v1/wallet (S01 wallet shortcut).
+  Future<Result<int>> getAvailableDiamonds();
+
   Future<Result<PhotoUploadTicket>> requestPhotoUpload({
     required String contentType,
     required IdempotencyKey idempotencyKey,
+  });
+
+  /// PUTs the bytes to the ticket's signed URL.
+  Future<Result<void>> uploadPhotoBytes({
+    required PhotoUploadTicket ticket,
+    required List<int> bytes,
+    required String contentType,
   });
 }

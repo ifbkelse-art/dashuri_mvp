@@ -9,7 +9,7 @@ import '../domain/usecases/unblock_user.dart';
 part 'blocked_users_state.dart';
 
 /// S06 blocked users: list (cursor pages) and unblock.
-final class BlockedUsersCubit extends Cubit<BlockedUsersState> {
+class BlockedUsersCubit extends Cubit<BlockedUsersState> {
   BlockedUsersCubit(this._listBlockedUsers, this._unblockUser)
     : super(const BlockedUsersStateInitial());
 

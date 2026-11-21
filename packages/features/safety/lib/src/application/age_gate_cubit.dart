@@ -6,7 +6,7 @@ import '../domain/entities/age.dart';
 import '../domain/usecases/submit_age_declaration.dart';
 
 /// A09 age declaration and A10 blocked state.
-final class AgeGateCubit extends Cubit<AgeGateState> {
+class AgeGateCubit extends Cubit<AgeGateState> {
   AgeGateCubit(this._submit, this._refresher, this._clock)
     : super(const AgeGateState());
 

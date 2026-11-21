@@ -8,7 +8,7 @@ import '../domain/usecases/report_user.dart';
 
 /// V11 report form and V12 confirmation. One idempotency key per report
 /// intent (and one per block), reused on retries.
-final class ReportCubit extends Cubit<ReportState> {
+class ReportCubit extends Cubit<ReportState> {
   ReportCubit(
     this._report,
     this._block, {

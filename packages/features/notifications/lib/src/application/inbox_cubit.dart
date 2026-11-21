@@ -13,7 +13,7 @@ part 'inbox_state.dart';
 
 /// C11 notifications inbox: first page, more pages, mark read, and a
 /// silent refresh on each realtime `notification.created` hint.
-final class InboxCubit extends Cubit<InboxState> {
+class InboxCubit extends Cubit<InboxState> {
   InboxCubit(this._listInbox, this._markRead, this._watch, this._clock)
     : super(const InboxStateInitial());
 

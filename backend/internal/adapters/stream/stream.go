@@ -313,13 +313,11 @@ func mapEvent(b webhookBody, raw []byte, webhookID string) []calls.ProviderEvent
 	if at.IsZero() {
 		at = time.Now()
 	}
-	eventID := webhookID
-	if eventID == "" {
-		sum := sha256.Sum256(raw)
-		eventID = "sha256:" + hex.EncodeToString(sum[:])
-	} else {
-		eventID = "stream:" + eventID
-	}
+	// Dedupe on the HMAC-signed body: X-Webhook-Id is not covered by the
+	// signature, so a replayed body with a new header must still collide.
+	_ = webhookID
+	sum := sha256.Sum256(raw)
+	eventID := "sha256:" + hex.EncodeToString(sum[:])
 	return []calls.ProviderEvent{{EventID: eventID, ProviderCallID: id, UserID: user, Kind: kind, At: at.UTC()}}
 }
 

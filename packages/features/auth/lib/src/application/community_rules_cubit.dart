@@ -6,7 +6,7 @@ import '../domain/entities/account_status.dart';
 import '../domain/usecases/accept_community_rules.dart';
 
 /// A13: one explicit "I agree" action.
-final class CommunityRulesCubit extends Cubit<CommunityRulesState> {
+class CommunityRulesCubit extends Cubit<CommunityRulesState> {
   CommunityRulesCubit(this._accept) : super(const CommunityRulesState());
 
   final AcceptCommunityRules _accept;

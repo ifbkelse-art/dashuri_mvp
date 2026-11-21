@@ -5,7 +5,7 @@ import 'package:equatable/equatable.dart';
 import '../domain/usecases/block_user.dart';
 
 /// V13 block confirmation.
-final class BlockCubit extends Cubit<BlockState> {
+class BlockCubit extends Cubit<BlockState> {
   BlockCubit(this._block, {required String userId})
     : _userId = userId,
       super(const BlockState());

@@ -58,7 +58,9 @@ func mapErr(err error) error {
 	case errors.Is(err, ErrSameReviewer):
 		return apperr.BusinessRule("different_reviewer_required", "an appeal must be decided by a different reviewer")
 	case errors.Is(err, ErrSelfDecision):
-		return apperr.Forbidden("self_review", "you cannot decide a case about yourself")
+		return apperr.Forbidden("self_review", "you cannot decide a case you filed or that is about you")
+	case errors.Is(err, ErrStaffTarget):
+		return apperr.Forbidden("admin_required", "only an admin may take action against a staff account")
 	case errors.Is(err, ErrInvalidDecision):
 		return apperr.BusinessRule("invalid_decision", "this decision is not allowed for this case")
 	}
@@ -96,6 +98,8 @@ func DecodeFrame(b64 string) ([]byte, error) {
 
 // SubmitFrame: POST /v1/calls/{callId}/moderation-frames — a participant's own
 // outgoing camera frame during the first 180 s after the call became active.
+const frameMinInterval = 8 * time.Second
+
 func (s *Service) SubmitFrame(ctx context.Context, p auth.Principal, callID string, in ModerationFrameRequest) (FrameAccepted, error) {
 	if err := s.ready(); err != nil {
 		return FrameAccepted{}, err
@@ -116,6 +120,13 @@ func (s *Service) SubmitFrame(ctx context.Context, p auth.Principal, callID stri
 	}
 	if !now.Before(*c.ModerationWindowEndsAt) || (c.Phase != "active" && c.Phase != "paused") {
 		return FrameAccepted{}, apperr.BusinessRule("moderation_window_closed", "automated checks run only in the first 3 minutes")
+	}
+	// At most one frame per participant every 8 s (the app sends one per
+	// 20 s); bounds classifier cost (security review finding 8).
+	if last, lerr := s.deps.Repo.LastFrameAt(ctx, callID, p.UserID); lerr != nil {
+		return FrameAccepted{}, mapErr(lerr)
+	} else if last != nil && now.Sub(*last) < frameMinInterval {
+		return FrameAccepted{}, &apperr.Error{Kind: apperr.KindRateLimited, Code: "frame_rate_limited", Detail: "frames are accepted at most every 8 seconds"}
 	}
 	img, err := DecodeFrame(in.ImageBase64)
 	if err != nil {
@@ -287,8 +298,25 @@ func (s *Service) DecideReport(ctx context.Context, p auth.Principal, reportId s
 	if !isUUID(reportId) {
 		return ModerationDecision{}, apperr.NotFound("report")
 	}
-	out, err := s.deps.Repo.DecideReport(ctx, ReportDecision{ReportID: reportId, ModeratorID: p.UserID, Action: in.Action, Reason: in.Reason, At: s.deps.Clock.Now()})
-	return out, mapErr(err)
+	out, err := s.deps.Repo.DecideReport(ctx, ReportDecision{ReportID: reportId, ModeratorID: p.UserID, Action: in.Action,
+		Reason: in.Reason, At: s.deps.Clock.Now(), ModeratorIsAdmin: p.Has(auth.RoleAdmin)})
+	if err != nil {
+		return out, mapErr(err)
+	}
+	// An enforcement that restricts the account also ends its live calls
+	// (security review finding 3); provider tokens would otherwise keep working.
+	if out.Enforced && s.deps.Calls != nil {
+		ids, lerr := s.deps.Repo.LiveCallIDs(ctx, out.TargetUserID)
+		if lerr != nil {
+			slog.ErrorContext(ctx, "enforcement: list live calls failed", "err", lerr)
+		}
+		for _, id := range ids {
+			if eerr := s.deps.Calls.EndCallForModeration(ctx, id); eerr != nil {
+				slog.ErrorContext(ctx, "enforcement: end call failed", "call_id", id, "err", eerr)
+			}
+		}
+	}
+	return out, nil
 }
 
 // DecideAppeal: POST /v1/admin/appeals/{appealId}/decisions — decided by a

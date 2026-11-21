@@ -6,9 +6,7 @@ import '../../domain/entities/profile.dart';
 import '../../domain/repositories/profile_repository.dart';
 import '../datasources/profile_remote_data_source.dart';
 
-/// Default [ProfileRepository]: delegates to the API. Add caching here, never in BLoCs.
-/// Idempotency keys arrive from the caller: the BLoC creates one per user
-/// intent and reuses it for retries (docs/architecture/flutter-architecture.md).
+/// Default [ProfileRepository]: delegates to the API.
 final class ProfileRepositoryImpl implements ProfileRepository {
   const ProfileRepositoryImpl(this._remote);
 
@@ -18,15 +16,8 @@ final class ProfileRepositoryImpl implements ProfileRepository {
   Future<Result<Profile>> getMyProfile() => _remote.getMyProfile();
 
   @override
-  Future<Result<Profile>> updateMyProfile({
-    required String? displayName,
-    required String? bio,
-    required List<String>? languages,
-  }) => _remote.updateMyProfile(
-    displayName: displayName,
-    bio: bio,
-    languages: languages,
-  );
+  Future<Result<Profile>> updateMyProfile(ProfileUpdate update) =>
+      _remote.updateMyProfile(update);
 
   @override
   Future<Result<Profile>> getProfile({required String userId}) =>
@@ -36,11 +27,25 @@ final class ProfileRepositoryImpl implements ProfileRepository {
   Future<Result<LevelProgress>> getMyLevel() => _remote.getMyLevel();
 
   @override
+  Future<Result<int>> getAvailableDiamonds() => _remote.getAvailableDiamonds();
+
+  @override
   Future<Result<PhotoUploadTicket>> requestPhotoUpload({
     required String contentType,
     required IdempotencyKey idempotencyKey,
   }) => _remote.requestPhotoUpload(
     contentType: contentType,
     idempotencyKey: idempotencyKey,
+  );
+
+  @override
+  Future<Result<void>> uploadPhotoBytes({
+    required PhotoUploadTicket ticket,
+    required List<int> bytes,
+    required String contentType,
+  }) => _remote.uploadBytes(
+    uploadUrl: ticket.uploadUrl,
+    bytes: bytes,
+    contentType: contentType,
   );
 }

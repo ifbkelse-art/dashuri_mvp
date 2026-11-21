@@ -40,6 +40,10 @@ type ModerationDecision struct {
 	DecisionId string `json:"decision_id"`
 	Action     string `json:"action"`
 	Status     string `json:"status"`
+	// Internal: who was decided about and whether an account restriction
+	// was applied (live calls are then ended). Not serialised.
+	TargetUserID string `json:"-"`
+	Enforced     bool   `json:"-"`
 }
 
 type AppealDecisionRequest struct {

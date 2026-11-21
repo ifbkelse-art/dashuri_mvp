@@ -58,11 +58,7 @@ class DashuriMonogram extends StatelessWidget {
 
 /// Segmented onboarding progress ("3/6"), A04–A12 header.
 class OnboardingStepBar extends StatelessWidget {
-  const OnboardingStepBar({
-    required this.step,
-    required this.total,
-    super.key,
-  });
+  const OnboardingStepBar({required this.step, required this.total, super.key});
 
   final int step;
   final int total;

@@ -107,7 +107,8 @@ func (r ModerationRepo) DecideReport(ctx context.Context, d moderation.ReportDec
 	var out moderation.ModerationDecision
 	err := r.Tx.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		var status, target string
-		err := tx.QueryRow(ctx, `select status, target_user_id from safety.reports where id = $1 for update`, d.ReportID).Scan(&status, &target)
+		var reporter *string
+		err := tx.QueryRow(ctx, `select status, target_user_id, reporter_id::text from safety.reports where id = $1 for update`, d.ReportID).Scan(&status, &target, &reporter)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return moderation.ErrNotFound
 		}
@@ -117,9 +118,19 @@ func (r ModerationRepo) DecideReport(ctx context.Context, d moderation.ReportDec
 		if status != "open" && status != "in_review" {
 			return moderation.ErrAlreadyDecided
 		}
-		if target == d.ModeratorID {
+		if target == d.ModeratorID || (reporter != nil && *reporter == d.ModeratorID) {
 			return moderation.ErrSelfDecision
 		}
+		if d.Action != "dismiss" && !d.ModeratorIsAdmin {
+			var staff bool
+			if err := tx.QueryRow(ctx, `select roles && array['moderator','admin','finance']::text[] from identity.accounts where id = $1`, target).Scan(&staff); err != nil {
+				return err
+			}
+			if staff {
+				return moderation.ErrStaffTarget
+			}
+		}
+		out.TargetUserID = target
 		var enforcementID *string
 		newReport := "decided"
 		if d.Action == "dismiss" {
@@ -132,6 +143,7 @@ func (r ModerationRepo) DecideReport(ctx context.Context, d moderation.ReportDec
 			}
 			enforcementID = &eid
 			if next, ok := statusForAction[d.Action]; ok {
+				out.Enforced = true
 				var cur string
 				if err := tx.QueryRow(ctx, `select status from identity.accounts where id = $1 for update`, target).Scan(&cur); err != nil {
 					return err
@@ -245,4 +257,31 @@ func (r ModerationRepo) FrameWindowCalls(ctx context.Context, now time.Time) ([]
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// LiveCallIDs lists the user's live calls (any non-terminal phase).
+func (r ModerationRepo) LiveCallIDs(ctx context.Context, userID string) ([]string, error) {
+	rows, err := r.Pool.Query(ctx, `select id::text from calls.calls
+		where (caller_id = $1 or receiver_id = $1)
+		  and phase in ('requested','ringing','accepted','connecting','active','paused')`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// LastFrameAt returns the latest frame check time for (call, user).
+func (r ModerationRepo) LastFrameAt(ctx context.Context, callID, userID string) (*time.Time, error) {
+	var t *time.Time
+	err := r.Pool.QueryRow(ctx, `select max(checked_at) from moderation.frame_checks where call_id = $1 and user_id = $2`, callID, userID).Scan(&t)
+	return t, err
 }

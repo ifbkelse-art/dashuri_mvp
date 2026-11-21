@@ -16,12 +16,42 @@ final class MyProfileStateLoading extends MyProfileState {
 }
 
 final class MyProfileStateLoaded extends MyProfileState {
-  const MyProfileStateLoaded(this.data);
+  const MyProfileStateLoaded(
+    this.data, {
+    this.level,
+    this.availableDiamonds,
+    this.hostModeAvailable = false,
+    this.mode = ExperienceMode.customer,
+  });
 
   final Profile data;
 
+  /// Null if the level could not be loaded (the card is hidden).
+  final LevelProgress? level;
+
+  /// Null if the wallet could not be loaded (shows "—").
+  final int? availableDiamonds;
+
+  /// Approved host: the profile shows a "Switch to host mode" control.
+  final bool hostModeAvailable;
+  final ExperienceMode mode;
+
+  MyProfileStateLoaded copyWith({ExperienceMode? mode}) => MyProfileStateLoaded(
+    data,
+    level: level,
+    availableDiamonds: availableDiamonds,
+    hostModeAvailable: hostModeAvailable,
+    mode: mode ?? this.mode,
+  );
+
   @override
-  List<Object?> get props => [data];
+  List<Object?> get props => [
+    data,
+    level,
+    availableDiamonds,
+    hostModeAvailable,
+    mode,
+  ];
 }
 
 final class MyProfileStateFailed extends MyProfileState {

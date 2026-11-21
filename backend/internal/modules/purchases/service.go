@@ -153,6 +153,7 @@ func (s *Service) playReady() error {
 //     obfuscatedExternalAccountId = sha256(user id) when present.
 //  3. purchaseState 0 → credit once; 2 → pending (no credit); else rejected.
 //  4. Acknowledge server-side after the credit.
+//
 // purchaseAllowed refuses minors and restricted accounts (security review finding 2).
 func purchaseAllowed(p auth.Principal) error {
 	if !p.AgeEligible {
@@ -209,7 +210,9 @@ func (s *Service) verifyPlay(ctx context.Context, userID string, pkg Package, to
 	if gp.ProductID != "" && gp.ProductID != pkg.ProductID {
 		return PurchaseVerification{}, apperr.BusinessRule("purchase_token_invalid", "token does not match the product")
 	}
-	if gp.ObfuscatedAccountID != "" && !strings.EqualFold(gp.ObfuscatedAccountID, SHA256Hex(userID)) {
+	// The app always sets obfuscatedAccountId = sha256(user id); a token
+	// without it (or with another account's) is refused (security review 10).
+	if !strings.EqualFold(gp.ObfuscatedAccountID, SHA256Hex(userID)) {
 		return PurchaseVerification{}, apperr.BusinessRule("purchase_already_used_by_other_account", "this purchase was made for another account")
 	}
 	rec := PurchaseRecord{UserID: userID, ProductID: pkg.ProductID, TokenHash: hash, OrderID: gp.OrderID, Diamonds: pkg.Diamonds, Rail: railPlay}

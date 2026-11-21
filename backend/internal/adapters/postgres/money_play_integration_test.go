@@ -11,6 +11,7 @@ import (
 	"dashuri/backend/internal/adapters/postgres"
 	"dashuri/backend/internal/modules/ledger"
 	"dashuri/backend/internal/modules/purchases"
+	"dashuri/backend/internal/platform/apperr"
 	"dashuri/backend/internal/testsupport/pgtest"
 )
 
@@ -64,7 +65,7 @@ func TestPlayTokenReusedByAnotherAccountRefused(t *testing.T) {
 	m := newMoneyEnv(t, api, admin)
 	a, b := pgtest.NewUser(t, admin, true), pgtest.NewUser(t, admin, true)
 	token := "tok" + pgtest.UUID()[:8]
-	m.play.set(token, 0, nil)
+	m.play.set(token, 0, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(a)})
 	ctx := context.Background()
 	if _, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(a), purchases.VerifyGooglePlayRequest{ProductId: "diamonds_4000", PurchaseToken: token}); err != nil {
 		t.Fatal(err)
@@ -103,7 +104,7 @@ func TestPlayPendingPurchaseNotCreditedUntilRTDN(t *testing.T) {
 	m := newMoneyEnv(t, api, admin)
 	user := pgtest.NewUser(t, admin, true)
 	token := "tok" + pgtest.UUID()[:8]
-	m.play.set(token, 2, nil)
+	m.play.set(token, 2, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(user)})
 	ctx := context.Background()
 	res, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), purchases.VerifyGooglePlayRequest{ProductId: "diamonds_12500", PurchaseToken: token})
 	if err != nil || res.Status != "pending" || res.DiamondsCredited != 0 {
@@ -113,7 +114,7 @@ func TestPlayPendingPurchaseNotCreditedUntilRTDN(t *testing.T) {
 		t.Fatalf("pending purchase credited: %d", b)
 	}
 	// Payment completes; RTDN ONE_TIME_PRODUCT_PURCHASED credits it.
-	m.play.set(token, 0, nil)
+	m.play.set(token, 0, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(user)})
 	msg := pgtest.UUID()
 	if err := m.rtdn(t, msg, map[string]any{"oneTimeProductNotification": map[string]any{"notificationType": 1, "purchaseToken": token, "sku": "diamonds_12500"}}); err != nil {
 		t.Fatal(err)
@@ -140,7 +141,7 @@ func TestVoidedPurchaseReversesOnlyUnspent(t *testing.T) {
 	user := pgtest.NewUser(t, admin, true)
 	host := pgtest.NewUser(t, admin, true, "customer", "host")
 	token := "tok" + pgtest.UUID()[:8]
-	m.play.set(token, 0, nil)
+	m.play.set(token, 0, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(user)})
 	res, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), purchases.VerifyGooglePlayRequest{ProductId: "diamonds_4000", PurchaseToken: token})
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +192,7 @@ func TestPollVoidedPurchasesReversesCreditedPurchase(t *testing.T) {
 	ctx := context.Background()
 	user := pgtest.NewUser(t, admin, true)
 	token := "tok" + pgtest.UUID()[:8]
-	m.play.set(token, 0, nil)
+	m.play.set(token, 0, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(user)})
 	if _, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), purchases.VerifyGooglePlayRequest{ProductId: "diamonds_4000", PurchaseToken: token}); err != nil {
 		t.Fatal(err)
 	}
@@ -203,5 +204,18 @@ func TestPollVoidedPurchasesReversesCreditedPurchase(t *testing.T) {
 	}
 	if b := balance(t, api, user, ledger.UserDiamondPurchased); b != 0 {
 		t.Fatalf("balance %d", b)
+	}
+}
+
+// Security review finding 10: a token without the account binding is refused.
+func TestPlayTokenWithoutAccountBindingRefused(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	m := newMoneyEnv(t, api, admin)
+	user := pgtest.NewUser(t, admin, true)
+	token := "tok" + pgtest.UUID()[:8]
+	m.play.set(token, 0, nil)
+	_, err := m.svc.VerifyGooglePlayPurchase(context.Background(), principal(user), purchases.VerifyGooglePlayRequest{ProductId: "diamonds_4000", PurchaseToken: token})
+	if e := apperr.As(err); e == nil || e.Code != "purchase_already_used_by_other_account" {
+		t.Fatalf("unbound token: %v", err)
 	}
 }

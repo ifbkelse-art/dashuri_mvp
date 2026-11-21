@@ -12,7 +12,7 @@ part 'session_state.dart';
 
 /// App-wide session state. Provided once above the router; the route guard
 /// reads it to decide redirects through the onboarding flow (FL01).
-final class SessionCubit extends Cubit<SessionState>
+class SessionCubit extends Cubit<SessionState>
     implements AccountStatusRefresher {
   SessionCubit(this._watchSession, this._getAccountStatus)
     : super(const SessionUnknown());

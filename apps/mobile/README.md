@@ -8,7 +8,9 @@ The Android app (iOS project present but not released; R3-2). This package is th
 | `lib/bootstrap/bootstrap.dart` | Error hooks, BLoC observer, config, DI, `runApp` |
 | `lib/app/di/injector.dart` | Registers platform adapters and every feature (`register…Feature`) |
 | `lib/app/router/app_router.dart` | Composes feature routes into one `GoRouter` |
-| `lib/app/router/session_route_guard.dart` | Signed-out → sign-in; not 18+ → age gate (enable once those pages exist) |
+| `lib/app/router/role_shells.dart` | Customer and host `StatefulShellRoute`s with `AdaptiveShell`; tab routes are collected by path from every `TabFeatureRoutes` feature (missing tab → error page) |
+| `lib/app/experience/app_experience_controller.dart` | `ExperienceController`: per-user permissions-primer flag and customer/host mode in `KeyValueStore` |
+| `lib/app/router/session_route_guard.dart` | Onboarding flow (FL01) from `GET /v1/me`: splash → welcome → phone/OTP → age gate → profile + gender → rules → permissions → choose experience → shell |
 | `lib/app/app.dart` | `MaterialApp.router` with the design-system theme |
 | `config/*.example.json` | Client-safe configuration (copy to `*.json`, git-ignored) |
 

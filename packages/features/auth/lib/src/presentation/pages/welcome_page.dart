@@ -69,6 +69,11 @@ class WelcomePage extends StatelessWidget {
             child: const Text('I already have an account'),
           ),
         ),
+        if (const bool.fromEnvironment('DASHURI_UI_PREVIEW'))
+          TextButton(
+            onPressed: () => context.go(RoutePaths.discovery),
+            child: const Text('Skip (UI preview)'),
+          ),
         const SizedBox(height: DashuriTokens.space4),
         Wrap(
           alignment: WrapAlignment.center,

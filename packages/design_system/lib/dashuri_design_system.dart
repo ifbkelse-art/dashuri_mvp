@@ -2,6 +2,7 @@
 /// primitives and shared components (design handoff 19 Nov 2026).
 library;
 
+export 'src/components/core_widgets.dart';
 export 'src/components/currency_icons.dart';
 export 'src/components/formatting.dart';
 export 'src/components/state_views.dart';
@@ -11,4 +12,3 @@ export 'src/responsive/breakpoints.dart';
 export 'src/theme/dashuri_text.dart';
 export 'src/theme/dashuri_theme.dart';
 export 'src/tokens/dashuri_tokens.dart';
-export 'src/components/core_widgets.dart';

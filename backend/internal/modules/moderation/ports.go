@@ -73,6 +73,8 @@ type AutomatedCase struct {
 type ReportDecision struct {
 	ReportID, ModeratorID, Action, Reason string
 	At                                    time.Time
+	// ModeratorIsAdmin allows enforcement against staff accounts.
+	ModeratorIsAdmin bool
 }
 
 // AppealDecision is a moderator decision on an appeal.
@@ -96,6 +98,7 @@ var (
 	ErrAlreadyDecided  = errors.New("moderation: already decided")
 	ErrSameReviewer    = errors.New("moderation: different reviewer required")
 	ErrSelfDecision    = errors.New("moderation: cannot decide own case")
+	ErrStaffTarget     = errors.New("moderation: only an admin may act against staff")
 	ErrInvalidDecision = errors.New("moderation: invalid decision")
 )
 
@@ -108,6 +111,10 @@ type Repository interface {
 	DecideReport(ctx context.Context, d ReportDecision) (ModerationDecision, error)
 	DecideAppeal(ctx context.Context, d AppealDecision) (ModerationDecision, error)
 	FrameWindowCalls(ctx context.Context, now time.Time) ([]CallFrames, error)
+	// LiveCallIDs lists the user's calls that are still live (enforcement ends them).
+	LiveCallIDs(ctx context.Context, userID string) ([]string, error)
+	// LastFrameAt is when the user last submitted a frame for the call.
+	LastFrameAt(ctx context.Context, callID, userID string) (*time.Time, error)
 }
 
 // QueueCursor is the keyset position (priority asc, created_at asc, id asc).

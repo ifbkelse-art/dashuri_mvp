@@ -9,7 +9,7 @@ import '../domain/usecases/location_usecases.dart';
 
 /// City picker: search the curated list, or detect once from the device.
 /// The picked city is saved to the profile before the page closes.
-final class CityPickerCubit extends Cubit<CityPickerState> {
+class CityPickerCubit extends Cubit<CityPickerState> {
   CityPickerCubit(
     this._search,
     this._detect,

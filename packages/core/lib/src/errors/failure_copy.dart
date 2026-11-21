@@ -17,8 +17,7 @@ String failureMessage(Failure failure) => switch (failure) {
   PlatformFailure() => 'Something on this device stopped this from working.',
   ServerFailure(code: 'database_unavailable') ||
   ServerFailure() => 'Our servers are having trouble. Please try again soon.',
-  ConflictFailure() || BusinessRuleFailure() =>
-    "This can't be done right now. Please try again.",
-  UnexpectedFailure() =>
-    'Something went wrong on our side. Please try again.',
+  ConflictFailure() ||
+  BusinessRuleFailure() => "This can't be done right now. Please try again.",
+  UnexpectedFailure() => 'Something went wrong on our side. Please try again.',
 };

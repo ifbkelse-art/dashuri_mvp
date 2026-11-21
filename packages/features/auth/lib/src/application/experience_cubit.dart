@@ -4,7 +4,7 @@ import 'package:equatable/equatable.dart';
 
 /// A12 choose your experience. The choice is stored on the device per user;
 /// the host shell is used only for approved hosts.
-final class ExperienceCubit extends Cubit<ExperienceState> {
+class ExperienceCubit extends Cubit<ExperienceState> {
   ExperienceCubit(this._controller)
     : super(
         ExperienceState(

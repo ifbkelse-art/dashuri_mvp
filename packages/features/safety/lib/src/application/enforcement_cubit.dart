@@ -8,7 +8,7 @@ import '../domain/usecases/list_enforcement_notices.dart';
 import '../domain/usecases/submit_appeal.dart';
 
 /// Enforcement notices (GET /v1/me/enforcement) and appeals (POST /v1/appeals).
-final class EnforcementCubit extends Cubit<EnforcementState> {
+class EnforcementCubit extends Cubit<EnforcementState> {
   EnforcementCubit(this._list, this._appeal) : super(const EnforcementState());
 
   final ListEnforcementNotices _list;

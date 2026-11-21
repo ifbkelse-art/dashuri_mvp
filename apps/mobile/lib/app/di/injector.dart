@@ -18,10 +18,15 @@ import 'package:feature_wallet/feature_wallet.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../experience/app_experience_controller.dart';
 import 'unconfigured_backend.dart';
 
 /// The app's single service locator. Only this file and route builders use it.
 final GetIt sl = GetIt.instance;
+
+/// False when running on [UnconfiguredBackend] (development without config):
+/// the welcome page then says the backend is not configured.
+bool backendConfigured = true;
 
 /// Composition root: platform adapters first, then each feature.
 /// To add a feature: depend on it in pubspec.yaml, call its `register…Feature(sl)`
@@ -36,7 +41,16 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
     )
     ..registerLazySingleton<SecureKeyValueStore>(SecureStore.new);
 
-  if (config.validate().isEmpty) {
+  sl
+    ..registerLazySingleton<AppExperienceController>(
+      () => AppExperienceController(sl<KeyValueStore>()),
+    )
+    ..registerLazySingleton<ExperienceController>(
+      () => sl<AppExperienceController>(),
+    );
+
+  backendConfigured = config.validate().isEmpty;
+  if (backendConfigured) {
     final client = await initSupabase(config);
     final session = SupabaseSessionGateway(client);
     sl
@@ -79,4 +93,11 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
   registerNotificationsFeature(sl);
   registerSettingsFeature(sl);
   registerLocationFeature(sl);
+
+  // H23 "Switch to customer mode" (feature_host looks this up if present).
+  sl.registerLazySingleton<HostModeSwitch>(
+    () => HostModeSwitch(
+      () => sl<ExperienceController>().setMode(ExperienceMode.customer),
+    ),
+  );
 }

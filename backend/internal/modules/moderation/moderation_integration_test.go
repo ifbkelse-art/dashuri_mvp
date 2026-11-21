@@ -183,3 +183,56 @@ func TestMissingFramesQueueReviewOnce(t *testing.T) {
 		t.Fatalf("missing frames must not end the call: %s", got.Phase)
 	}
 }
+
+// Security review findings 3, 6 and 8.
+func TestEnforcementEndsLiveCallsAndConflictRules(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	ctx := context.Background()
+	callSvc := callstest.Calls(api, &callstest.Video{})
+	svc := moderation.NewService(moderation.Deps{Enabled: true, Calls: callSvc,
+		Repo:       postgres.ModerationRepo{Pool: api, Tx: db.TxManager{Pool: api}},
+		Classifier: fakeClassifier{moderation.NudityScore{Vendor: "fake"}}})
+	host := callstest.Host(t, admin, 1000)
+	cust := pgtest.NewUser(t, admin, true)
+	mod := pgtest.NewUser(t, admin, true, "customer", "moderator")
+	otherMod := pgtest.NewUser(t, admin, true, "customer", "moderator")
+	callstest.Fund(t, api, cust, 100000)
+	callID := activeCall(t, callSvc, cust, host, time.Now().UTC().Add(-30*time.Second))
+
+	// 8: a second frame within 8 s is rate limited.
+	req := moderation.ModerationFrameRequest{ImageBase64: frame, CapturedAt: time.Now().UTC()}
+	if _, err := svc.SubmitFrame(ctx, callstest.Principal(cust), callID, req); err != nil {
+		t.Fatalf("first frame: %v", err)
+	}
+	if _, err := svc.SubmitFrame(ctx, callstest.Principal(cust), callID, req); callstest.Rule(err) != "frame_rate_limited" {
+		t.Fatalf("second frame: %v", err)
+	}
+
+	report := func(reporter, target string) string {
+		var id string
+		if err := admin.QueryRow(ctx, `insert into safety.reports (reporter_id, target_user_id, category, priority) values ($1, $2, 'harassment', 2) returning id`, reporter, target).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	// 6: a moderator cannot decide a report they filed.
+	own := report(mod, cust)
+	if _, err := svc.DecideReport(ctx, callstest.Principal(mod, auth.RoleModerator), own, moderation.ModerationDecisionRequest{Action: "ban", Reason: "x"}); callstest.Rule(err) != "self_review" {
+		t.Fatalf("own report: %v", err)
+	}
+	// 6: a moderator cannot ban another staff member; only an admin can.
+	staff := report(cust, otherMod)
+	if _, err := svc.DecideReport(ctx, callstest.Principal(mod, auth.RoleModerator), staff, moderation.ModerationDecisionRequest{Action: "ban", Reason: "x"}); callstest.Rule(err) != "admin_required" {
+		t.Fatalf("staff target: %v", err)
+	}
+	// 3: banning the customer ends their live call.
+	r := report(host, cust)
+	if _, err := svc.DecideReport(ctx, callstest.Principal(otherMod, auth.RoleModerator), r, moderation.ModerationDecisionRequest{Action: "ban", Reason: "abuse"}); err != nil {
+		t.Fatal(err)
+	}
+	var phase string
+	_ = api.QueryRow(ctx, `select phase from calls.calls where id = $1`, callID).Scan(&phase)
+	if phase != "ended" {
+		t.Fatalf("ban left the live call in phase %s", phase)
+	}
+}
