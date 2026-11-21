@@ -9,7 +9,8 @@ part 'free_call_card_state.dart';
 
 /// Loads FreeCallCard for the page. Add one method per user action; each calls
 /// a use case and emits states. No API or Supabase access here.
-final class FreeCallCardCubit extends Cubit<FreeCallCardState> {
+// Not final: page tests mock it.
+class FreeCallCardCubit extends Cubit<FreeCallCardState> {
   FreeCallCardCubit(this._getFreeCallCard)
     : super(const FreeCallCardStateInitial());
 

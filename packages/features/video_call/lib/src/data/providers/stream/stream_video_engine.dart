@@ -46,7 +46,8 @@ final class StreamVideoEngine implements VideoEngine {
       return const Err(
         PlatformFailure(
           code: 'video_not_configured',
-          message: 'No Stream api key (server api_key or DASHURI_STREAM_API_KEY)',
+          message:
+              'No Stream api key (server api_key or DASHURI_STREAM_API_KEY)',
         ),
       );
     }
@@ -69,7 +70,11 @@ final class StreamVideoEngine implements VideoEngine {
         await _teardown();
         return Err(_failure('video_connect_failed', connected));
       }
-      final (type, id) = _callCid(credentials.providerCallId);
+      var (type, id) = _callCid(credentials.providerCallId);
+      if (credentials.callType != null &&
+          !credentials.providerCallId.contains(':')) {
+        type = credentials.callType!;
+      }
       final c = client.makeCall(
         callType: sv.StreamCallType.fromString(type),
         id: id,

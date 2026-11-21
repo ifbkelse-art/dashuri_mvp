@@ -60,8 +60,9 @@ final class VideoCallRoutes implements FeatureRoutes {
         final incoming = state.uri.queryParameters['incoming'] == '1';
         final kit = _sl<CallMediaKit>();
         return BlocProvider(
-          create: (_) => createCallBloc(_sl, kit)
-            ..add(CallAttachRequested(callId, incoming: incoming)),
+          create: (_) =>
+              createCallBloc(_sl, kit)
+                ..add(CallAttachRequested(callId, incoming: incoming)),
           child: CallPage(views: kit.views),
         );
       },

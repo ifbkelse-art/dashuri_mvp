@@ -83,7 +83,7 @@ class GlassPill extends StatelessWidget {
         style: const TextStyle(color: Colors.white),
         child: IconTheme.merge(
           data: const IconThemeData(color: Colors.white, size: 16),
-          child: child,
+          child: FittedBox(fit: BoxFit.scaleDown, child: child),
         ),
       ),
     ),
@@ -291,7 +291,10 @@ class SummaryRow extends StatelessWidget {
             child: DefaultTextStyle.merge(
               style: theme.textTheme.titleSmall?.copyWith(color: valueColor),
               textAlign: TextAlign.end,
-              child: Align(alignment: Alignment.centerRight, child: value),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: FittedBox(fit: BoxFit.scaleDown, child: value),
+              ),
             ),
           ),
         ],

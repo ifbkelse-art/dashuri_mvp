@@ -75,30 +75,34 @@ void main() {
       },
     );
     when(() => capture(any())).thenAnswer((_) async => Success(frame));
-    when(() => submit(any())).thenAnswer((_) async => const Success(null));
+    when(() => submit(any())).thenAnswer((_) async => const Success(true));
   });
 
-  test('first frame after 5 s, then every 20 s until the window ends', () async {
-    scheduler.start(
-      callId: 'c1',
-      windowEndsAt: clock.now().add(const Duration(seconds: 180)),
-    );
-    expect(timers.single.delay, const Duration(seconds: 5));
-    await fire();
-    expect(timers.single.delay, const Duration(seconds: 20));
-    // 5 + 20 * 8 = 165 s; the next tick (185 s) is past the window.
-    for (var i = 0; i < 8; i++) {
+  test(
+    'first frame after 5 s, then every 20 s until the window ends',
+    () async {
+      scheduler.start(
+        callId: 'c1',
+        windowEndsAt: clock.now().add(const Duration(seconds: 180)),
+      );
+      expect(timers.single.delay, const Duration(seconds: 5));
       await fire();
-    }
-    expect(scheduler.submittedCount, 9);
-    expect(timers, isEmpty);
-    expect(scheduler.isRunning, isFalse);
-    verify(() => submit(any())).called(9);
-  });
+      expect(timers.single.delay, const Duration(seconds: 20));
+      // 5 + 20 * 8 = 165 s; the next tick (185 s) is past the window.
+      for (var i = 0; i < 8; i++) {
+        await fire();
+      }
+      expect(scheduler.submittedCount, 9);
+      expect(timers, isEmpty);
+      expect(scheduler.isRunning, isFalse);
+      verify(() => submit(any())).called(9);
+    },
+  );
 
   test('stops on moderation_window_closed', () async {
     when(() => submit(any())).thenAnswer(
-      (_) async => const Err(BusinessRuleFailure(code: 'moderation_window_closed')),
+      (_) async =>
+          const Err(BusinessRuleFailure(code: 'moderation_window_closed')),
     );
     scheduler.start(
       callId: 'c1',
@@ -107,6 +111,16 @@ void main() {
     await fire();
     expect(scheduler.isRunning, isFalse);
     expect(timers, isEmpty);
+  });
+
+  test('stops when the server says moderation is off', () async {
+    when(() => submit(any())).thenAnswer((_) async => const Success(false));
+    scheduler.start(
+      callId: 'c1',
+      windowEndsAt: clock.now().add(const Duration(minutes: 3)),
+    );
+    await fire();
+    expect(scheduler.isRunning, isFalse);
   });
 
   test('a failed capture skips the frame and keeps the schedule', () async {

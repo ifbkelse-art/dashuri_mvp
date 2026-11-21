@@ -45,7 +45,8 @@ final class CallHistoryLoaded extends CallHistoryState {
 }
 
 /// Own call history (GET /v1/calls/history), cursor-paged.
-final class CallHistoryCubit extends Cubit<CallHistoryState> {
+// Not final: page tests mock it.
+class CallHistoryCubit extends Cubit<CallHistoryState> {
   CallHistoryCubit(this._history) : super(const CallHistoryLoading());
 
   final GetCallHistory _history;
@@ -65,13 +66,15 @@ final class CallHistoryCubit extends Cubit<CallHistoryState> {
   Future<void> loadMore() async {
     final s = state;
     if (s is! CallHistoryLoaded || !s.hasMore || s.loadingMore) return;
-    emit(CallHistoryLoaded(s.items, nextCursor: s.nextCursor, loadingMore: true));
+    emit(
+      CallHistoryLoaded(s.items, nextCursor: s.nextCursor, loadingMore: true),
+    );
     final result = await _history(PageRequest(cursor: s.nextCursor));
     emit(switch (result) {
-      Success(:final value) => CallHistoryLoaded(
-        [...s.items, ...value.items],
-        nextCursor: value.nextCursor,
-      ),
+      Success(:final value) => CallHistoryLoaded([
+        ...s.items,
+        ...value.items,
+      ], nextCursor: value.nextCursor),
       Err() => CallHistoryLoaded(
         s.items,
         nextCursor: s.nextCursor,

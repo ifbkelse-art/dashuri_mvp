@@ -10,10 +10,17 @@ import '../datasources/call_remote_data_source.dart';
 import '../models/call_json.dart';
 
 final class CallRepositoryImpl implements CallRepository {
-  const CallRepositoryImpl(this._remote, this._realtime);
+  const CallRepositoryImpl(
+    this._remote,
+    this._realtime, {
+    String? Function()? currentUserId,
+  }) : _currentUserId = currentUserId;
 
   final CallRemoteDataSource _remote;
   final RealtimeGateway _realtime;
+
+  /// Signed-in user id, used to read `call:<id>` events (caller's view).
+  final String? Function()? _currentUserId;
 
   @override
   Future<Result<CallSession>> requestCall({
@@ -46,7 +53,7 @@ final class CallRepositoryImpl implements CallRepository {
   @override
   Stream<CallEvent> watchCall(String callId) => _realtime
       .subscribe('call:$callId')
-      .map(_safeEvent)
+      .map((e) => _safeEvent(e, _currentUserId?.call()))
       .where((e) => e != null)
       .cast<CallEvent>();
 
@@ -54,12 +61,12 @@ final class CallRepositoryImpl implements CallRepository {
   Stream<CallSession> watchUserCalls(String userId) => _realtime
       .subscribe('user:$userId')
       .where((e) => e.type == 'call.updated')
-      .map(_safeEvent)
+      .map((e) => _safeEvent(e, null))
       .whereType<CallUpdated>()
       .map((e) => e.session);
 
   @override
-  Future<Result<void>> submitModerationFrame({
+  Future<Result<bool>> submitModerationFrame({
     required String callId,
     required String imageBase64,
     required DateTime capturedAt,
@@ -108,9 +115,9 @@ final class CallRepositoryImpl implements CallRepository {
   }
 
   /// A malformed realtime payload is a hint lost, not a crash.
-  static CallEvent? _safeEvent(RealtimeEvent e) {
+  static CallEvent? _safeEvent(RealtimeEvent e, String? selfUserId) {
     try {
-      return callEventFromRealtime(e);
+      return callEventFromRealtime(e, selfUserId: selfUserId);
     } on Object {
       return null;
     }

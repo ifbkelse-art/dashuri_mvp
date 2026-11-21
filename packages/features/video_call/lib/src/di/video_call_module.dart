@@ -61,8 +61,13 @@ void registerVideoCallFeature(GetIt sl) {
       () => CallRemoteDataSource(sl<ApiClient>()),
     )
     ..registerLazySingleton<CallRepository>(
-      () =>
-          CallRepositoryImpl(sl<CallRemoteDataSource>(), sl<RealtimeGateway>()),
+      () => CallRepositoryImpl(
+        sl<CallRemoteDataSource>(),
+        sl<RealtimeGateway>(),
+        currentUserId: () => sl.isRegistered<SessionGateway>()
+            ? sl<SessionGateway>().currentSession?.userId
+            : null,
+      ),
     )
     ..registerFactory<CallMediaKit>(() {
       final engine = StreamVideoEngine(fallbackApiKey: streamApiKeyFallback);

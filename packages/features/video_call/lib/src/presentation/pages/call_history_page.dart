@@ -23,14 +23,13 @@ class CallHistoryPage extends StatelessWidget {
             message: callFailureMessage(failure),
             onRetry: cubit.load,
           ),
-          CallHistoryLoaded(:final items) when items.isEmpty =>
-            EmptyStateView(
-              icon: Icons.videocam_outlined,
-              title: 'No calls yet',
-              message: 'Calls you make or receive will appear here.',
-              actionLabel: 'Refresh',
-              onAction: cubit.load,
-            ),
+          CallHistoryLoaded(:final items) when items.isEmpty => EmptyStateView(
+            icon: Icons.videocam_outlined,
+            title: 'No calls yet',
+            message: 'Calls you make or receive will appear here.',
+            actionLabel: 'Refresh',
+            onAction: cubit.load,
+          ),
           CallHistoryLoaded() => RefreshIndicator(
             onRefresh: cubit.load,
             child: NotificationListener<ScrollNotification>(
@@ -86,7 +85,7 @@ class _CallTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = call.peerName.isEmpty ? 'Call' : call.peerName;
-    final started = call.startedAt?.toLocal();
+    final started = (call.createdAt ?? call.startedAt)?.toLocal();
     final date = started == null
         ? null
         : '${started.day.toString().padLeft(2, '0')}/'

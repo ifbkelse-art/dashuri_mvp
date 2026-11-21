@@ -23,30 +23,27 @@ class CallSummaryPage extends StatelessWidget {
   final String callId;
 
   @override
-  Widget build(BuildContext context) =>
-      BlocBuilder<CallSummaryCubit, CallSummaryState>(
-        builder: (context, s) => Scaffold(
-          appBar: AppBar(
-            leading: CloseButton(onPressed: () => _done(context, s)),
-          ),
-          body: switch (s) {
-            CallSummaryLoading() => const LoadingView(),
-            CallSummaryFailed(:final failure) => ErrorStateView(
-              message: callFailureMessage(failure),
-              onRetry: () => context.read<CallSummaryCubit>().load(callId),
-            ),
-            CallSummaryLoaded() => SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  vertical: DashuriTokens.space5,
-                ),
-                child: ResponsiveCenter(child: _Content(state: s)),
-              ),
-            ),
-          },
+  Widget build(
+    BuildContext context,
+  ) => BlocBuilder<CallSummaryCubit, CallSummaryState>(
+    builder: (context, s) => Scaffold(
+      appBar: AppBar(leading: CloseButton(onPressed: () => _done(context, s))),
+      body: switch (s) {
+        CallSummaryLoading() => const LoadingView(),
+        CallSummaryFailed(:final failure) => ErrorStateView(
+          message: callFailureMessage(failure),
+          onRetry: () => context.read<CallSummaryCubit>().load(callId),
         ),
-      );
+        CallSummaryLoaded() => SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: DashuriTokens.space5),
+            child: ResponsiveCenter(child: _Content(state: s)),
+          ),
+        ),
+      },
+    ),
+  );
 }
 
 void _done(BuildContext context, CallSummaryState s) {
@@ -121,7 +118,11 @@ class _Content extends StatelessWidget {
     if (s.phase == CallPhase.failed) {
       return Column(
         children: [
-          Icon(Icons.link_off_rounded, size: 56, color: theme.colorScheme.primary),
+          Icon(
+            Icons.link_off_rounded,
+            size: 56,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(height: DashuriTokens.space4),
           Text(
             "The call couldn't connect",
@@ -167,7 +168,10 @@ class _Content extends StatelessWidget {
     final duration = DashuriFormat.duration(s.billedSeconds);
     final moderation = s.endReason == 'moderation';
     final rows = <Widget>[
-      SummaryRow(label: 'Billed time', value: Text(minutesSeconds(s.billedSeconds))),
+      SummaryRow(
+        label: 'Billed time',
+        value: Text(minutesSeconds(s.billedSeconds)),
+      ),
       if (!s.isFreeCall)
         SummaryRow(
           label: s.role == CallRole.receiver ? 'Your rate' : 'Rate',
@@ -211,7 +215,10 @@ class _Content extends StatelessWidget {
             ),
           ] else
             Text(
-              'Your earnings for this call will appear in Earnings.',
+              s.isFreeCall
+                  ? 'Free calls are paid only for a full connected minute. '
+                        'Any earnings for this call will appear in Earnings.'
+                  : 'Your earnings for this call will appear in Earnings.',
               style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -279,7 +286,9 @@ class _Content extends StatelessWidget {
         const SizedBox(height: DashuriTokens.space6),
         if (ranOut || s.isFreeCall) ...[
           PrimaryButton(
-            label: s.isFreeCall ? 'Buy Diamonds to keep talking' : 'Top up Diamonds',
+            label: s.isFreeCall
+                ? 'Buy Diamonds to keep talking'
+                : 'Top up Diamonds',
             icon: Icons.add_rounded,
             onPressed: () => context.push(RoutePaths.buyDiamonds),
           ),
@@ -336,14 +345,17 @@ class _Notice extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.hourglass_bottom_rounded, color: DashuriTokens.warning),
+          const Icon(
+            Icons.hourglass_bottom_rounded,
+            color: DashuriTokens.warning,
+          ),
           const SizedBox(width: DashuriTokens.space3),
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: DashuriTokens.neutral800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: DashuriTokens.neutral800),
             ),
           ),
         ],

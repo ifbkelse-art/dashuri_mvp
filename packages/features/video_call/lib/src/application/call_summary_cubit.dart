@@ -39,7 +39,8 @@ final class CallSummaryLoaded extends CallSummaryState {
 }
 
 /// V08–V10, V14, V18: the server's final view of a call.
-final class CallSummaryCubit extends Cubit<CallSummaryState> {
+// Not final: page tests mock it.
+class CallSummaryCubit extends Cubit<CallSummaryState> {
   CallSummaryCubit({
     required GetCall getCall,
     required GetAvailableDiamonds getBalance,

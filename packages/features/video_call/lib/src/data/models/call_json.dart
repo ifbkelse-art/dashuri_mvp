@@ -37,26 +37,58 @@ CallSession callSessionFromJson(JsonMap json) => CallSession(
   startedAt: _date(json['started_at']),
   moderationWindowEndsAt: _date(json['moderation_window_ends_at']),
   beansEarned: _int(json['beans_earned']),
+  createdAt: _date(json['created_at']),
 );
+
+/// `call.updated` on `call:<id>` is sent from the caller's view with
+/// `caller_user_id`/`receiver_user_id`. When [selfUserId] is the receiver,
+/// re-derive the role and peer id; the caller-view `peer` (which would be
+/// this user) is dropped and kept from the previous snapshot by the bloc.
+CallSession callSessionForUser(JsonMap json, String? selfUserId) {
+  final s = callSessionFromJson(json);
+  final caller = json['caller_user_id'], receiver = json['receiver_user_id'];
+  if (selfUserId == null || caller is! String || receiver is! String) return s;
+  if (selfUserId == caller) {
+    return s.role == CallRole.caller
+        ? s
+        : callSessionFromJson({
+            ...json,
+            'role': 'caller',
+            'peer_user_id': receiver,
+            'peer': null,
+          });
+  }
+  if (selfUserId == receiver) {
+    return callSessionFromJson({
+      ...json,
+      'role': 'receiver',
+      'peer_user_id': caller,
+      if (s.role != CallRole.receiver) 'peer': null,
+    });
+  }
+  return s;
+}
 
 CallCredentials callCredentialsFromJson(JsonMap json) => CallCredentials(
   provider: json['provider']! as String,
   providerCallId: json['provider_call_id']! as String,
-  userToken: json['user_token']! as String,
+  userToken: (json['user_token'] ?? json['token'])! as String,
   expiresAt: DateTime.parse(json['expires_at']! as String),
   apiKey: json['api_key'] as String?,
   providerUserId: json['user_id'] as String?,
+  callType: json['call_type'] as String?,
 );
 
 /// Maps a realtime event; unknown types return null and are ignored.
-CallEvent? callEventFromRealtime(RealtimeEvent e) => switch (e.type) {
-  'call.updated' => CallUpdated(callSessionFromJson(e.payload)),
-  'call.low_balance' => CallLowBalance(
-    (e.payload['seconds_remaining']! as num).toInt(),
-  ),
-  'call.moderation_ended' => const CallModerationEnded(),
-  _ => null,
-};
+CallEvent? callEventFromRealtime(RealtimeEvent e, {String? selfUserId}) =>
+    switch (e.type) {
+      'call.updated' => CallUpdated(callSessionForUser(e.payload, selfUserId)),
+      'call.low_balance' => CallLowBalance(
+        (e.payload['seconds_remaining']! as num).toInt(),
+      ),
+      'call.moderation_ended' => const CallModerationEnded(),
+      _ => null,
+    };
 
 /// Combines GET /v1/discovery/hosts/{id}, GET /v1/wallet and
 /// GET /v1/purchases/packages into the pre-call view.
@@ -81,7 +113,9 @@ String? userIdFromJwt(String token) {
   final parts = token.split('.');
   if (parts.length != 3) return null;
   try {
-    final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+    final payload = utf8.decode(
+      base64Url.decode(base64Url.normalize(parts[1])),
+    );
     final map = jsonDecode(payload);
     if (map is Map<String, Object?>) {
       final id = map['user_id'] ?? map['sub'];

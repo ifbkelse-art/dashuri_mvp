@@ -10,6 +10,7 @@ abstract interface class FreeCallRepository {
 
   Future<Result<FreeCallRequest>> requestFreeCall({
     required IdempotencyKey idempotencyKey,
+    String? integrityToken,
   });
 
   Future<Result<FreeCallRequest>> getFreeCallRequest({

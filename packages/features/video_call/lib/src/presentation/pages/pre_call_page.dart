@@ -16,36 +16,33 @@ class PreCallPage extends StatelessWidget {
   final String hostUserId;
 
   @override
-  Widget build(BuildContext context) =>
-      BlocConsumer<PreCallCubit, PreCallState>(
-        listener: (context, s) {
-          if (s is PreCallStarted) {
-            context.pushReplacement(
-              RoutePaths.withParams(RoutePaths.call, {
-                'callId': s.session.callId,
-              }),
-            );
-          }
-        },
-        builder: (context, s) => Scaffold(
-          appBar: AppBar(
-            leading: const CloseButton(),
-            title: Text(
-              s is PreCallReady && s.insufficient
-                  ? 'Top up to call'
-                  : 'Video call',
-            ),
-          ),
-          body: switch (s) {
-            PreCallLoading() || PreCallStarted() => const LoadingView(),
-            PreCallFailed(:final failure) => ErrorStateView(
-              message: callFailureMessage(failure),
-              onRetry: () => context.read<PreCallCubit>().load(hostUserId),
-            ),
-            PreCallReady() => _Ready(state: s, hostUserId: hostUserId),
-          },
+  Widget build(
+    BuildContext context,
+  ) => BlocConsumer<PreCallCubit, PreCallState>(
+    listener: (context, s) {
+      if (s is PreCallStarted) {
+        context.pushReplacement(
+          RoutePaths.withParams(RoutePaths.call, {'callId': s.session.callId}),
+        );
+      }
+    },
+    builder: (context, s) => Scaffold(
+      appBar: AppBar(
+        leading: const CloseButton(),
+        title: Text(
+          s is PreCallReady && s.insufficient ? 'Top up to call' : 'Video call',
         ),
-      );
+      ),
+      body: switch (s) {
+        PreCallLoading() || PreCallStarted() => const LoadingView(),
+        PreCallFailed(:final failure) => ErrorStateView(
+          message: callFailureMessage(failure),
+          onRetry: () => context.read<PreCallCubit>().load(hostUserId),
+        ),
+        PreCallReady() => _Ready(state: s, hostUserId: hostUserId),
+      },
+    ),
+  );
 }
 
 class _Ready extends StatelessWidget {

@@ -16,6 +16,9 @@ Timer _defaultTimer(Duration d, void Function() cb) => Timer(d, cb);
 /// then every [interval], and submit each frame. Stops at the window end, on
 /// `moderation_window_closed` from the server, or on [stop].
 ///
+/// Also stops when the server answers `accepted: false` (moderation off)
+/// or 503 `moderation_not_configured`.
+///
 /// A failed capture or upload skips that frame (the server queues a review
 /// if no frames arrive for 60 s; it never ends a call for missing frames).
 final class ModerationFrameScheduler {
@@ -85,9 +88,16 @@ final class ModerationFrameScheduler {
       final sent = await _submit((callId: callId, frame: value));
       if (_callId != callId) return;
       switch (sent) {
+        // `accepted: false`: moderation is switched off on the server.
+        case Success(:final value) when !value:
+          return stop();
         case Success():
           _submitted++;
-        case Err(:final failure) when failure.code == 'moderation_window_closed':
+        case Err(:final failure)
+            when const {
+              'moderation_window_closed',
+              'moderation_not_configured',
+            }.contains(failure.code):
           return stop();
         case Err():
           break;

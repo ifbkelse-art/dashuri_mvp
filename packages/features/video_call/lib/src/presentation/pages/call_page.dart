@@ -50,11 +50,6 @@ class _CallPageState extends State<CallPage> {
   }
 
   void _onState(BuildContext context, CallState s) {
-    if (s.lowBalanceSecondsRemaining != null &&
-        s.lowBalanceSecondsRemaining != _lowBalanceValue) {
-      _lowBalanceValue = s.lowBalanceSecondsRemaining;
-      _lowBalanceAt = DateTime.now().toUtc();
-    }
     if (s.status != CallUiStatus.ended) return;
     final session = s.session;
     final router = GoRouter.of(context);
@@ -76,9 +71,7 @@ class _CallPageState extends State<CallPage> {
       return;
     }
     router.go(
-      RoutePaths.withParams(RoutePaths.callSummary, {
-        'callId': session.callId,
-      }),
+      RoutePaths.withParams(RoutePaths.callSummary, {'callId': session.callId}),
     );
     if (s.requestedEndReason == 'report') {
       unawaited(
@@ -123,6 +116,15 @@ class _CallPageState extends State<CallPage> {
     if (ok) bloc.add(const CallEndRequested());
   }
 
+  /// Anchors the visual low-balance countdown on when the warning arrived.
+  void _trackLowBalance(CallState s) {
+    final v = s.lowBalanceSecondsRemaining;
+    if (v != null && v != _lowBalanceValue) {
+      _lowBalanceValue = v;
+      _lowBalanceAt = DateTime.now().toUtc();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Theme(
     data: DashuriTheme.dark(),
@@ -145,6 +147,7 @@ class _CallPageState extends State<CallPage> {
   );
 
   Widget _body(BuildContext context, CallState s) {
+    _trackLowBalance(s);
     final session = s.session;
     switch (s.status) {
       case CallUiStatus.idle || CallUiStatus.requesting:
@@ -358,7 +361,8 @@ class _CallCanvas extends StatelessWidget {
   final VoidCallback onReport;
 
   bool get _live =>
-      state.status == CallUiStatus.active || state.status == CallUiStatus.paused;
+      state.status == CallUiStatus.active ||
+      state.status == CallUiStatus.paused;
 
   @override
   Widget build(BuildContext context) {
@@ -367,7 +371,11 @@ class _CallCanvas extends StatelessWidget {
         ? (session.role == CallRole.caller ? 'Host' : 'Customer')
         : session.peerName;
     final avatar = Center(
-      child: UserAvatar(name: peerName, url: session.peer?.photoUrl, radius: 56),
+      child: UserAvatar(
+        name: peerName,
+        url: session.peer?.photoUrl,
+        radius: 56,
+      ),
     );
     final isWaiting = !_live;
     return LayoutBuilder(
@@ -524,7 +532,8 @@ class _TopBar extends StatelessWidget {
     final white = theme.textTheme.labelLarge?.copyWith(color: Colors.white);
     return EverySecond(
       builder: (context, now) {
-        final paused = state.status == CallUiStatus.paused || state.reconnecting;
+        final paused =
+            state.status == CallUiStatus.paused || state.reconnecting;
         final started = session.startedAt;
         // Display clock anchored on the server's start time; frozen while
         // paused. Billing figures are the server's billedSeconds.
@@ -751,11 +760,7 @@ class _WaitingOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                UserAvatar(
-                  name: name,
-                  url: session.peer?.photoUrl,
-                  radius: 56,
-                ),
+                UserAvatar(name: name, url: session.peer?.photoUrl, radius: 56),
                 const SizedBox(height: DashuriTokens.space5),
                 Text(
                   ringing ? 'Ringing…' : 'Connecting securely…',
@@ -812,10 +817,9 @@ class _ReconnectingOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final paused =
-        context.select<CallBloc, bool>(
-          (b) => b.state.status == CallUiStatus.paused,
-        );
+    final paused = context.select<CallBloc, bool>(
+      (b) => b.state.status == CallUiStatus.paused,
+    );
     return ColoredBox(
       color: Colors.black.withValues(alpha: .6),
       child: Center(
@@ -826,7 +830,11 @@ class _ReconnectingOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 40),
+                const Icon(
+                  Icons.wifi_off_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
                 const SizedBox(height: DashuriTokens.space3),
                 Text(
                   'Connection lost',
@@ -843,10 +851,12 @@ class _ReconnectingOverlay extends StatelessWidget {
                 ),
                 if (paused) ...[
                   const SizedBox(height: DashuriTokens.space4),
-                  const GlassPill(
-                    child: Text(
-                      "Billing is paused. You won't be charged while you're "
-                      'disconnected.',
+                  Text(
+                    "Billing is paused. You won't be charged while you're "
+                    'disconnected.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF7FD8AE),
                     ),
                   ),
                 ],

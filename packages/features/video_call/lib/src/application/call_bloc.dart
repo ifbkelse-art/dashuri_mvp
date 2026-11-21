@@ -23,7 +23,8 @@ part 'call_state.dart';
 /// Orchestrates one call on the device: API lifecycle + media engine +
 /// server events. It never counts billable time; it displays the server's
 /// `billedSeconds`/`diamondsCharged` from `CallUpdated` events.
-final class CallBloc extends Bloc<CallBlocEvent, CallState> {
+// Not final: page tests mock it.
+class CallBloc extends Bloc<CallBlocEvent, CallState> {
   CallBloc({
     required RequestCall requestCall,
     required AcceptCall acceptCall,
@@ -96,10 +97,7 @@ final class CallBloc extends Bloc<CallBlocEvent, CallState> {
     }
   }
 
-  Future<void> _onAttach(
-    CallAttachRequested e,
-    Emitter<CallState> emit,
-  ) async {
+  Future<void> _onAttach(CallAttachRequested e, Emitter<CallState> emit) async {
     final getCall = _getCall;
     if (getCall == null) return;
     emit(
@@ -176,10 +174,7 @@ final class CallBloc extends Bloc<CallBlocEvent, CallState> {
       );
     }
     emit(
-      state.copyWith(
-        status: CallUiStatus.ending,
-        requestedEndReason: e.reason,
-      ),
+      state.copyWith(status: CallUiStatus.ending, requestedEndReason: e.reason),
     );
     final result = await _endCall((
       callId: callId,
@@ -222,10 +217,7 @@ final class CallBloc extends Bloc<CallBlocEvent, CallState> {
     }
   }
 
-  Future<void> _onRefresh(
-    CallRefreshTicked e,
-    Emitter<CallState> emit,
-  ) async {
+  Future<void> _onRefresh(CallRefreshTicked e, Emitter<CallState> emit) async {
     final callId = state.session?.callId;
     final getCall = _getCall;
     if (callId == null || getCall == null) return;
@@ -236,7 +228,8 @@ final class CallBloc extends Bloc<CallBlocEvent, CallState> {
   }
 
   /// Applies a server snapshot: status, moderation window, polling, media.
-  Future<void> _apply(CallSession session, Emitter<CallState> emit) async {
+  Future<void> _apply(CallSession incoming, Emitter<CallState> emit) async {
+    final session = incoming.withPeerFrom(state.session);
     final status = switch (session.phase) {
       CallPhase.requested || CallPhase.ringing =>
         session.role == CallRole.receiver

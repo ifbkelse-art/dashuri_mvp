@@ -26,7 +26,7 @@ const _info = PreCallInfo(
   ratePerMinute: 2400,
   availability: 'available',
   availableDiamonds: 12480,
-  approxPaisePerDiamondMilli: 22000,
+  approxPaisePerDiamondMilli: 2200,
 );
 
 void main() {
@@ -135,9 +135,9 @@ void main() {
       'loads the session and the remaining balance',
       build: () {
         final get = _Get(), bal = _Balance();
-        when(() => get('c1')).thenAnswer(
-          (_) async => Success(session(phase: CallPhase.ended)),
-        );
+        when(
+          () => get('c1'),
+        ).thenAnswer((_) async => Success(session(phase: CallPhase.ended)));
         when(() => bal(any())).thenAnswer((_) async => const Success(5080));
         return CallSummaryCubit(getCall: get, getBalance: bal);
       },
@@ -173,9 +173,9 @@ void main() {
         when(() => h(const PageRequest())).thenAnswer(
           (_) async => Success(Page(items: [session()], nextCursor: 'n')),
         );
-        when(() => h(const PageRequest(cursor: 'n'))).thenAnswer(
-          (_) async => Success(Page(items: [session(billed: 5)])),
-        );
+        when(
+          () => h(const PageRequest(cursor: 'n')),
+        ).thenAnswer((_) async => Success(Page(items: [session(billed: 5)])));
         return CallHistoryCubit(h);
       },
       act: (c) async {

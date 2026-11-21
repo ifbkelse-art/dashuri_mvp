@@ -25,9 +25,9 @@ The one-minute Free Call Card for eligible new customers: card status and a rand
 - Founder decision S4: one card per phone and device, random match among opted-in hosts, max 20 free calls per host per day, ₹10 host compensation per eligible free-call minute. All enforced server-side.
 - Android only. Disabled on iOS (Apple guideline 1.2 excludes random chat): the app hides this feature when `Platform.isIOS`.
 - Play policy: random-chat apps must block minors via Play Console tools (from 26 Aug 2026).
-- Device binding needs a Play Integrity token; the data source will send it once the integration is chosen (TODO).
+- Device binding: a Play Integrity token from `MethodChannel('dashuri/integrity')` `requestToken` (no arguments; the Android side derives the nonce). Failures map to `integrity_unavailable`. The request body carries `platform` (`ApiClient` has no per-request headers).
 - When matched, navigate to the call route with the returned `callId`; the video_call feature takes over.
 
-## Pages to build
+## Pages
 
-- FreeCallPage (RoutePaths.freeCall)
+- FreeCallPage (RoutePaths.freeCall): card state, then matching (`FreeCallMatchCubit` polls every 2 s, up to 90 s).

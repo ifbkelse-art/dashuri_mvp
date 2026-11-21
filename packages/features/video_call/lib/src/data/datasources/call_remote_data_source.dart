@@ -50,13 +50,13 @@ class CallRemoteDataSource {
     decode: objectDecoder(callCredentialsFromJson),
   );
 
-  Future<Result<void>> moderationFrame(
+  Future<Result<bool>> moderationFrame(
     String callId,
     String imageBase64,
     DateTime capturedAt,
-  ) => _api.post<void>(
+  ) => _api.post(
     '/v1/calls/$callId/moderation-frames',
-    decode: (_) {},
+    decode: (j) => j is Map<String, Object?> && j['accepted'] == true,
     body: {
       'image_base64': imageBase64,
       'captured_at': capturedAt.toUtc().toIso8601String(),
@@ -69,10 +69,8 @@ class CallRemoteDataSource {
     query: page.toQuery(),
   );
 
-  Future<Result<JsonMap>> host(String userId) => _api.get(
-    '/v1/discovery/hosts/$userId',
-    decode: objectDecoder((j) => j),
-  );
+  Future<Result<JsonMap>> host(String userId) =>
+      _api.get('/v1/discovery/hosts/$userId', decode: objectDecoder((j) => j));
 
   Future<Result<JsonMap>> wallet() =>
       _api.get('/v1/wallet', decode: objectDecoder((j) => j));

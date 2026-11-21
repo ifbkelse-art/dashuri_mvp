@@ -22,7 +22,8 @@ final class IncomingCallState extends Equatable {
 
 /// Watches `user:<currentUserId>` for ringing calls where the user is the
 /// receiver (V16). Each call id is reported once.
-final class IncomingCallCubit extends Cubit<IncomingCallState> {
+// Not final: page tests mock it.
+class IncomingCallCubit extends Cubit<IncomingCallState> {
   IncomingCallCubit(this._watch) : super(const IncomingCallState());
 
   final WatchIncomingCalls _watch;

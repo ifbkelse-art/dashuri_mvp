@@ -56,6 +56,7 @@ final class CallSession extends Equatable {
     this.startedAt,
     this.moderationWindowEndsAt,
     this.beansEarned,
+    this.createdAt,
   });
 
   final String callId;
@@ -82,7 +83,34 @@ final class CallSession extends Equatable {
   /// Beans credited to the host for this call, when the server reports it.
   final int? beansEarned;
 
+  /// When the call was requested.
+  final DateTime? createdAt;
+
   String get peerName => peer?.displayName ?? '';
+
+  /// This snapshot with [peer] filled from [previous] when the server
+  /// omitted it (e.g. `call:<id>` events seen from the receiver side).
+  CallSession withPeerFrom(CallSession? previous) =>
+      peer != null || previous?.peer == null
+      ? this
+      : copyWith(peer: previous!.peer);
+
+  CallSession copyWith({CallPeer? peer}) => CallSession(
+    callId: callId,
+    role: role,
+    peerUserId: peerUserId,
+    phase: phase,
+    ratePerMinute: ratePerMinute,
+    billedSeconds: billedSeconds,
+    diamondsCharged: diamondsCharged,
+    isFreeCall: isFreeCall,
+    endReason: endReason,
+    peer: peer ?? this.peer,
+    startedAt: startedAt,
+    moderationWindowEndsAt: moderationWindowEndsAt,
+    beansEarned: beansEarned,
+    createdAt: createdAt,
+  );
 
   @override
   List<Object?> get props => [
@@ -99,5 +127,6 @@ final class CallSession extends Equatable {
     startedAt,
     moderationWindowEndsAt,
     beansEarned,
+    createdAt,
   ];
 }

@@ -10,6 +10,7 @@ final class CallCredentials extends Equatable {
     required this.expiresAt,
     this.apiKey,
     this.providerUserId,
+    this.callType,
   });
 
   final String provider; // e.g. "stream"
@@ -24,6 +25,9 @@ final class CallCredentials extends Equatable {
   /// Provider user id; when absent the adapter reads it from the token.
   final String? providerUserId;
 
+  /// Provider call type, e.g. `default` (joins `<callType>:<providerCallId>`).
+  final String? callType;
+
   @override
   List<Object?> get props => [
     provider,
@@ -32,5 +36,6 @@ final class CallCredentials extends Equatable {
     expiresAt,
     apiKey,
     providerUserId,
+    callType,
   ];
 }

@@ -1,10 +1,15 @@
 import 'package:dashuri_network/dashuri_network.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 
 import '../application/discovery_cubit.dart';
+import '../application/discovery_header_cubit.dart';
+import '../application/host_profile_cubit.dart';
 import '../data/datasources/discovery_remote_data_source.dart';
 import '../data/repositories/discovery_repository_impl.dart';
 import '../domain/repositories/discovery_repository.dart';
+import '../domain/usecases/get_discovery_home.dart';
+import '../domain/usecases/get_host_profile.dart';
 import '../domain/usecases/list_available_hosts.dart';
 
 /// Registers the discovery feature. Called once from the app's composition root.
@@ -21,7 +26,23 @@ void registerDiscoveryFeature(GetIt sl) {
     ..registerFactory<ListAvailableHosts>(
       () => ListAvailableHosts(sl<DiscoveryRepository>()),
     )
+    ..registerFactory<GetHostProfile>(
+      () => GetHostProfile(sl<DiscoveryRepository>()),
+    )
+    ..registerFactory<GetDiscoveryHome>(
+      () => GetDiscoveryHome(sl<DiscoveryRepository>()),
+    )
     ..registerFactory<DiscoveryCubit>(
       () => DiscoveryCubit(sl<ListAvailableHosts>()),
+    )
+    ..registerFactory<DiscoveryHeaderCubit>(
+      () => DiscoveryHeaderCubit(
+        sl<GetDiscoveryHome>(),
+        // The Free Call Card is Android only (hidden on iOS, S4).
+        freeCallSupported: defaultTargetPlatform != TargetPlatform.iOS,
+      ),
+    )
+    ..registerFactory<HostProfileCubit>(
+      () => HostProfileCubit(sl<GetHostProfile>()),
     );
 }

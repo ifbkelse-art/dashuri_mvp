@@ -35,8 +35,9 @@ abstract interface class CallRepository {
   /// `call.updated` events on `user:<userId>` (incoming rings for hosts).
   Stream<CallSession> watchUserCalls(String userId);
 
-  /// POST /v1/calls/{id}/moderation-frames (S7).
-  Future<Result<void>> submitModerationFrame({
+  /// POST /v1/calls/{id}/moderation-frames (S7). Success carries the
+  /// server's `accepted` flag (false when moderation is switched off).
+  Future<Result<bool>> submitModerationFrame({
     required String callId,
     required String imageBase64,
     required DateTime capturedAt,

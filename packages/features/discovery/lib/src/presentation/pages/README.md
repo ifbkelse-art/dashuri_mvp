@@ -1,8 +1,3 @@
-# discovery pages (founder-owned)
+# discovery pages
 
-Put this feature's pages here, one file per page, then register each in `lib/src/routes/discovery_routes.dart`.
-
-Planned pages:
-- DiscoveryPage (RoutePaths.discovery)
-
-Rules: pages read state with `BlocBuilder`/`BlocListener` from the cubits in `lib/src/application/`, use `dashuri_design_system` for styling, and never import `data/` or `dashuri_network`.
+DiscoveryPage (C01–C06, C02 banner), DiscoveryFiltersPage (C03), HostProfilePage (C07–C09, C12).

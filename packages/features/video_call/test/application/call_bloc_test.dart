@@ -147,7 +147,9 @@ void main() {
     seed: () => const CallState(status: CallUiStatus.active, session: _ringing),
     act: (b) => b.add(
       CallServerEventReceived(
-        CallUpdated(session(phase: CallPhase.active, billed: 65, charged: 4333)),
+        CallUpdated(
+          session(phase: CallPhase.active, billed: 65, charged: 4333),
+        ),
       ),
     ),
     verify: (b) {
@@ -211,9 +213,9 @@ void main() {
 
   blocTest<CallBloc, CallState>(
     'caller joins media when the server reports accepted',
-    setUp: () => when(() => get('c1')).thenAnswer(
-      (_) async => Success(session(phase: CallPhase.ringing)),
-    ),
+    setUp: () => when(
+      () => get('c1'),
+    ).thenAnswer((_) async => Success(session(phase: CallPhase.ringing))),
     build: build,
     act: (b) async {
       b.add(const CallAttachRequested('c1'));
@@ -262,25 +264,30 @@ void main() {
     'active call inside the moderation window starts frame capture',
     build: build,
     seed: () => CallState(status: CallUiStatus.connecting, session: session()),
-    act: (b) => b.add(
-      CallServerEventReceived(
-        CallUpdated(
-          session(
-            moderationEnds: DateTime.now().toUtc().add(
-              const Duration(minutes: 3),
+    act: (b) async {
+      b.add(
+        CallServerEventReceived(
+          CallUpdated(
+            session(
+              moderationEnds: DateTime.now().toUtc().add(
+                const Duration(minutes: 3),
+              ),
             ),
           ),
         ),
-      ),
-    ),
-    verify: (_) => expect(moderation.isRunning, isTrue),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(moderation.isRunning, isTrue);
+    },
+    // Closing the bloc stops the scheduler.
+    verify: (_) => expect(moderation.isRunning, isFalse),
   );
 
   blocTest<CallBloc, CallState>(
     'reporting ends the call with reason report and stops moderation',
-    setUp: () => when(() => end(any())).thenAnswer(
-      (_) async => Success(session(phase: CallPhase.ended)),
-    ),
+    setUp: () => when(
+      () => end(any()),
+    ).thenAnswer((_) async => Success(session(phase: CallPhase.ended))),
     build: build,
     seed: () => CallState(status: CallUiStatus.active, session: session()),
     act: (b) {
@@ -296,7 +303,11 @@ void main() {
       expect(moderation.isRunning, isFalse);
       final captured =
           verify(() => end(captureAny())).captured.single
-              as ({String callId, String reason, IdempotencyKey idempotencyKey});
+              as ({
+                String callId,
+                String reason,
+                IdempotencyKey idempotencyKey,
+              });
       expect(captured.reason, 'report');
       verify(() => engine.leave()).called(greaterThanOrEqualTo(1));
     },
@@ -311,7 +322,8 @@ void main() {
     ),
     verify: (b) {
       expect(b.state.status, CallUiStatus.ended);
-      verify(() => engine.leave()).called(1);
+      // Once on the server end, once more (idempotent) on close.
+      verify(() => engine.leave()).called(2);
     },
   );
 
@@ -333,9 +345,9 @@ void main() {
   blocTest<CallBloc, CallState>(
     'a failed media join shows a failure',
     setUp: () {
-      when(() => get('c1')).thenAnswer(
-        (_) async => Success(session(phase: CallPhase.accepted)),
-      );
+      when(
+        () => get('c1'),
+      ).thenAnswer((_) async => Success(session(phase: CallPhase.accepted)));
       when(() => engine.join(any())).thenAnswer(
         (_) async => const Err(PlatformFailure(code: 'video_not_configured')),
       );

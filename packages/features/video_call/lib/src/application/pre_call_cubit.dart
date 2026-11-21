@@ -66,7 +66,8 @@ final class PreCallStarted extends PreCallState {
 
 /// V01/V06: shows the host's rate and own balance, then requests the call
 /// (POST /v1/calls) with one idempotency key per "Start video call" intent.
-final class PreCallCubit extends Cubit<PreCallState> {
+// Not final: page tests mock it.
+class PreCallCubit extends Cubit<PreCallState> {
   PreCallCubit({
     required GetPreCallInfo getInfo,
     required RequestCall requestCall,

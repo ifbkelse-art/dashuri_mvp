@@ -16,7 +16,20 @@ Future<void> pumpPage(WidgetTester t, Widget page, {Size size = phone}) async {
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
   final router = GoRouter(
-    routes: [GoRoute(path: '/', builder: (_, _) => page)],
+    routes: [
+      GoRoute(path: '/', builder: (_, _) => page),
+      GoRoute(
+        path: '/:a',
+        builder: _echo,
+        routes: [
+          GoRoute(
+            path: ':b',
+            builder: _echo,
+            routes: [GoRoute(path: ':c', builder: _echo)],
+          ),
+        ],
+      ),
+    ],
     errorBuilder: (_, s) => Scaffold(body: Text('route:${s.uri}')),
   );
   addTearDown(router.dispose);
@@ -63,3 +76,6 @@ CallSession session({
   moderationWindowEndsAt: moderationEnds,
   beansEarned: beans,
 );
+
+Widget _echo(BuildContext _, GoRouterState s) =>
+    Scaffold(body: Text('route:${s.uri}'));

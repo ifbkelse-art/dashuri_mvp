@@ -1,8 +1,3 @@
-# free_call pages (founder-owned)
+# free_call pages
 
-Put this feature's pages here, one file per page, then register each in `lib/src/routes/free_call_routes.dart`.
-
-Planned pages:
-- FreeCallPage (RoutePaths.freeCall)
-
-Rules: pages read state with `BlocBuilder`/`BlocListener` from the cubits in `lib/src/application/`, use `dashuri_design_system` for styling, and never import `data/` or `dashuri_network`.
+FreeCallPage (C02 card state, C10 matching). The call itself (V15) is `RoutePaths.call` in video_call.
