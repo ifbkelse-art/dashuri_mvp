@@ -1,6 +1,6 @@
 # Dashuri
 
-A paid one-to-one video marketplace for India (Android first). This repository holds the engineering foundation: a Flutter monorepo, a Go backend, Supabase migrations, the API contract and architecture docs. Production features are **not implemented yet**. Server operations return `501`, and client integrations (Play Billing, video) are documented skeletons.
+A paid one-to-one video marketplace for India (Android first). This repository holds the engineering foundation: a Flutter monorepo, a Go backend, Supabase migrations, the API contract and architecture docs. **MVP status (2026-11-22): implemented.** See `PROJECT_STATUS.md` for what is complete, test results, and what still needs real credentials. Decisions and API additions: `docs/mvp/MVP_DECISIONS_AND_CONTRACT.md`.
 
 ## Start here
 
