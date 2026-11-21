@@ -103,6 +103,9 @@ func (s *Service) ProposeAdjustment(ctx context.Context, p auth.Principal, in Ad
 	if errors.Is(err, ErrUnknownAccount) {
 		return AdjustmentProposal{}, apperr.NotFound("account owner")
 	}
+	if errors.Is(err, ErrOwnAccount) {
+		return AdjustmentProposal{}, apperr.Forbidden("conflict_of_interest", "you cannot propose an adjustment to your own account")
+	}
 	if err != nil {
 		return AdjustmentProposal{}, apperr.Internal(err)
 	}
@@ -125,6 +128,8 @@ func (s *Service) DecideAdjustment(ctx context.Context, p auth.Principal, propos
 	switch {
 	case errors.Is(err, ErrProposalNotFound):
 		return AdjustmentProposal{}, apperr.NotFound("proposal")
+	case errors.Is(err, ErrOwnAccount):
+		return AdjustmentProposal{}, apperr.Forbidden("conflict_of_interest", "you cannot propose or approve an adjustment to your own account, or to the proposer's")
 	case errors.Is(err, ErrSameApprover):
 		return AdjustmentProposal{}, apperr.BusinessRule("second_approver_required", "a different staff member must decide this adjustment")
 	case errors.Is(err, ErrProposalNotPending):

@@ -13,7 +13,7 @@ import (
 // Routes registers this module's endpoints. Handlers only decode, call the
 // service and encode; validation and rules live in the service.
 func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
-	mux.Handle("GET /v1/me", mw.User(s.handleGetMe))
+	mux.Handle("GET /v1/me", mw.UserAllowingSuspended(s.handleGetMe))
 	mux.Handle("POST /v1/me/rules-acceptance", mw.User(s.handleAcceptRules))
 	mux.Handle("GET /v1/me/profile", mw.User(s.handleGetMyProfile))
 	mux.Handle("PATCH /v1/me/profile", mw.User(s.handleUpdateMyProfile))

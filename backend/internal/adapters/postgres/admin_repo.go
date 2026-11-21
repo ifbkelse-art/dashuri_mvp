@@ -94,6 +94,9 @@ func (r AdminRepo) Reconcile(ctx context.Context) (admin.Reconciliation, error) 
 
 func (r AdminRepo) ProposeAdjustment(ctx context.Context, acct ledger.AccountRef, amount int64, reason, by string) (string, error) {
 	var id string
+	if acct.UserID == by {
+		return "", admin.ErrOwnAccount // security review finding 5
+	}
 	err := r.Tx.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		accountID, err := AccountID(ctx, tx, acct, ledger.CurrencyOf(acct.Kind))
 		if IsForeignKeyViolation(err) {
@@ -135,6 +138,9 @@ func (r AdminRepo) DecideAdjustment(ctx context.Context, proposalID, by string, 
 		}
 		if p.ProposedBy == by {
 			return admin.ErrSameApprover
+		}
+		if approve && (owner == by || owner == p.ProposedBy) {
+			return admin.ErrOwnAccount // security review finding 5
 		}
 		if !approve {
 			if _, err := tx.Exec(ctx, `update ledger.adjustment_proposals set status = 'rejected', approved_by = $2 where id = $1`, p.ID, by); err != nil {

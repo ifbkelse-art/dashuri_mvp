@@ -45,6 +45,7 @@ var (
 	ErrProposalNotFound   = errors.New("admin: proposal not found")
 	ErrProposalNotPending = errors.New("admin: proposal not awaiting approval")
 	ErrSameApprover       = errors.New("admin: approver must differ from proposer")
+	ErrOwnAccount         = errors.New("admin: staff cannot adjust an account they own or proposed for")
 	ErrUnknownAccount     = errors.New("admin: account owner not found")
 	ErrCycleNotFound      = errors.New("admin: payout cycle not found")
 	ErrCycleNotReady      = errors.New("admin: payout cycle not ready")

@@ -183,6 +183,18 @@ func TestReconciliationDetectsDriftAndAdjustmentsNeedTwoPeople(t *testing.T) {
 	if _, err := svc.ProposeAdjustment(ctx, pa, admin.AdjustmentRequest{Account: user + ":diamond_purchased", Currency: "BEAN", Amount: 5, Reason: "x"}); ruleCode(err) != "validation_failed" {
 		t.Fatalf("currency mismatch: %v", err)
 	}
+	// Security review finding 5: no adjustment to your own account, and no
+	// approving a credit to the proposer's account.
+	if _, err := svc.ProposeAdjustment(ctx, pa, admin.AdjustmentRequest{Account: "user:" + alice + ":bean_available", Currency: "BEAN", Amount: 100000, Reason: "self"}); ruleCode(err) != "conflict_of_interest" {
+		t.Fatalf("self adjustment: %v", err)
+	}
+	toBob, err := svc.ProposeAdjustment(ctx, pa, admin.AdjustmentRequest{Account: "user:" + bob + ":bean_available", Currency: "BEAN", Amount: 100000, Reason: "colleague"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.DecideAdjustment(ctx, pb, toBob.ProposalId, true); ruleCode(err) != "conflict_of_interest" {
+		t.Fatalf("approve own credit: %v", err)
+	}
 	if n := count(t, adm, `select count(*) from audit.events where target = $1`, prop.ProposalId); n != 2 {
 		t.Fatalf("audit events for proposal %d", n)
 	}

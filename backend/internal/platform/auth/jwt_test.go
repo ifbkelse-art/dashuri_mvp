@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -65,5 +67,38 @@ func TestAlgNoneRejected(t *testing.T) {
 	tok, _ := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.RegisteredClaims{Subject: "x", ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))}).SignedString(jwt.UnsafeAllowNoneSignatureType)
 	if _, err := v.Verify(context.Background(), tok); err == nil {
 		t.Fatal("alg=none must be rejected")
+	}
+}
+
+type fakeVerifier struct{}
+
+func (fakeVerifier) Verify(context.Context, string) (string, error) { return "u1", nil }
+
+type fakeRoles struct{ status string }
+
+func (f fakeRoles) Account(context.Context, string) (Account, error) {
+	return Account{Roles: []Role{RoleCustomer}, Status: f.status}, nil
+}
+
+// Security review finding 7: suspended and banned users are refused
+// everywhere except the routes used to read the decision and appeal.
+func TestSuspendedUsersOnlyReachAppealRoutes(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })
+	for _, status := range []string{"suspended", "banned"} {
+		req := func() *http.Request {
+			r := httptest.NewRequest(http.MethodGet, "/v1/x", nil)
+			r.Header.Set("Authorization", "Bearer t")
+			return r
+		}
+		rr := httptest.NewRecorder()
+		Middleware(fakeVerifier{}, fakeRoles{status})(ok).ServeHTTP(rr, req())
+		if rr.Code != http.StatusForbidden {
+			t.Fatalf("%s on a normal route: %d", status, rr.Code)
+		}
+		rr = httptest.NewRecorder()
+		MiddlewareAllowingSuspended(fakeVerifier{}, fakeRoles{status})(ok).ServeHTTP(rr, req())
+		if rr.Code != 204 {
+			t.Fatalf("%s on an appeal route: %d", status, rr.Code)
+		}
 	}
 }

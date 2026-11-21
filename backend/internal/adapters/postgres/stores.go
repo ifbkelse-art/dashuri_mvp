@@ -96,11 +96,9 @@ func (s RoleSource) Account(ctx context.Context, userID string) (auth.Account, e
 	if err != nil {
 		return auth.Account{}, apperr.Internal(err)
 	}
+	// Suspended and banned accounts are refused by auth.Middleware except on
+	// the few routes needed to read the decision and appeal it.
 	switch a.Status {
-	case "suspended":
-		return auth.Account{}, apperr.Forbidden("account_suspended", "this account is suspended")
-	case "banned":
-		return auth.Account{}, apperr.Forbidden("account_banned", "this account is banned")
 	case "deleted":
 		return auth.Account{}, apperr.Forbidden("account_deleted", "this account has been deleted")
 	}

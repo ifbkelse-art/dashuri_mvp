@@ -39,6 +39,7 @@ abstract final class DashuriText {
       );
       return useGoogleFonts ? GoogleFonts.manrope(textStyle: base) : base;
     }
+
     return TextTheme(
       displayLarge: display(46, 48, ink),
       displayMedium: display(38, 42, ink),

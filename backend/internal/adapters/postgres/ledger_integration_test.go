@@ -95,8 +95,10 @@ func TestRoleSourceProvisionsAndRefusesSuspended(t *testing.T) {
 	if _, err := admin.Exec(ctx, `update identity.accounts set status = 'suspended' where id = $1`, id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rs.Account(ctx, id); err == nil {
-		t.Fatal("suspended account must be refused")
+	// The loader reports the status; auth.Middleware refuses it except on
+	// the appeal routes (security review finding 7).
+	if a, err := rs.Account(ctx, id); err != nil || a.Status != "suspended" {
+		t.Fatalf("suspended account: %+v %v", a, err)
 	}
 }
 

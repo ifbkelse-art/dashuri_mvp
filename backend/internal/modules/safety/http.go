@@ -16,8 +16,8 @@ func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 	mux.Handle("POST /v1/blocks", mw.User(idempotency.Require(mw.Idempotency, s.handleBlockUser)))
 	mux.Handle("DELETE /v1/blocks/{userId}", mw.User(s.handleUnblockUser))
 	mux.Handle("GET /v1/blocks", mw.User(s.handleListBlockedUsers))
-	mux.Handle("GET /v1/me/enforcement", mw.User(s.handleListEnforcementNotices))
-	mux.Handle("POST /v1/appeals", mw.User(idempotency.Require(mw.Idempotency, s.handleSubmitAppeal)))
+	mux.Handle("GET /v1/me/enforcement", mw.UserAllowingSuspended(s.handleListEnforcementNotices))
+	mux.Handle("POST /v1/appeals", mw.UserAllowingSuspended(idempotency.Require(mw.Idempotency, s.handleSubmitAppeal)))
 }
 
 func (s *Service) handleReportUser(w http.ResponseWriter, r *http.Request) {

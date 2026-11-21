@@ -54,10 +54,14 @@ func New(cfg config.Config, pool *pgxpool.Pool) http.Handler {
 	}
 	limiter := ratelimit.NewTokenBucket(5, 20)
 	authMW := auth.Middleware(verifier, postgres.RoleSource{Pool: pool})
+	limitedMW := auth.MiddlewareAllowingSuspended(verifier, postgres.RoleSource{Pool: pool})
 
 	stack := routing.Stack{
 		User: func(h http.HandlerFunc) http.Handler {
 			return authMW(ratelimit.PerUser(limiter, h))
+		},
+		UserAllowingSuspended: func(h http.HandlerFunc) http.Handler {
+			return limitedMW(ratelimit.PerUser(limiter, h))
 		},
 		Webhook:     func(h http.HandlerFunc) http.Handler { return h },
 		Idempotency: postgres.IdempotencyStore{Pool: pool},

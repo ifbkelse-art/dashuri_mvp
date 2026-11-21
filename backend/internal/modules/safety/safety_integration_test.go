@@ -32,13 +32,15 @@ func TestReportIsIdempotentOverHTTP(t *testing.T) {
 	ctx := context.Background()
 	svc := safety.NewService(safety.Deps{Repo: postgres.SafetyRepo{Pool: api}})
 	mux := http.NewServeMux()
+	testUser := func(h http.HandlerFunc) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h(w, r.WithContext(auth.WithPrincipal(r.Context(), identitytest.Principal(r.Header.Get("X-Test-User")))))
+		})
+	}
 	safety.Routes(mux, svc, routing.Stack{
-		User: func(h http.HandlerFunc) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h(w, r.WithContext(auth.WithPrincipal(r.Context(), identitytest.Principal(r.Header.Get("X-Test-User")))))
-			})
-		},
-		Idempotency: postgres.IdempotencyStore{Pool: api},
+		User:                  testUser,
+		UserAllowingSuspended: testUser,
+		Idempotency:           postgres.IdempotencyStore{Pool: api},
 	})
 	reporter, target := pgtest.NewUser(t, admin, true), pgtest.NewUser(t, admin, true)
 	callID := identitytest.Call(t, admin, reporter, target, "ended", 120, 2*time.Hour)

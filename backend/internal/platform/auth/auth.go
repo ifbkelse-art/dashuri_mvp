@@ -38,7 +38,9 @@ type Principal struct {
 }
 
 // Restricted reports an enforcement restriction (no calls, no messaging).
-func (p Principal) Restricted() bool { return p.Status == "restricted" }
+func (p Principal) Restricted() bool {
+	return p.Status == "restricted" || p.Status == "suspended" || p.Status == "banned"
+}
 
 // Account is what a RoleSource loads for a verified user.
 type Account struct {
@@ -83,8 +85,19 @@ func WithPrincipal(ctx context.Context, p Principal) context.Context {
 	return context.WithValue(ctx, principalKey, p)
 }
 
-// Middleware requires a valid bearer token on every request it wraps.
+// Middleware requires a valid bearer token on every request it wraps and
+// refuses suspended or banned accounts.
 func Middleware(v TokenVerifier, roles RoleSource) func(http.Handler) http.Handler {
+	return middleware(v, roles, false)
+}
+
+// MiddlewareAllowingSuspended is Middleware for the routes a suspended or
+// banned user still needs: account status, enforcement notices and appeals.
+func MiddlewareAllowingSuspended(v TokenVerifier, roles RoleSource) func(http.Handler) http.Handler {
+	return middleware(v, roles, true)
+}
+
+func middleware(v TokenVerifier, roles RoleSource, allowSuspended bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -100,6 +113,10 @@ func Middleware(v TokenVerifier, roles RoleSource) func(http.Handler) http.Handl
 			acct, err := roles.Account(r.Context(), sub)
 			if err != nil {
 				httpx.WriteError(w, r, err)
+				return
+			}
+			if !allowSuspended && (acct.Status == "suspended" || acct.Status == "banned") {
+				httpx.WriteError(w, r, apperr.Forbidden("account_"+acct.Status, "this account is "+acct.Status))
 				return
 			}
 			p := Principal{UserID: sub, Roles: acct.Roles, Status: acct.Status, AgeEligible: acct.AgeEligible}

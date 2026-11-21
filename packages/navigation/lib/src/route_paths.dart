@@ -30,7 +30,8 @@ abstract final class RoutePaths {
   static const notifications = '/notifications'; // C11
   static const conversation = '/messages/:conversationId'; // CH02/CH04/CH05
   static const buyDiamonds = '/wallet/buy'; // W02
-  static const checkout = '/wallet/checkout/:productId'; // W03/W04 (Play sheet or Cashfree)
+  static const checkout =
+      '/wallet/checkout/:productId'; // W03/W04 (Play sheet or Cashfree)
   static const paymentResult = '/wallet/payment/:orderId'; // W05–W07
   static const transactions = '/wallet/transactions'; // W08
   static const transactionDetail = '/wallet/transactions/:entryId'; // W09
@@ -42,7 +43,8 @@ abstract final class RoutePaths {
   static const helpSupport = '/settings/help'; // S07
   static const legal = '/settings/legal'; // S08
   static const deleteAccount = '/settings/delete-account'; // S09/S10
-  static const enforcement = '/settings/account-status'; // enforcement notices + appeal
+  static const enforcement =
+      '/settings/account-status'; // enforcement notices + appeal
 
   // Calls (V01–V18), full-screen from any tab.
   static const preCall = '/hosts/:userId/call'; // V01/V06
