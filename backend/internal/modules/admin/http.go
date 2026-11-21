@@ -14,6 +14,8 @@ import (
 func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 	mux.Handle("GET /v1/admin/ledger/reconciliation", mw.User(auth.Require(s.handleGetReconciliation, auth.RoleFinance, auth.RoleAdmin)))
 	mux.Handle("POST /v1/admin/ledger/adjustments", mw.User(idempotency.Require(mw.Idempotency, auth.Require(s.handleProposeAdjustment, auth.RoleFinance, auth.RoleAdmin))))
+	mux.Handle("POST /v1/admin/ledger/adjustments/{proposalId}/approve", mw.User(idempotency.Require(mw.Idempotency, auth.Require(s.handleApproveAdjustment, auth.RoleFinance, auth.RoleAdmin))))
+	mux.Handle("POST /v1/admin/ledger/adjustments/{proposalId}/reject", mw.User(idempotency.Require(mw.Idempotency, auth.Require(s.handleRejectAdjustment, auth.RoleFinance, auth.RoleAdmin))))
 	mux.Handle("POST /v1/admin/payout-cycles/{cycleId}/approve", mw.User(idempotency.Require(mw.Idempotency, auth.Require(s.handleApprovePayoutCycle, auth.RoleFinance))))
 }
 
@@ -44,6 +46,26 @@ func (s *Service) handleProposeAdjustment(w http.ResponseWriter, r *http.Request
 		return
 	}
 	httpx.WriteJSON(w, 201, out)
+}
+
+func (s *Service) handleApproveAdjustment(w http.ResponseWriter, r *http.Request) {
+	p, _ := auth.FromContext(r.Context())
+	out, err := s.DecideAdjustment(r.Context(), p, r.PathValue("proposalId"), true)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, 200, out)
+}
+
+func (s *Service) handleRejectAdjustment(w http.ResponseWriter, r *http.Request) {
+	p, _ := auth.FromContext(r.Context())
+	out, err := s.DecideAdjustment(r.Context(), p, r.PathValue("proposalId"), false)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, 200, out)
 }
 
 func (s *Service) handleApprovePayoutCycle(w http.ResponseWriter, r *http.Request) {

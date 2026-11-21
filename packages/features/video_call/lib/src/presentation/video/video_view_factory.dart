@@ -1,9 +1,10 @@
 import 'package:flutter/widgets.dart';
 
-/// Provider-specific video surfaces for the founder's call page. The
-/// provider adapter implements this; pages place the returned widgets.
+/// Provider-specific video surfaces for the call page. The provider adapter
+/// implements this; pages place the returned widgets. [placeholder] is shown
+/// while no video track is available (camera off, not yet received).
 abstract interface class VideoViewFactory {
-  Widget localPreview();
+  Widget localPreview({Widget? placeholder});
 
-  Widget remoteVideo();
+  Widget remoteVideo({Widget? placeholder});
 }

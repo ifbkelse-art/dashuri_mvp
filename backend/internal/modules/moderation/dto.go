@@ -63,3 +63,30 @@ func (r AppealDecisionRequest) validate() map[string]string {
 	}
 	return errs
 }
+
+// ModerationFrameRequest: POST /v1/calls/{callId}/moderation-frames.
+type ModerationFrameRequest struct {
+	ImageBase64 string    `json:"image_base64"`
+	CapturedAt  time.Time `json:"captured_at"`
+}
+
+// MaxFrameBytes is the decoded JPEG limit (200 KB).
+const MaxFrameBytes = 200 * 1024
+
+func (r ModerationFrameRequest) validate() map[string]string {
+	errs := map[string]string{}
+	if r.ImageBase64 == "" {
+		errs["image_base64"] = "required"
+	} else if len(r.ImageBase64) > (MaxFrameBytes+2)/3*4+64 {
+		errs["image_base64"] = "too_large"
+	}
+	if r.CapturedAt.IsZero() {
+		errs["captured_at"] = "required"
+	}
+	return errs
+}
+
+// FrameAccepted is the 202 response for a frame.
+type FrameAccepted struct {
+	Accepted bool `json:"accepted"`
+}

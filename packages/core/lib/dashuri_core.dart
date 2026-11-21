@@ -3,9 +3,11 @@ library;
 
 export 'src/config/app_config.dart';
 export 'src/errors/failure.dart';
+export 'src/errors/failure_copy.dart';
 export 'src/idempotency/idempotency_key.dart';
 export 'src/observability/analytics.dart';
 export 'src/observability/logger.dart';
+export 'src/onboarding/experience.dart';
 export 'src/pagination/page.dart';
 export 'src/result/result.dart';
 export 'src/session/auth_session.dart';

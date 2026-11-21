@@ -30,5 +30,9 @@ final class AuthRepositoryImpl implements AuthRepository {
       _account.getAccountStatus();
 
   @override
+  Future<Result<AccountStatus>> acceptCommunityRules(String version) =>
+      _account.acceptCommunityRules(version);
+
+  @override
   Future<Result<void>> signOut() => _session.signOut();
 }

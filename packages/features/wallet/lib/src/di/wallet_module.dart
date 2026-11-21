@@ -1,23 +1,31 @@
+import 'package:dashuri_core/dashuri_core.dart';
 import 'package:dashuri_network/dashuri_network.dart';
 import 'package:get_it/get_it.dart';
 
 import '../application/wallet_cubit.dart';
+import '../application/wallet_history_cubit.dart';
 import '../data/datasources/wallet_remote_data_source.dart';
 import '../data/repositories/wallet_repository_impl.dart';
 import '../domain/repositories/wallet_repository.dart';
+import '../domain/usecases/find_wallet_entry.dart';
+import '../domain/usecases/get_is_host.dart';
 import '../domain/usecases/get_wallet_summary.dart';
 import '../domain/usecases/list_wallet_entries.dart';
+import '../domain/usecases/watch_wallet_updates.dart';
 
 /// Registers the wallet feature. Called once from the app's composition root.
-/// Data sources and repositories are lazy singletons; use cases and
-/// cubits are factories (a fresh cubit per page).
+/// Needs `ApiClient`, `RealtimeGateway` and `SessionGateway` registered first.
 void registerWalletFeature(GetIt sl) {
   sl
     ..registerLazySingleton<WalletRemoteDataSource>(
       () => WalletRemoteDataSource(sl<ApiClient>()),
     )
     ..registerLazySingleton<WalletRepository>(
-      () => WalletRepositoryImpl(sl<WalletRemoteDataSource>()),
+      () => WalletRepositoryImpl(
+        sl<WalletRemoteDataSource>(),
+        realtime: sl<RealtimeGateway>(),
+        session: sl<SessionGateway>(),
+      ),
     )
     ..registerFactory<GetWalletSummary>(
       () => GetWalletSummary(sl<WalletRepository>()),
@@ -25,5 +33,22 @@ void registerWalletFeature(GetIt sl) {
     ..registerFactory<ListWalletEntries>(
       () => ListWalletEntries(sl<WalletRepository>()),
     )
-    ..registerFactory<WalletCubit>(() => WalletCubit(sl<GetWalletSummary>()));
+    ..registerFactory<FindWalletEntry>(
+      () => FindWalletEntry(sl<WalletRepository>()),
+    )
+    ..registerFactory<GetIsHost>(() => GetIsHost(sl<WalletRepository>()))
+    ..registerFactory<WatchWalletUpdates>(
+      () => WatchWalletUpdates(sl<WalletRepository>()),
+    )
+    ..registerFactory<WalletCubit>(
+      () => WalletCubit(
+        sl<GetWalletSummary>(),
+        sl<ListWalletEntries>(),
+        sl<GetIsHost>(),
+        sl<WatchWalletUpdates>(),
+      ),
+    )
+    ..registerFactory<WalletHistoryCubit>(
+      () => WalletHistoryCubit(sl<ListWalletEntries>()),
+    );
 }

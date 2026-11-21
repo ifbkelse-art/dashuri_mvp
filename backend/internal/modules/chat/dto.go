@@ -1,17 +1,31 @@
 package chat
 
-import "time"
+import (
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+)
 
-// Wire types for this module. Generated from the API registry; keep in sync
-// with api/openapi/dashuri.v1.yaml (the contract).
+// Wire types. Keep in sync with api/openapi/dashuri.v1.yaml and
+// docs/mvp/MVP_DECISIONS_AND_CONTRACT.md §2.6.
+
+// Peer is the other participant of a conversation.
+type Peer struct {
+	UserId      string  `json:"user_id"`
+	DisplayName string  `json:"display_name"`
+	PhotoUrl    *string `json:"photo_url"`
+}
 
 type Conversation struct {
-	Id                 string    `json:"id"`
-	PeerUserId         string    `json:"peer_user_id"`
-	PeerDisplayName    string    `json:"peer_display_name"`
-	LastMessagePreview *string   `json:"last_message_preview,omitempty"`
-	UnreadCount        int       `json:"unread_count"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	Id                 string       `json:"id"`
+	PeerUserId         string       `json:"peer_user_id"`
+	PeerDisplayName    string       `json:"peer_display_name"`
+	Peer               Peer         `json:"peer"`
+	LastMessage        *ChatMessage `json:"last_message"`
+	LastMessagePreview *string      `json:"last_message_preview"`
+	UnreadCount        int          `json:"unread_count"`
+	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
 type StartConversationRequest struct {
@@ -22,8 +36,7 @@ func (r StartConversationRequest) validate() map[string]string {
 	errs := map[string]string{}
 	if r.PeerUserId == "" {
 		errs["peer_user_id"] = "required"
-	}
-	if r.PeerUserId != "" && !isUUID(r.PeerUserId) {
+	} else if !isUUID(r.PeerUserId) {
 		errs["peer_user_id"] = "invalid_uuid"
 	}
 	return errs
@@ -37,17 +50,32 @@ type ChatMessage struct {
 	SentAt         time.Time `json:"sent_at"`
 }
 
+// MaxMessageChars is the message length limit in characters (D-15).
+const MaxMessageChars = 1000
+
 type SendMessageRequest struct {
 	Body string `json:"body"`
 }
 
+// normalize trims surrounding whitespace.
+func (r *SendMessageRequest) normalize() { r.Body = strings.TrimSpace(r.Body) }
+
 func (r SendMessageRequest) validate() map[string]string {
 	errs := map[string]string{}
-	if r.Body == "" {
+	switch {
+	case r.Body == "":
 		errs["body"] = "required"
-	}
-	if len(r.Body) > 1000 {
+	case !utf8.ValidString(r.Body):
+		errs["body"] = "invalid_encoding"
+	case utf8.RuneCountInString(r.Body) > MaxMessageChars:
 		errs["body"] = "too_long"
+	default:
+		for _, c := range r.Body {
+			if unicode.IsControl(c) && c != '\n' && c != '\r' && c != '\t' {
+				errs["body"] = "invalid_characters"
+				break
+			}
+		}
 	}
 	return errs
 }
@@ -60,9 +88,18 @@ func (r MessagingPrivacy) validate() map[string]string {
 	errs := map[string]string{}
 	if r.WhoCanMessage == "" {
 		errs["who_can_message"] = "required"
-	}
-	if r.WhoCanMessage != "everyone" && r.WhoCanMessage != "past_call_partners" {
+	} else if r.WhoCanMessage != "everyone" && r.WhoCanMessage != "past_call_partners" {
 		errs["who_can_message"] = "invalid_value"
 	}
 	return errs
+}
+
+// previewChars bounds last_message_preview.
+const previewChars = 80
+
+func preview(body string) string {
+	if utf8.RuneCountInString(body) <= previewChars {
+		return body
+	}
+	return string([]rune(body)[:previewChars]) + "…"
 }

@@ -11,3 +11,4 @@ export 'src/responsive/breakpoints.dart';
 export 'src/theme/dashuri_text.dart';
 export 'src/theme/dashuri_theme.dart';
 export 'src/tokens/dashuri_tokens.dart';
+export 'src/components/core_widgets.dart';

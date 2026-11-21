@@ -1,6 +1,10 @@
 package safety
 
-import "time"
+import (
+	"strings"
+	"time"
+	"unicode/utf8"
+)
 
 // Wire types for this module. Generated from the API registry; keep in sync
 // with api/openapi/dashuri.v1.yaml (the contract).
@@ -16,20 +20,18 @@ func (r ReportRequest) validate() map[string]string {
 	errs := map[string]string{}
 	if r.TargetUserId == "" {
 		errs["target_user_id"] = "required"
-	}
-	if r.TargetUserId != "" && !isUUID(r.TargetUserId) {
+	} else if !isUUID(r.TargetUserId) {
 		errs["target_user_id"] = "invalid_uuid"
 	}
 	if r.Category == "" {
 		errs["category"] = "required"
-	}
-	if r.Category != "nudity" && r.Category != "sexual_content" && r.Category != "minor_safety" && r.Category != "harassment" && r.Category != "spam_or_scam" && r.Category != "fake_profile" && r.Category != "other" {
+	} else if r.Category != "nudity" && r.Category != "sexual_content" && r.Category != "minor_safety" && r.Category != "harassment" && r.Category != "spam_or_scam" && r.Category != "fake_profile" && r.Category != "other" {
 		errs["category"] = "invalid_value"
 	}
 	if r.CallId != nil && *r.CallId != "" && !isUUID(*r.CallId) {
 		errs["call_id"] = "invalid_uuid"
 	}
-	if r.Details != nil && len(*r.Details) > 1000 {
+	if r.Details != nil && utf8.RuneCountInString(*r.Details) > 1000 {
 		errs["details"] = "too_long"
 	}
 	return errs
@@ -62,11 +64,14 @@ type BlockedUser struct {
 }
 
 type EnforcementNotice struct {
-	Id         string    `json:"id"`
-	Action     string    `json:"action"`
-	Reason     string    `json:"reason"`
-	CreatedAt  time.Time `json:"created_at"`
-	Appealable bool      `json:"appealable"`
+	Id         string     `json:"id"`
+	Action     string     `json:"action"`
+	Reason     string     `json:"reason"`
+	CreatedAt  time.Time  `json:"created_at"`
+	Appealable bool       `json:"appealable"`
+	ExpiresAt  *time.Time `json:"expires_at"`
+	// AppealStatus is open | upheld | overturned, or null when not appealed.
+	AppealStatus *string `json:"appeal_status"`
 }
 
 type AppealRequest struct {
@@ -82,10 +87,10 @@ func (r AppealRequest) validate() map[string]string {
 	if r.EnforcementId != "" && !isUUID(r.EnforcementId) {
 		errs["enforcement_id"] = "invalid_uuid"
 	}
-	if r.Statement == "" {
+	if strings.TrimSpace(r.Statement) == "" {
 		errs["statement"] = "required"
 	}
-	if len(r.Statement) > 2000 {
+	if utf8.RuneCountInString(r.Statement) > 2000 {
 		errs["statement"] = "too_long"
 	}
 	return errs

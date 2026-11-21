@@ -16,12 +16,15 @@ final class InboxStateLoading extends InboxState {
 }
 
 final class InboxStateLoaded extends InboxState {
-  const InboxStateLoaded(this.data);
+  const InboxStateLoaded(this.data, {this.loadingMore = false});
 
   final Page<InboxItem> data;
+  final bool loadingMore;
+
+  int get unreadCount => data.items.where((i) => i.readAt == null).length;
 
   @override
-  List<Object?> get props => [data];
+  List<Object?> get props => [data, loadingMore];
 }
 
 final class InboxStateFailed extends InboxState {

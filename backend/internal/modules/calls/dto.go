@@ -31,6 +31,12 @@ type CallSession struct {
 	DiamondsCharged int64   `json:"diamonds_charged"`
 	IsFreeCall      bool    `json:"is_free_call"`
 	EndReason       *string `json:"end_reason,omitempty"`
+	// MVP additions (docs/mvp/MVP_DECISIONS_AND_CONTRACT.md §2.5).
+	Peer                   *Peer      `json:"peer"`
+	StartedAt              *time.Time `json:"started_at"`
+	ModerationWindowEndsAt *time.Time `json:"moderation_window_ends_at"`
+	CreatedAt              time.Time  `json:"created_at"`
+	EndedAt                *time.Time `json:"ended_at"`
 }
 
 type EndCallRequest struct {
@@ -54,4 +60,7 @@ type CallCredentials struct {
 	ProviderCallId string    `json:"provider_call_id"`
 	UserToken      string    `json:"user_token"`
 	ExpiresAt      time.Time `json:"expires_at"`
+	// APIKey is Stream's public API key; CallType is the Stream call type.
+	APIKey   string `json:"api_key"`
+	CallType string `json:"call_type"`
 }

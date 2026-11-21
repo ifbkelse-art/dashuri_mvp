@@ -68,6 +68,36 @@ final class ApiClient {
   Future<Result<void>> delete(String path) =>
       _send<void>('DELETE', path, decode: (_) {});
 
+  /// PUTs raw [bytes] to a pre-signed storage URL (e.g. a photo upload
+  /// ticket). No bearer token is sent: the URL itself carries the grant.
+  Future<Result<void>> uploadToSignedUrl(
+    Uri url,
+    List<int> bytes, {
+    required String contentType,
+  }) async {
+    try {
+      final response = await _dio.requestUri<Object?>(
+        url,
+        data: Stream<List<int>>.value(bytes),
+        options: Options(
+          method: 'PUT',
+          contentType: contentType,
+          responseType: ResponseType.plain,
+          headers: {Headers.contentLengthHeader: bytes.length},
+        ),
+      );
+      final status = response.statusCode ?? 0;
+      if (status >= 200 && status < 300) return const Success(null);
+      return Err(
+        status >= 500
+            ? ServerFailure(code: 'upload_failed', message: 'HTTP $status')
+            : PlatformFailure(code: 'upload_rejected', message: 'HTTP $status'),
+      );
+    } on DioException catch (e) {
+      return Err(NetworkFailure(message: e.message));
+    }
+  }
+
   Future<Result<T>> _send<T>(
     String method,
     String path, {

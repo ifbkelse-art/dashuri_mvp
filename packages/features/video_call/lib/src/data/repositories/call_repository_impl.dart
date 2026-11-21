@@ -4,6 +4,7 @@ import 'package:dashuri_network/dashuri_network.dart';
 import '../../domain/entities/call_credentials.dart';
 import '../../domain/entities/call_event.dart';
 import '../../domain/entities/call_session.dart';
+import '../../domain/entities/pre_call_info.dart';
 import '../../domain/repositories/call_repository.dart';
 import '../datasources/call_remote_data_source.dart';
 import '../models/call_json.dart';
@@ -45,7 +46,77 @@ final class CallRepositoryImpl implements CallRepository {
   @override
   Stream<CallEvent> watchCall(String callId) => _realtime
       .subscribe('call:$callId')
-      .map(callEventFromRealtime)
+      .map(_safeEvent)
       .where((e) => e != null)
       .cast<CallEvent>();
+
+  @override
+  Stream<CallSession> watchUserCalls(String userId) => _realtime
+      .subscribe('user:$userId')
+      .where((e) => e.type == 'call.updated')
+      .map(_safeEvent)
+      .whereType<CallUpdated>()
+      .map((e) => e.session);
+
+  @override
+  Future<Result<void>> submitModerationFrame({
+    required String callId,
+    required String imageBase64,
+    required DateTime capturedAt,
+  }) => _remote.moderationFrame(callId, imageBase64, capturedAt);
+
+  @override
+  Future<Result<Page<CallSession>>> callHistory(PageRequest page) =>
+      _remote.history(page);
+
+  @override
+  Future<Result<PreCallInfo>> preCallInfo(String hostUserId) async {
+    final results = await Future.wait([
+      _remote.host(hostUserId),
+      _remote.wallet(),
+      _remote.packages(),
+    ]);
+    final host = results[0], wallet = results[1], packages = results[2];
+    if (host case Err(:final failure)) return Err(failure);
+    if (wallet case Err(:final failure)) return Err(failure);
+    try {
+      return Success(
+        preCallInfoFromJson(
+          host: (host as Success<JsonMap>).value,
+          wallet: (wallet as Success<JsonMap>).value,
+          // The ₹ hint is optional; a failed catalogue call only hides it.
+          packages: packages is Success<JsonMap> ? packages.value : null,
+        ),
+      );
+    } on TypeError catch (e) {
+      return Err(UnexpectedFailure(message: 'Response did not match: $e'));
+    }
+  }
+
+  @override
+  Future<Result<int>> availableDiamonds() async {
+    final wallet = await _remote.wallet();
+    return switch (wallet) {
+      Success(:final value) when value['available_diamonds'] is num => Success(
+        (value['available_diamonds']! as num).toInt(),
+      ),
+      Success() => const Err(
+        UnexpectedFailure(message: 'available_diamonds missing'),
+      ),
+      Err(:final failure) => Err(failure),
+    };
+  }
+
+  /// A malformed realtime payload is a hint lost, not a crash.
+  static CallEvent? _safeEvent(RealtimeEvent e) {
+    try {
+      return callEventFromRealtime(e);
+    } on Object {
+      return null;
+    }
+  }
+}
+
+extension<T> on Stream<T> {
+  Stream<R> whereType<R>() => where((e) => e is R).cast<R>();
 }

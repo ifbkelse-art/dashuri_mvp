@@ -5,12 +5,14 @@ import (
 	"regexp"
 	"strconv"
 
+	"dashuri/backend/internal/modules/keyset"
 	"dashuri/backend/internal/platform/apperr"
 )
 
 // Deps are the ports this module needs. Add repository and provider
 // interfaces here as the module is implemented; wire them in internal/app.
 type Deps struct {
+	Repo Repository
 	Push PushSender
 }
 
@@ -43,3 +45,6 @@ func validationError(errs map[string]string) error { return apperr.Validation(er
 var uuidRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 func isUUID(s string) bool { return uuidRE.MatchString(s) }
+
+// DecodeCursor parses a keyset token; empty means first page.
+func DecodeCursor(s string) (*Cursor, error) { return keyset.Decode(s) }

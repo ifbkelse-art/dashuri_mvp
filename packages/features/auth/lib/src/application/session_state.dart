@@ -30,6 +30,9 @@ final class SessionSignedIn extends SessionState {
   final Failure? accountFailure;
 
   bool get ageEligible => account?.ageEligible ?? false;
+  bool get profileComplete => account?.profileComplete ?? false;
+  bool get rulesAccepted => account?.rulesAccepted ?? false;
+  bool get isApprovedHost => account?.isApprovedHost ?? false;
 
   @override
   List<Object?> get props => [session, account, accountFailure];

@@ -15,4 +15,8 @@ abstract interface class NotificationsRepository {
   Future<Result<Page<InboxItem>>> listInbox({required PageRequest page});
 
   Future<Result<void>> markRead({required String notificationId});
+
+  /// Hints from realtime (`user:<id>` `notification.created`). Each event
+  /// means "re-fetch the inbox"; the API stays the source of truth.
+  Stream<void> watchNewNotifications();
 }

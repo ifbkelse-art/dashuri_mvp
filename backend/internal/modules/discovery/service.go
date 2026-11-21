@@ -2,21 +2,159 @@ package discovery
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"dashuri/backend/internal/platform/apperr"
 	"dashuri/backend/internal/platform/auth"
+	"dashuri/backend/internal/platform/clock"
 )
 
-// Service implements the discovery module's use cases. Every method is a
-// scaffold that returns 501 until implemented; the documented steps are the
-// required behaviour (see docs/architecture).
+// PhotoTTL is the lifetime of signed card photo URLs.
+const PhotoTTL = time.Hour
+
+// Service implements discovery (D-06 sort, D-08 offline only).
 type Service struct {
 	deps Deps
 }
 
-func NewService(d Deps) *Service { return &Service{deps: d} }
+func NewService(d Deps) *Service {
+	if d.Clock == nil {
+		d.Clock = clock.System{}
+	}
+	return &Service{deps: d}
+}
 
-// ListAvailableHosts: GET /v1/discovery/hosts — Hosts online and accepting calls, with their rates. Excludes blocked users.
-func (s *Service) ListAvailableHosts(ctx context.Context, p auth.Principal, page PageRequest) (Page[HostCard], error) {
-	return Page[HostCard]{}, apperr.NotImplemented("discovery.ListAvailableHosts")
+func (s *Service) repo() (Repository, error) {
+	if s.deps.Repo == nil {
+		return nil, apperr.Unavailable("database_unavailable", "database not configured")
+	}
+	return s.deps.Repo, nil
+}
+
+// ListAvailableHosts: GET /v1/discovery/hosts — hosts online or busy,
+// filtered by language and city, keyset paginated.
+func (s *Service) ListAvailableHosts(ctx context.Context, p auth.Principal, in ListRequest) (Page[HostCard], error) {
+	if errs := in.validate(); len(errs) > 0 {
+		return Page[HostCard]{}, validationError(errs)
+	}
+	after, err := DecodeCursor(in.Cursor, in.Sort)
+	if err != nil {
+		return Page[HostCard]{}, validationError(map[string]string{"cursor": "invalid"})
+	}
+	repo, err := s.repo()
+	if err != nil {
+		return Page[HostCard]{}, err
+	}
+	rows, err := repo.ListHosts(ctx, ListQuery{
+		ViewerID: p.UserID, Language: in.Language, CityID: in.CityID, Sort: in.Sort, After: after, Limit: in.Limit + 1,
+	})
+	if err != nil {
+		return Page[HostCard]{}, apperr.Internal(err)
+	}
+	page := Page[HostCard]{Items: []HostCard{}}
+	if len(rows) > in.Limit {
+		rows = rows[:in.Limit]
+		last := rows[len(rows)-1]
+		k1, k2 := SortKeys(in.Sort, last)
+		next := Cursor{Sort: in.Sort, K1: k1, K2: k2, ID: last.UserID}.Encode()
+		page.NextCursor = &next
+	}
+	photos := s.sign(ctx, rows)
+	for _, h := range rows {
+		page.Items = append(page.Items, s.card(h, photos))
+	}
+	return page, nil
+}
+
+// GetHost: GET /v1/discovery/hosts/{userId} — host detail, also offline.
+func (s *Service) GetHost(ctx context.Context, p auth.Principal, userID string) (HostDetail, error) {
+	if !isUUID(userID) {
+		return HostDetail{}, apperr.NotFound("host")
+	}
+	repo, err := s.repo()
+	if err != nil {
+		return HostDetail{}, err
+	}
+	h, err := repo.Host(ctx, p.UserID, userID)
+	if errors.Is(err, ErrNotFound) {
+		return HostDetail{}, apperr.NotFound("host")
+	}
+	if err != nil {
+		return HostDetail{}, apperr.Internal(err)
+	}
+	return HostDetail{HostCard: s.card(h, s.sign(ctx, []HostRow{h})), Bio: h.Bio}, nil
+}
+
+// GetSummary: GET /v1/discovery/summary.
+func (s *Service) GetSummary(ctx context.Context, p auth.Principal) (Summary, error) {
+	repo, err := s.repo()
+	if err != nil {
+		return Summary{}, err
+	}
+	n, err := repo.OnlineCount(ctx, p.UserID)
+	if err != nil {
+		return Summary{}, apperr.Internal(err)
+	}
+	return Summary{OnlineCount: n}, nil
+}
+
+func (s *Service) sign(ctx context.Context, rows []HostRow) map[string]string {
+	if s.deps.Photos == nil {
+		return nil
+	}
+	var paths []string
+	for _, h := range rows {
+		if h.PhotoPath != nil {
+			paths = append(paths, *h.PhotoPath)
+		}
+	}
+	if len(paths) == 0 {
+		return nil
+	}
+	return s.deps.Photos.SignRead(ctx, paths, PhotoTTL)
+}
+
+func (s *Service) card(h HostRow, photos map[string]string) HostCard {
+	c := HostCard{
+		UserId: h.UserID, DisplayName: h.DisplayName, Languages: h.Languages,
+		Level: s.deps.Rules.LevelForXP(h.LifetimeXP), RatePerMinute: h.RatePerMinute,
+		City: h.City, IsVerified: h.KYCApproved, Availability: Availability(h),
+	}
+	if c.Languages == nil {
+		c.Languages = []string{}
+	}
+	if h.PhotoPath != nil {
+		if u, ok := photos[*h.PhotoPath]; ok {
+			c.PhotoUrl = &u
+		}
+	}
+	if h.VerifiedDOB != nil {
+		age := ageOn(*h.VerifiedDOB, s.deps.Clock.Now())
+		c.Age = &age
+	}
+	return c
+}
+
+// Availability maps a host row to available | busy | offline.
+func Availability(h HostRow) string {
+	switch {
+	case h.Busy:
+		return "busy"
+	case h.Online:
+		return "available"
+	default:
+		return "offline"
+	}
+}
+
+var ist = time.FixedZone("IST", 5*3600+1800)
+
+func ageOn(dob, now time.Time) int {
+	y, m, d := now.In(ist).Date()
+	age := y - dob.Year()
+	if m < dob.Month() || (m == dob.Month() && d < dob.Day()) {
+		age--
+	}
+	return age
 }

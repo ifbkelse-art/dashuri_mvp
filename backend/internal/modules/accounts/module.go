@@ -1,39 +1,19 @@
 package accounts
 
 import (
-	"net/http"
 	"regexp"
-	"strconv"
 
+	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/platform/apperr"
+	"dashuri/backend/internal/platform/clock"
 )
 
-// Deps are the ports this module needs. Add repository and provider
-// interfaces here as the module is implemented; wire them in internal/app.
-type Deps struct{}
-
-// PageRequest is a parsed cursor page request.
-type PageRequest struct {
-	Cursor string
-	Limit  int
-}
-
-// Page is the list envelope {items, next_cursor}.
-type Page[T any] struct {
-	Items      []T     `json:"items"`
-	NextCursor *string `json:"next_cursor,omitempty"`
-}
-
-func parsePage(r *http.Request) (PageRequest, error) {
-	p := PageRequest{Cursor: r.URL.Query().Get("cursor"), Limit: 20}
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 || n > 100 {
-			return p, apperr.Validation(map[string]string{"limit": "must_be_1_to_100"})
-		}
-		p.Limit = n
-	}
-	return p, nil
+// Deps are the ports this module needs. Repo is nil without a database.
+type Deps struct {
+	Repo    Repository
+	Storage PhotoStorage // nil or unconfigured: uploads 503, photos omitted
+	Rules   economy.Rules
+	Clock   clock.Clock
 }
 
 func validationError(errs map[string]string) error { return apperr.Validation(errs) }

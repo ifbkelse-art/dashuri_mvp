@@ -7,9 +7,8 @@ import '../models/wallet_entry_json.dart';
 import '../models/wallet_summary_json.dart';
 
 /// HTTP access to the wallet endpoints of the Go API.
-/// Value-moving or create calls take an [IdempotencyKey] from the caller so
-/// retries of the same user intent reuse it.
-final class WalletRemoteDataSource {
+// Not final: repository tests mock it.
+class WalletRemoteDataSource {
   const WalletRemoteDataSource(this._api);
 
   final ApiClient _api;
@@ -23,5 +22,11 @@ final class WalletRemoteDataSource {
     '/v1/wallet/entries',
     decode: pageDecoder(walletEntryFromJson),
     query: page.toQuery(),
+  );
+
+  /// GET /v1/me (AccountStatus); only `is_host` is read here.
+  Future<Result<bool>> isHost() => _api.get(
+    '/v1/me',
+    decode: objectDecoder((json) => json['is_host'] == true),
   );
 }

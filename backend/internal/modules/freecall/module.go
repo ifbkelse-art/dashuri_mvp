@@ -7,13 +7,18 @@ import (
 
 	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/platform/apperr"
+	"dashuri/backend/internal/platform/clock"
 )
 
 // Deps are the ports this module needs. Add repository and provider
 // interfaces here as the module is implemented; wire them in internal/app.
 type Deps struct {
-	Rules   economy.Rules
-	Enabled bool // FREE_CALL_ENABLED; Android only (S4)
+	Rules     economy.Rules
+	Enabled   bool              // FREE_CALL_ENABLED; Android only (S4)
+	Integrity IntegrityVerifier // nil without Google credentials → 503 integrity_not_configured
+	Repo      Repository        // nil without a database → 503
+	Calls     CallLauncher
+	Clock     clock.Clock
 }
 
 // PageRequest is a parsed cursor page request.

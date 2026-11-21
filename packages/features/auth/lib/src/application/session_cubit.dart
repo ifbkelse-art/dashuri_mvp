@@ -11,8 +11,9 @@ import '../domain/usecases/watch_session.dart';
 part 'session_state.dart';
 
 /// App-wide session state. Provided once above the router; the route guard
-/// reads it to decide redirects (signed out → sign-in, not 18+ → age gate).
-final class SessionCubit extends Cubit<SessionState> {
+/// reads it to decide redirects through the onboarding flow (FL01).
+final class SessionCubit extends Cubit<SessionState>
+    implements AccountStatusRefresher {
   SessionCubit(this._watchSession, this._getAccountStatus)
     : super(const SessionUnknown());
 
@@ -24,13 +25,26 @@ final class SessionCubit extends Cubit<SessionState> {
     _subscription ??= _watchSession(const NoInput()).listen(_onSession);
   }
 
+  /// Re-reads `GET /v1/me` (after an onboarding step or a retry).
   Future<void> refreshAccount() async {
     if (state case SessionSignedIn(:final session)) await _onSession(session);
+  }
+
+  @override
+  Future<void> refreshAccountStatus() => refreshAccount();
+
+  /// Applies an AccountStatus returned by an onboarding endpoint
+  /// (e.g. POST /v1/me/rules-acceptance) without another round trip.
+  void applyAccount(AccountStatus account) {
+    if (state case SessionSignedIn(:final session)) {
+      emit(SessionSignedIn(session: session, account: account));
+    }
   }
 
   Future<void> _onSession(AuthSession? session) async {
     if (session == null) return emit(const SessionSignedOut());
     final result = await _getAccountStatus(const NoInput());
+    if (isClosed) return;
     emit(switch (result) {
       Success(:final value) => SessionSignedIn(
         session: session,

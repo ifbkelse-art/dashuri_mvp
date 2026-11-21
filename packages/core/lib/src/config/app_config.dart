@@ -13,6 +13,7 @@ final class AppConfig extends Equatable {
     required this.apiBaseUrl,
     required this.supabaseUrl,
     required this.supabasePublishableKey,
+    this.supportEmail = '',
   });
 
   /// Reads `--dart-define` values. Missing values are empty strings;
@@ -28,6 +29,7 @@ final class AppConfig extends Equatable {
     supabasePublishableKey: const String.fromEnvironment(
       'DASHURI_SUPABASE_PUBLISHABLE_KEY',
     ),
+    supportEmail: const String.fromEnvironment('DASHURI_SUPPORT_EMAIL'),
   );
 
   final AppEnvironment environment;
@@ -38,6 +40,10 @@ final class AppConfig extends Equatable {
 
   /// Supabase publishable (anon) key. Safe for clients; RLS protects data.
   final String supabasePublishableKey;
+
+  /// Support contact shown in Help & support (D-22). Optional; empty when
+  /// not configured, in which case the app says so instead of guessing.
+  final String supportEmail;
 
   /// Names of missing required values; empty when the config is usable.
   List<String> validate() => [
@@ -52,5 +58,6 @@ final class AppConfig extends Equatable {
     apiBaseUrl,
     supabaseUrl,
     supabasePublishableKey,
+    supportEmail,
   ];
 }

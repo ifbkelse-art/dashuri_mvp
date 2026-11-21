@@ -16,12 +16,24 @@ final class BlockedUsersStateLoading extends BlockedUsersState {
 }
 
 final class BlockedUsersStateLoaded extends BlockedUsersState {
-  const BlockedUsersStateLoaded(this.data);
+  const BlockedUsersStateLoaded(
+    this.data, {
+    this.loadingMore = false,
+    this.unblocking = const {},
+    this.actionFailure,
+  });
 
   final Page<BlockedUser> data;
+  final bool loadingMore;
+
+  /// User ids with an unblock in flight.
+  final Set<String> unblocking;
+
+  /// Last failed unblock or load-more, shown as a snackbar.
+  final Failure? actionFailure;
 
   @override
-  List<Object?> get props => [data];
+  List<Object?> get props => [data, loadingMore, unblocking, actionFailure];
 }
 
 final class BlockedUsersStateFailed extends BlockedUsersState {

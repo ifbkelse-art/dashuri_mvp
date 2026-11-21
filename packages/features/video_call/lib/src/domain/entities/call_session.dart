@@ -14,7 +14,29 @@ enum CallPhase {
   ended,
   declined,
   missed,
-  failed,
+  failed;
+
+  /// Terminal phases: nothing more will happen on this call.
+  bool get isTerminal => switch (this) {
+    ended || declined || missed || failed => true,
+    _ => false,
+  };
+}
+
+/// The other participant as the server describes them (contract 2.5).
+final class CallPeer extends Equatable {
+  const CallPeer({
+    required this.userId,
+    required this.displayName,
+    this.photoUrl,
+  });
+
+  final String userId;
+  final String displayName;
+  final String? photoUrl;
+
+  @override
+  List<Object?> get props => [userId, displayName, photoUrl];
 }
 
 /// A call as reported by the server. Billing numbers are the server's.
@@ -30,6 +52,10 @@ final class CallSession extends Equatable {
     required this.diamondsCharged,
     required this.isFreeCall,
     required this.endReason,
+    this.peer,
+    this.startedAt,
+    this.moderationWindowEndsAt,
+    this.beansEarned,
   });
 
   final String callId;
@@ -44,6 +70,20 @@ final class CallSession extends Equatable {
   final bool isFreeCall;
   final String? endReason;
 
+  /// Display details of the other participant (null on older servers).
+  final CallPeer? peer;
+
+  /// When the server saw both participants live (billing start).
+  final DateTime? startedAt;
+
+  /// End of the automated safety-check window (S7, D-09).
+  final DateTime? moderationWindowEndsAt;
+
+  /// Beans credited to the host for this call, when the server reports it.
+  final int? beansEarned;
+
+  String get peerName => peer?.displayName ?? '';
+
   @override
   List<Object?> get props => [
     callId,
@@ -55,5 +95,9 @@ final class CallSession extends Equatable {
     diamondsCharged,
     isFreeCall,
     endReason,
+    peer,
+    startedAt,
+    moderationWindowEndsAt,
+    beansEarned,
   ];
 }

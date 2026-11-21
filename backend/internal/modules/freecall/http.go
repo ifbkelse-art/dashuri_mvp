@@ -19,7 +19,7 @@ func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 
 func (s *Service) handleGetFreeCallCard(w http.ResponseWriter, r *http.Request) {
 	p, _ := auth.FromContext(r.Context())
-	out, err := s.GetFreeCallCard(r.Context(), p)
+	out, err := s.GetFreeCallCard(r.Context(), p, r.Header.Get(PlatformHeader))
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -38,7 +38,7 @@ func (s *Service) handleRequestFreeCall(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteError(w, r, validationError(errs))
 		return
 	}
-	out, err := s.RequestFreeCall(r.Context(), p, in)
+	out, err := s.RequestFreeCall(r.Context(), p, in, r.Header.Get(PlatformHeader))
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return

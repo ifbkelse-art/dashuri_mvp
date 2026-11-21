@@ -7,6 +7,7 @@ import (
 
 	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/platform/apperr"
+	"dashuri/backend/internal/platform/clock"
 )
 
 // Deps are the ports this module needs. Add repository and provider
@@ -14,6 +15,8 @@ import (
 type Deps struct {
 	Rules economy.Rules
 	KYC   KYCProvider
+	Repo  Repository // nil without a database → 503
+	Clock clock.Clock
 }
 
 // PageRequest is a parsed cursor page request.

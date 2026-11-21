@@ -5,7 +5,8 @@ import '../../domain/entities/call_credentials.dart';
 import '../../domain/entities/call_session.dart';
 import '../models/call_json.dart';
 
-final class CallRemoteDataSource {
+// Not final: repository tests mock it.
+class CallRemoteDataSource {
   const CallRemoteDataSource(this._api);
 
   final ApiClient _api;
@@ -48,4 +49,34 @@ final class CallRemoteDataSource {
     '/v1/calls/$callId/credentials',
     decode: objectDecoder(callCredentialsFromJson),
   );
+
+  Future<Result<void>> moderationFrame(
+    String callId,
+    String imageBase64,
+    DateTime capturedAt,
+  ) => _api.post<void>(
+    '/v1/calls/$callId/moderation-frames',
+    decode: (_) {},
+    body: {
+      'image_base64': imageBase64,
+      'captured_at': capturedAt.toUtc().toIso8601String(),
+    },
+  );
+
+  Future<Result<Page<CallSession>>> history(PageRequest page) => _api.get(
+    '/v1/calls/history',
+    decode: pageDecoder(callSessionFromJson),
+    query: page.toQuery(),
+  );
+
+  Future<Result<JsonMap>> host(String userId) => _api.get(
+    '/v1/discovery/hosts/$userId',
+    decode: objectDecoder((j) => j),
+  );
+
+  Future<Result<JsonMap>> wallet() =>
+      _api.get('/v1/wallet', decode: objectDecoder((j) => j));
+
+  Future<Result<JsonMap>> packages() =>
+      _api.get('/v1/purchases/packages', decode: objectDecoder((j) => j));
 }

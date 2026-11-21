@@ -30,3 +30,9 @@ final class CallLowBalance extends CallEvent {
   @override
   List<Object?> get props => [secondsRemaining];
 }
+
+/// The automated safety check ended the call (S7). A `call.updated` with
+/// the final state follows; this only lets the UI explain why.
+final class CallModerationEnded extends CallEvent {
+  const CallModerationEnded();
+}

@@ -1,18 +1,46 @@
 package wallet
 
 import (
+	"context"
+	"errors"
 	"net/http"
-	"regexp"
 	"strconv"
+	"time"
 
-	"dashuri/backend/internal/modules/ledger"
 	"dashuri/backend/internal/platform/apperr"
 )
 
-// Deps are the ports this module needs. Add repository and provider
-// interfaces here as the module is implemented; wire them in internal/app.
+// Deps are the ports this module needs; wired in internal/app/wire_wallet.go.
 type Deps struct {
-	Ledger ledger.Store
+	Repo Repository // nil → 503 database_unavailable
+}
+
+// Balances are the user's ledger projection rows (by account kind) plus
+// the Diamonds reserved for a live call.
+type Balances struct {
+	ByKind   map[string]int64
+	Reserved int64
+}
+
+// EntryRow is one journal entry as seen by one user, per currency.
+type EntryRow struct {
+	EntryID    string
+	EntryType  string
+	Reference  string
+	OccurredAt time.Time
+	Currency   string
+	Net        int64 // sum of the user's postings in this currency
+	Available  int64 // sum of the user's bean_available postings
+}
+
+// ErrBadCursor: the cursor does not decode.
+var ErrBadCursor = errors.New("wallet: invalid cursor")
+
+// Repository is the wallet read model (internal/adapters/postgres/wallet_repo.go).
+type Repository interface {
+	Balances(ctx context.Context, userID string) (Balances, error)
+	// Entries pages the user's entries newest first (keyset on occurred_at, entry id).
+	Entries(ctx context.Context, userID, cursor string, limit int) (rows []EntryRow, next string, err error)
 }
 
 // PageRequest is a parsed cursor page request.
@@ -38,9 +66,3 @@ func parsePage(r *http.Request) (PageRequest, error) {
 	}
 	return p, nil
 }
-
-func validationError(errs map[string]string) error { return apperr.Validation(errs) }
-
-var uuidRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
-func isUUID(s string) bool { return uuidRE.MatchString(s) }

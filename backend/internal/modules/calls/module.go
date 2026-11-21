@@ -5,9 +5,11 @@ import (
 	"regexp"
 	"strconv"
 
+	"time"
+
 	"dashuri/backend/internal/modules/economy"
-	"dashuri/backend/internal/modules/ledger"
 	"dashuri/backend/internal/platform/apperr"
+	"dashuri/backend/internal/platform/clock"
 )
 
 // Deps are the ports this module needs. Add repository and provider
@@ -16,9 +18,23 @@ type Deps struct {
 	Rules    economy.Rules
 	Video    VideoProvider
 	Realtime RealtimePublisher
-	Repo     Repository
-	Ledger   ledger.Store
+	Repo     Repository // nil when the database is not configured → 503
+	Clock    clock.Clock
+	// ProviderName is the {provider} webhook path segment ("stream").
+	ProviderName string
+	// APIKey is the provider's public key returned with call credentials.
+	APIKey string
 }
+
+// Timing rules of the call lifecycle (video-call-architecture.md).
+const (
+	RingTimeout       = 30 * time.Second  // ringing → missed
+	ConnectTimeout    = 45 * time.Second  // accepted but never active → failed
+	StaleTimeout      = 90 * time.Second  // nobody live and no events → end and settle
+	ModerationWindow  = 180 * time.Second // S7: automated checks after active
+	ReservationWindow = 120               // seconds reserved per window
+	TokenTTL          = time.Hour         // provider user-token lifetime
+)
 
 // PageRequest is a parsed cursor page request.
 type PageRequest struct {

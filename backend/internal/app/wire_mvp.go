@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	"dashuri/backend/internal/modules/location"
 	"dashuri/backend/internal/platform/routing"
 	"dashuri/backend/internal/wiring"
 )
@@ -11,4 +12,5 @@ import (
 // workstream adds one line here and owns its own wire file.
 func mountMVPModules(mux *http.ServeMux, env wiring.Env, stack routing.Stack) {
 	_, _, _ = mux, env, stack
+	location.Routes(mux, wireLocation(env), stack) // BE-identity
 }

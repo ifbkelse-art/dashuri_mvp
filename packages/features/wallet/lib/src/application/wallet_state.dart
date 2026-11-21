@@ -16,12 +16,38 @@ final class WalletStateLoading extends WalletState {
 }
 
 final class WalletStateLoaded extends WalletState {
-  const WalletStateLoaded(this.data);
+  const WalletStateLoaded({
+    required this.summary,
+    this.recent = const [],
+    this.isHost = false,
+    this.recentFailed = false,
+    this.refreshing = false,
+  });
 
-  final WalletSummary data;
+  final WalletSummary summary;
+  final List<WalletEntry> recent;
+  final bool isHost;
+
+  /// Balances loaded but recent activity did not.
+  final bool recentFailed;
+  final bool refreshing;
+
+  WalletStateLoaded copyWith({bool? refreshing}) => WalletStateLoaded(
+    summary: summary,
+    recent: recent,
+    isHost: isHost,
+    recentFailed: recentFailed,
+    refreshing: refreshing ?? this.refreshing,
+  );
 
   @override
-  List<Object?> get props => [data];
+  List<Object?> get props => [
+    summary,
+    recent,
+    isHost,
+    recentFailed,
+    refreshing,
+  ];
 }
 
 final class WalletStateFailed extends WalletState {

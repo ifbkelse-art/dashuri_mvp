@@ -13,6 +13,7 @@ import (
 // call the service and encode; no business logic lives here.
 func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 	mux.Handle("POST /v1/calls", mw.User(idempotency.Require(mw.Idempotency, s.handleRequestCall)))
+	mux.Handle("GET /v1/calls/history", mw.User(s.handleListCallHistory))
 	mux.Handle("GET /v1/calls/{callId}", mw.User(s.handleGetCall))
 	mux.Handle("POST /v1/calls/{callId}/accept", mw.User(auth.Require(s.handleAcceptCall, auth.RoleHost)))
 	mux.Handle("POST /v1/calls/{callId}/decline", mw.User(auth.Require(s.handleDeclineCall, auth.RoleHost)))
@@ -110,4 +111,19 @@ func (s *Service) handleVideoProviderWebhook(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Service) handleListCallHistory(w http.ResponseWriter, r *http.Request) {
+	p, _ := auth.FromContext(r.Context())
+	page, err := parsePage(r)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	out, err := s.ListCallHistory(r.Context(), p, page)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, 200, out)
 }

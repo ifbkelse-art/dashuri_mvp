@@ -8,6 +8,8 @@ final class CallCredentials extends Equatable {
     required this.providerCallId,
     required this.userToken,
     required this.expiresAt,
+    this.apiKey,
+    this.providerUserId,
   });
 
   final String provider; // e.g. "stream"
@@ -15,6 +17,20 @@ final class CallCredentials extends Equatable {
   final String userToken;
   final DateTime expiresAt;
 
+  /// Public provider API key (Stream api key), when the server sends it.
+  /// The app falls back to `DASHURI_STREAM_API_KEY` from its build config.
+  final String? apiKey;
+
+  /// Provider user id; when absent the adapter reads it from the token.
+  final String? providerUserId;
+
   @override
-  List<Object?> get props => [provider, providerCallId, userToken, expiresAt];
+  List<Object?> get props => [
+    provider,
+    providerCallId,
+    userToken,
+    expiresAt,
+    apiKey,
+    providerUserId,
+  ];
 }

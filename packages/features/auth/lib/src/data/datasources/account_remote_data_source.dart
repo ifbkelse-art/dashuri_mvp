@@ -11,4 +11,11 @@ final class AccountRemoteDataSource {
 
   Future<Result<AccountStatus>> getAccountStatus() =>
       _api.get('/v1/me', decode: objectDecoder(accountStatusFromJson));
+
+  Future<Result<AccountStatus>> acceptCommunityRules(String version) =>
+      _api.post(
+        '/v1/me/rules-acceptance',
+        decode: objectDecoder(accountStatusFromJson),
+        body: {'version': version},
+      );
 }

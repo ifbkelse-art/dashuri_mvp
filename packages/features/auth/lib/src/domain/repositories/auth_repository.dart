@@ -14,5 +14,8 @@ abstract interface class AuthRepository {
 
   Future<Result<AccountStatus>> getAccountStatus();
 
+  /// POST /v1/me/rules-acceptance
+  Future<Result<AccountStatus>> acceptCommunityRules(String version);
+
   Future<Result<void>> signOut();
 }

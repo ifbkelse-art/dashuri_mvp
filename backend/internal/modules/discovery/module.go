@@ -5,17 +5,20 @@ import (
 	"regexp"
 	"strconv"
 
+	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/platform/apperr"
+	"dashuri/backend/internal/platform/clock"
 )
 
-// Deps are the ports this module needs. Add repository and provider
-// interfaces here as the module is implemented; wire them in internal/app.
-type Deps struct{}
+// HeartbeatWindowSeconds is how fresh a host heartbeat must be to count as online.
+const HeartbeatWindowSeconds = 90
 
-// PageRequest is a parsed cursor page request.
-type PageRequest struct {
-	Cursor string
-	Limit  int
+// Deps are the ports this module needs. Repo is nil without a database.
+type Deps struct {
+	Repo   Repository
+	Photos PhotoSigner // optional; without it cards have no photo
+	Rules  economy.Rules
+	Clock  clock.Clock
 }
 
 // Page is the list envelope {items, next_cursor}.
@@ -24,11 +27,12 @@ type Page[T any] struct {
 	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
-func parsePage(r *http.Request) (PageRequest, error) {
-	p := PageRequest{Cursor: r.URL.Query().Get("cursor"), Limit: 20}
-	if v := r.URL.Query().Get("limit"); v != "" {
+func parseList(r *http.Request) (ListRequest, error) {
+	q := r.URL.Query()
+	p := ListRequest{Cursor: q.Get("cursor"), Limit: 20, Language: q.Get("language"), CityID: q.Get("city_id"), Sort: q.Get("sort")}
+	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil || n < 1 || n > 100 {
+		if err != nil {
 			return p, apperr.Validation(map[string]string{"limit": "must_be_1_to_100"})
 		}
 		p.Limit = n

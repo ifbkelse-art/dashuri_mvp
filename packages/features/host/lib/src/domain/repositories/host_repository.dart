@@ -1,6 +1,9 @@
 import 'package:dashuri_core/dashuri_core.dart';
 
+import '../entities/host_call.dart';
 import '../entities/host_earnings.dart';
+import '../entities/host_photo.dart';
+import '../entities/host_profile.dart';
 import '../entities/host_status.dart';
 import '../entities/kyc_session.dart';
 import '../entities/withdrawal.dart';
@@ -32,4 +35,23 @@ abstract interface class HostRepository {
   });
 
   Future<Result<Page<Withdrawal>>> listWithdrawals({required PageRequest page});
+
+  /// GET /v1/me/profile
+  Future<Result<HostProfile>> getMyProfile();
+
+  /// PATCH /v1/me/profile
+  Future<Result<HostProfile>> updateMyProfile({
+    required String displayName,
+    required String? bio,
+    required List<String> languages,
+  });
+
+  /// POST /v1/me/photos/upload-tickets, then PUT the bytes to the signed URL.
+  Future<Result<PhotoUploadTicket>> uploadPhoto({
+    required PickedPhoto photo,
+    required IdempotencyKey idempotencyKey,
+  });
+
+  /// GET /v1/calls/history
+  Future<Result<Page<HostCall>>> listCallHistory({required PageRequest page});
 }

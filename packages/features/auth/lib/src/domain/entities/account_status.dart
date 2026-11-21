@@ -8,6 +8,9 @@ final class AccountStatus extends Equatable {
     required this.ageEligible,
     required this.isHost,
     required this.restriction,
+    this.profileComplete = false,
+    this.rulesAccepted = false,
+    this.hostState,
   });
 
   final String userId;
@@ -19,6 +22,29 @@ final class AccountStatus extends Equatable {
   /// Active enforcement (e.g. `suspended`), or null.
   final String? restriction;
 
+  /// Display name and gender are set (A08/A11).
+  final bool profileComplete;
+
+  /// The current community rules version was accepted (A13).
+  final bool rulesAccepted;
+
+  /// `applied|kyc_pending|approved|suspended`, or null when never applied.
+  final String? hostState;
+
+  /// An approved host can use the host shell.
+  bool get isApprovedHost => isHost && hostState == 'approved';
+
+  /// Restrictions that lock the whole app to the account-status page.
+  bool get isLockedOut => restriction == 'suspended' || restriction == 'banned';
+
   @override
-  List<Object?> get props => [userId, ageEligible, isHost, restriction];
+  List<Object?> get props => [
+    userId,
+    ageEligible,
+    isHost,
+    restriction,
+    profileComplete,
+    rulesAccepted,
+    hostState,
+  ];
 }

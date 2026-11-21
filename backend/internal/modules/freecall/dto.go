@@ -12,10 +12,19 @@ type FreeCallCard struct {
 
 type FreeCallRequestBody struct {
 	PlayIntegrityToken *string `json:"play_integrity_token,omitempty"`
+	// Platform is optional (android|ios); the X-Client-Platform header is
+	// used when absent.
+	Platform *string `json:"platform,omitempty"`
 }
 
 func (r FreeCallRequestBody) validate() map[string]string {
 	errs := map[string]string{}
+	if r.Platform != nil && *r.Platform != "android" && *r.Platform != "ios" {
+		errs["platform"] = "invalid_value"
+	}
+	if r.PlayIntegrityToken != nil && len(*r.PlayIntegrityToken) > 16<<10 {
+		errs["play_integrity_token"] = "too_long"
+	}
 	return errs
 }
 

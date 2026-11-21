@@ -195,6 +195,7 @@ type Repository interface {
 	CustomerPhone(ctx context.Context, userID string) (string, error)
 	InsertCashfreeOrder(ctx context.Context, o CashfreeOrderRecord) error
 	CashfreeOrder(ctx context.Context, orderID string) (CashfreeOrderRecord, bool, error)
+	SetCashfreeSession(ctx context.Context, orderID, paymentSessionID, cfOrderID string) error
 	// SetCashfreeOrderState moves an order that is not final (created or
 	// pending) to state; final orders are left unchanged.
 	SetCashfreeOrderState(ctx context.Context, orderID, state, reason string) error

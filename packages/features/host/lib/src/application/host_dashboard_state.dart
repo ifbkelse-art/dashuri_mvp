@@ -16,12 +16,37 @@ final class HostDashboardStateLoading extends HostDashboardState {
 }
 
 final class HostDashboardStateLoaded extends HostDashboardState {
-  const HostDashboardStateLoaded(this.data);
+  const HostDashboardStateLoaded(
+    this.data, {
+    this.profile,
+    this.updating = false,
+    this.actionFailure,
+  });
 
   final HostStatus data;
 
+  /// Own profile for the greeting; null when it could not be loaded.
+  final HostProfile? profile;
+
+  /// An availability or opt-in change is in flight.
+  final bool updating;
+
+  /// The last availability/opt-in change failed (shown as a snackbar).
+  final Failure? actionFailure;
+
+  HostDashboardStateLoaded copyWith({
+    HostStatus? data,
+    bool? updating,
+    Failure? actionFailure,
+  }) => HostDashboardStateLoaded(
+    data ?? this.data,
+    profile: profile,
+    updating: updating ?? this.updating,
+    actionFailure: actionFailure,
+  );
+
   @override
-  List<Object?> get props => [data];
+  List<Object?> get props => [data, profile, updating, actionFailure];
 }
 
 final class HostDashboardStateFailed extends HostDashboardState {

@@ -57,6 +57,11 @@ type Config struct {
 
 	// Push (FCM HTTP v1). Uses GoogleCredentialsFile for auth.
 	FCMProjectID string
+
+	// Supabase Storage signing key (BE-identity): issues signed upload and
+	// read URLs for the private profile-photos bucket. Server only; empty
+	// makes photo uploads return 503 storage_not_configured.
+	StorageServiceKey string // secret
 }
 
 // Load reads and validates configuration. In production every required
@@ -91,6 +96,7 @@ func Load() (Config, error) {
 		SightengineUser:        os.Getenv("SIGHTENGINE_API_USER"),
 		SightengineSecret:      os.Getenv("SIGHTENGINE_API_SECRET"),
 		FCMProjectID:           os.Getenv("FCM_PROJECT_ID"),
+		StorageServiceKey:      os.Getenv("SUPABASE_STORAGE_SERVICE_KEY"),
 	}
 	return c, c.Validate()
 }

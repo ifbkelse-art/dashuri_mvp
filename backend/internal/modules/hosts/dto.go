@@ -13,6 +13,35 @@ type HostStatus struct {
 	MinRatePerMinute int64  `json:"min_rate_per_minute"`
 	MaxRatePerMinute int64  `json:"max_rate_per_minute"`
 	FreeCallOptIn    bool   `json:"free_call_opt_in"`
+	// MVP additions (§2.7).
+	TodayEarnedBeans int64 `json:"today_earned_beans"`
+	TodayCalls       int64 `json:"today_calls"`
+	Level            int   `json:"level"`
+}
+
+// KycDecisionRequest: POST /v1/admin/hosts/{userId}/kyc-decision (moderator).
+type KycDecisionRequest struct {
+	Decision    string `json:"decision"`
+	DateOfBirth string `json:"date_of_birth,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+}
+
+func (r KycDecisionRequest) validate() map[string]string {
+	errs := map[string]string{}
+	if r.Decision != "approve" && r.Decision != "reject" {
+		errs["decision"] = "invalid_value"
+	}
+	if r.Decision == "approve" {
+		if r.DateOfBirth == "" {
+			errs["date_of_birth"] = "required"
+		} else if _, err := time.Parse("2006-01-02", r.DateOfBirth); err != nil {
+			errs["date_of_birth"] = "invalid_date"
+		}
+	}
+	if len(r.Reason) > 500 {
+		errs["reason"] = "too_long"
+	}
+	return errs
 }
 
 type KycSession struct {
@@ -59,4 +88,6 @@ type HostEarnings struct {
 	BeansPendingPayout int64      `json:"beans_pending_payout"`
 	AvailableInrPaise  int64      `json:"available_inr_paise"`
 	NextPayoutDate     *time.Time `json:"next_payout_date,omitempty"`
+	TodayEarnedBeans   int64      `json:"today_earned_beans"`
+	TodayCalls         int64      `json:"today_calls"`
 }

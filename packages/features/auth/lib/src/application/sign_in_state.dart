@@ -7,19 +7,31 @@ final class SignInState extends Equatable {
     this.step = SignInStep.enterPhone,
     this.phone = '',
     this.failure,
+    this.codesSent = 0,
   });
 
   final SignInStep step;
+
+  /// E.164 phone number the code was (or will be) sent to.
   final String phone;
   final Failure? failure;
 
-  SignInState copyWith({SignInStep? step, String? phone, Failure? failure}) =>
-      SignInState(
-        step: step ?? this.step,
-        phone: phone ?? this.phone,
-        failure: failure,
-      );
+  /// Incremented on every successful send/resend; the OTP page restarts its
+  /// resend countdown when this changes.
+  final int codesSent;
+
+  SignInState copyWith({
+    SignInStep? step,
+    String? phone,
+    Failure? failure,
+    int? codesSent,
+  }) => SignInState(
+    step: step ?? this.step,
+    phone: phone ?? this.phone,
+    failure: failure,
+    codesSent: codesSent ?? this.codesSent,
+  );
 
   @override
-  List<Object?> get props => [step, phone, failure];
+  List<Object?> get props => [step, phone, failure, codesSent];
 }

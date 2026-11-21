@@ -1,44 +1,149 @@
 import 'package:dashuri_core/dashuri_core.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../domain/entities/purchase_update.dart';
+import 'sha256.dart';
 import 'store_billing.dart';
 
-/// Google Play Billing adapter (in_app_purchase). NOT IMPLEMENTED YET.
+/// Google Play Billing adapter (`in_app_purchase`).
 ///
-/// TODO(billing): implement with in_app_purchase:
-///  1. queryPrices → `_iap.queryProductDetails(ids)`; map to localized prices.
-///  2. launchPurchase → `_iap.buyConsumable(..., autoConsume: false)`.
-///  3. updates → map `_iap.purchaseStream` statuses (pending, purchased,
-///     restored, canceled, error) to [PurchaseUpdate]s, passing the
-///     server-verification data (purchase token) on `purchased`.
-///  4. complete → only after server status `credited`: `_iap.completePurchase`
-///     and consume via the Android platform addition, per current Play Billing
-///     requirements (verify the exact acknowledge/consume sequence before release).
-/// Never credit Diamonds on the device.
+/// - Products are queried by the server catalogue's `product_id`.
+/// - Purchases use `buyConsumable(autoConsume: false)` with
+///   `applicationUserName = sha256(userId)` (Play's obfuscatedAccountId), so
+///   nothing is consumed before the server has verified the token.
+/// - [complete] calls `completePurchase` only after the server said
+///   `credited` or `rejected`. The server consumes the token with the Play
+///   Developer API when it credits, so the pack can be bought again.
+/// Never credits Diamonds on the device.
 final class PlayStoreBilling implements StoreBilling {
-  PlayStoreBilling([InAppPurchase? iap]) : _iap = iap ?? InAppPurchase.instance;
+  PlayStoreBilling({
+    required SessionGateway session,
+    InAppPurchase? iap,
+    bool Function()? isAndroid,
+  }) : _session = session,
+       _iapOverride = iap,
+       _isAndroid =
+           isAndroid ??
+           (() => !kIsWeb && defaultTargetPlatform == TargetPlatform.android);
 
-  // ignore: unused_field
-  final InAppPurchase _iap;
+  final SessionGateway _session;
+  final InAppPurchase? _iapOverride;
+  final bool Function() _isAndroid;
+  final Map<String, ProductDetails> _products = {};
 
-  static const _notImplemented = PlatformFailure(
-    code: 'billing_not_implemented',
+  /// Purchases awaiting the server's answer, by purchase token.
+  final Map<String, PurchaseDetails> _awaitingCompletion = {};
+
+  // Resolved lazily: touching the plugin off Android is not allowed.
+  InAppPurchase get _iap => _iapOverride ?? InAppPurchase.instance;
+
+  static const _unavailable = PlatformFailure(
+    code: 'billing_unavailable',
+    message: 'Google Play Billing is not available on this device.',
   );
+
+  @override
+  Future<bool> isAvailable() async {
+    if (!_isAndroid()) return false;
+    try {
+      return await _iap.isAvailable();
+    } on Object {
+      return false;
+    }
+  }
 
   @override
   Future<Result<Map<String, String>>> queryPrices(
     Set<String> productIds,
-  ) async => const Err(_notImplemented);
+  ) async {
+    if (!await isAvailable()) return const Err(_unavailable);
+    try {
+      final response = await _iap.queryProductDetails(productIds);
+      if (response.error case final IAPError e) {
+        return Err(PlatformFailure(code: e.code, message: e.message));
+      }
+      for (final p in response.productDetails) {
+        _products[p.id] = p;
+      }
+      return Success({for (final p in response.productDetails) p.id: p.price});
+    } on PlatformException catch (e) {
+      return Err(PlatformFailure(code: e.code, message: e.message));
+    }
+  }
 
   @override
-  Future<Result<void>> launchPurchase(String productId) async =>
-      const Err(_notImplemented);
+  Future<Result<void>> launchPurchase(String productId) async {
+    final userId = _session.currentSession?.userId;
+    if (userId == null) return const Err(UnauthenticatedFailure());
+    if (!_products.containsKey(productId)) {
+      final prices = await queryPrices({productId});
+      if (prices case Err(:final failure)) return Err(failure);
+      if (!_products.containsKey(productId)) {
+        return const Err(PlatformFailure(code: 'product_not_found'));
+      }
+    }
+    try {
+      final launched = await _iap.buyConsumable(
+        purchaseParam: PurchaseParam(
+          productDetails: _products[productId]!,
+          applicationUserName: sha256Hex(userId),
+        ),
+        autoConsume: false,
+      );
+      return launched
+          ? const Success(null)
+          : const Err(PlatformFailure(code: 'billing_launch_failed'));
+    } on InAppPurchaseException catch (e) {
+      return Err(PlatformFailure(code: e.code, message: e.message));
+    } on PlatformException catch (e) {
+      return Err(PlatformFailure(code: e.code, message: e.message));
+    }
+  }
 
   @override
-  Stream<PurchaseUpdate> updates() => const Stream.empty();
+  Stream<PurchaseUpdate> updates() {
+    if (!_isAndroid()) return const Stream.empty();
+    return _iap.purchaseStream.expand((list) => list.map(_toUpdate));
+  }
+
+  PurchaseUpdate _toUpdate(PurchaseDetails d) {
+    switch (d.status) {
+      case PurchaseStatus.pending:
+        return PurchasePending(d.productID);
+      case PurchaseStatus.purchased:
+      case PurchaseStatus.restored:
+        final token = d.verificationData.serverVerificationData;
+        _awaitingCompletion[token] = d;
+        return PurchaseNeedsVerification(
+          d.productID,
+          purchaseToken: token,
+          orderId: d.purchaseID,
+        );
+      case PurchaseStatus.canceled:
+        return PurchaseCancelled(d.productID);
+      case PurchaseStatus.error:
+        return PurchaseStoreError(
+          d.productID,
+          d.error?.code ?? 'billing_error',
+        );
+    }
+  }
 
   @override
-  Future<Result<void>> complete(String purchaseToken) async =>
-      const Err(_notImplemented);
+  Future<Result<void>> complete(String purchaseToken) async {
+    final details = _awaitingCompletion.remove(purchaseToken);
+    if (details == null || !details.pendingCompletePurchase) {
+      return const Success(null);
+    }
+    try {
+      await _iap.completePurchase(details);
+      return const Success(null);
+    } on Object catch (e) {
+      // Keep it so a later retry can complete it.
+      _awaitingCompletion[purchaseToken] = details;
+      return Err(PlatformFailure(code: 'complete_failed', message: '$e'));
+    }
+  }
 }

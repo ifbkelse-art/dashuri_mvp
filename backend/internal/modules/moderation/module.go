@@ -6,14 +6,23 @@ import (
 	"strconv"
 
 	"dashuri/backend/internal/platform/apperr"
+	"dashuri/backend/internal/platform/clock"
 )
 
 // Deps are the ports this module needs. Add repository and provider
 // interfaces here as the module is implemented; wire them in internal/app.
 type Deps struct {
+	// Enabled is MODERATION_ENABLED. When true but Classifier is nil
+	// (credentials missing) frames are refused with 503 moderation_not_configured.
+	Enabled    bool
 	Classifier NudityClassifier
 	Frames     FrameSource
 	Evidence   EvidenceStore
+	Repo       Repository // nil without a database → 503
+	Calls      CallEnder
+	Clock      clock.Clock
+	// Threshold flags a frame when any explicit class reaches it (default 0.6).
+	Threshold float64
 }
 
 // PageRequest is a parsed cursor page request.

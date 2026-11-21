@@ -8,9 +8,13 @@ import (
 	"dashuri/backend/internal/platform/apperr"
 )
 
-// Deps are the ports this module needs. Add repository and provider
-// interfaces here as the module is implemented; wire them in internal/app.
-type Deps struct{}
+// Deps are the ports this module needs. Repo is nil without a database.
+type Deps struct {
+	Repo     Repository
+	Realtime Publisher     // optional
+	Photos   PhotoSigner   // optional
+	Push     MessagePusher // optional
+}
 
 // PageRequest is a parsed cursor page request.
 type PageRequest struct {

@@ -63,3 +63,33 @@ final class CallMediaEventReceived extends CallBlocEvent {
   @override
   List<Object?> get props => [event];
 }
+
+/// Opens the call screen for an existing call: the caller after the
+/// pre-call request or a free-call match, or the host for an incoming ring
+/// ([incoming] = true).
+final class CallAttachRequested extends CallBlocEvent {
+  const CallAttachRequested(this.callId, {this.incoming = false});
+
+  final String callId;
+  final bool incoming;
+
+  @override
+  List<Object?> get props => [callId, incoming];
+}
+
+final class CallMicrophoneToggled extends CallBlocEvent {
+  const CallMicrophoneToggled();
+}
+
+final class CallCameraToggled extends CallBlocEvent {
+  const CallCameraToggled();
+}
+
+final class CallCameraFlipped extends CallBlocEvent {
+  const CallCameraFlipped();
+}
+
+/// Periodic re-fetch while waiting on the other side (realtime is a hint).
+final class CallRefreshTicked extends CallBlocEvent {
+  const CallRefreshTicked();
+}

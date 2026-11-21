@@ -20,6 +20,26 @@ func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 	mux.Handle("PUT /v1/host/rate", mw.User(auth.Require(s.handleSetRate, auth.RoleHost)))
 	mux.Handle("PUT /v1/host/free-call-opt-in", mw.User(auth.Require(s.handleSetFreeCallOptIn, auth.RoleHost)))
 	mux.Handle("GET /v1/host/earnings", mw.User(auth.Require(s.handleGetEarnings, auth.RoleHost)))
+	mux.Handle("POST /v1/admin/hosts/{userId}/kyc-decision", mw.User(auth.Require(s.handleDecideKyc, auth.RoleModerator, auth.RoleAdmin)))
+}
+
+func (s *Service) handleDecideKyc(w http.ResponseWriter, r *http.Request) {
+	p, _ := auth.FromContext(r.Context())
+	var in KycDecisionRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	if errs := in.validate(); len(errs) > 0 {
+		httpx.WriteError(w, r, validationError(errs))
+		return
+	}
+	out, err := s.DecideKyc(r.Context(), p, r.PathValue("userId"), in)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteJSON(w, 200, out)
 }
 
 func (s *Service) handleGetHostStatus(w http.ResponseWriter, r *http.Request) {
