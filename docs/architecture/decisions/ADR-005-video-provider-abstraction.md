@@ -1,6 +1,6 @@
 # ADR-005: Video provider behind a port; Stream pending validation
 
-- **Status:** Accepted (abstraction); provider choice **pending**, 2026-11-17
+- **Status:** Accepted (abstraction), 2026-11-17. **Provider confirmed by the founder on 2026-11-21: Stream (getstream.io) Video**; the adapters are implemented in `backend/internal/adapters/stream` and `feature_video_call`. The validation checklist below still applies before launch.
 
 ## Context
 Stream Video is the intended provider, "subject to final commercial and technical validation". Billing correctness depends on trustworthy server-side events, and moderation (S7) may need server-side access to frames.

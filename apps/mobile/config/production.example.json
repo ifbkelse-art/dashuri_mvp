@@ -2,5 +2,6 @@
   "DASHURI_ENV": "production",
   "DASHURI_API_BASE_URL": "https://api-production.example.invalid",
   "DASHURI_SUPABASE_URL": "https://YOUR-PROJECT.supabase.co",
-  "DASHURI_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_REPLACE_ME"
+  "DASHURI_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_REPLACE_ME",
+  "DASHURI_CASHFREE_ENABLED": "false"
 }
