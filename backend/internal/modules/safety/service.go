@@ -76,12 +76,19 @@ func (s *Service) ReportUser(ctx context.Context, p auth.Principal, in ReportReq
 	if errs := in.validate(); len(errs) > 0 {
 		return ReportReceipt{}, validationError(errs)
 	}
-	if in.TargetUserId == p.UserID {
-		return ReportReceipt{}, validationError(map[string]string{"target_user_id": "self"})
-	}
 	repo, err := s.repo()
 	if err != nil {
 		return ReportReceipt{}, err
+	}
+	if in.TargetUserId == p.UserID {
+		// A grievance (D-22): category "other", about no other user, with
+		// details. Stored without a target; anything else about oneself is invalid.
+		if in.Category != "other" || (in.CallId != nil && *in.CallId != "") || in.Details == nil || strings.TrimSpace(*in.Details) == "" {
+			return ReportReceipt{}, validationError(map[string]string{"target_user_id": "self"})
+		}
+		d := strings.TrimSpace(*in.Details)
+		rec, err := repo.CreateReport(ctx, NewReport{ReporterID: p.UserID, Category: in.Category, Details: &d, Priority: PriorityFor(in.Category)})
+		return rec, internalOrNil(err)
 	}
 	ok, err := repo.UserExists(ctx, in.TargetUserId)
 	if err != nil {

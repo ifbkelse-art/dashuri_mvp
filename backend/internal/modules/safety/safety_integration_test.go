@@ -184,3 +184,26 @@ func TestBlocksEnforcementAndAppeals(t *testing.T) {
 		}
 	}
 }
+
+// Grievances (D-22): a complaint about no other user is stored without a
+// target; other self-reports stay invalid.
+func TestGrievanceWithoutTarget(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	ctx := context.Background()
+	s := safety.NewService(safety.Deps{Repo: postgres.SafetyRepo{Pool: api}})
+	u := pgtest.NewUser(t, admin, true)
+	p := auth.Principal{UserID: u, Roles: []auth.Role{auth.RoleCustomer}, Status: "active", AgeEligible: true}
+	details := "Payment issue with order dsh_123"
+	rec, err := s.ReportUser(ctx, p, safety.ReportRequest{TargetUserId: u, Category: "other", Details: &details})
+	if err != nil {
+		t.Fatalf("grievance: %v", err)
+	}
+	var target *string
+	_ = admin.QueryRow(ctx, `select target_user_id::text from safety.reports where id = $1`, rec.ReportId).Scan(&target)
+	if target != nil {
+		t.Fatalf("grievance stored with target %v", *target)
+	}
+	if _, err := s.ReportUser(ctx, p, safety.ReportRequest{TargetUserId: u, Category: "harassment", Details: &details}); err == nil {
+		t.Fatal("self-report with a user category must be refused")
+	}
+}

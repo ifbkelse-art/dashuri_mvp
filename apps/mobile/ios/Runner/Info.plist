@@ -66,5 +66,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Dashuri uses your camera for video calls.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dashuri uses your microphone for calls.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose profile photos from your library.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Optional: detect your city once. Your exact location is never stored.</string>
 </dict>
 </plist>

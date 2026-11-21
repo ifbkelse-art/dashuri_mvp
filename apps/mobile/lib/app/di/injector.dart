@@ -19,6 +19,7 @@ import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../experience/app_experience_controller.dart';
+import '../platform/device_photo_pickers.dart';
 import 'unconfigured_backend.dart';
 
 /// The app's single service locator. Only this file and route builders use it.
@@ -81,13 +82,16 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
   );
 
   registerAuthFeature(sl);
+  sl
+    ..registerLazySingleton<PhotoPicker>(DevicePhotoPicker.new)
+    ..registerLazySingleton<HostPhotoPicker>(DeviceHostPhotoPicker.new);
   registerProfileFeature(sl);
   registerDiscoveryFeature(sl);
   registerFreeCallFeature(sl);
   registerVideoCallFeature(sl);
   registerChatFeature(sl);
   registerWalletFeature(sl);
-  registerPurchasesFeature(sl);
+  registerPurchasesFeature(sl, cashfreeEnabled: config.cashfreeEnabled);
   registerHostFeature(sl);
   registerSafetyFeature(sl);
   registerNotificationsFeature(sl);

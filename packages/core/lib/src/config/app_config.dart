@@ -14,6 +14,7 @@ final class AppConfig extends Equatable {
     required this.supabaseUrl,
     required this.supabasePublishableKey,
     this.supportEmail = '',
+    this.cashfreeEnabled = false,
   });
 
   /// Reads `--dart-define` values. Missing values are empty strings;
@@ -30,6 +31,7 @@ final class AppConfig extends Equatable {
       'DASHURI_SUPABASE_PUBLISHABLE_KEY',
     ),
     supportEmail: const String.fromEnvironment('DASHURI_SUPPORT_EMAIL'),
+    cashfreeEnabled: const bool.fromEnvironment('DASHURI_CASHFREE_ENABLED'),
   );
 
   final AppEnvironment environment;
@@ -45,6 +47,10 @@ final class AppConfig extends Equatable {
   /// not configured, in which case the app says so instead of guessing.
   final String supportEmail;
 
+  /// Shows the Cashfree rail when the server also lists it (ADR-011).
+  /// Off by default; Play Billing stays the default rail.
+  final bool cashfreeEnabled;
+
   /// Names of missing required values; empty when the config is usable.
   List<String> validate() => [
     if (apiBaseUrl.toString().isEmpty) 'DASHURI_API_BASE_URL',
@@ -59,5 +65,6 @@ final class AppConfig extends Equatable {
     supabaseUrl,
     supabasePublishableKey,
     supportEmail,
+    cashfreeEnabled,
   ];
 }

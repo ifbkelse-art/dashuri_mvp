@@ -39,7 +39,7 @@ func (r SafetyRepo) CreateReport(ctx context.Context, n safety.NewReport) (safet
 		if err := tx.QueryRow(ctx, `
 			insert into safety.reports (reporter_id, target_user_id, category, call_id, details, priority)
 			values ($1, $2, $3, $4, $5, $6) returning id, status`,
-			n.ReporterID, n.TargetID, n.Category, n.CallID, n.Details, n.Priority).Scan(&rec.ReportId, &rec.Status); err != nil {
+			n.ReporterID, nullIfEmptyTarget(n.TargetID), n.Category, n.CallID, n.Details, n.Priority).Scan(&rec.ReportId, &rec.Status); err != nil {
 			return err
 		}
 		return idAudit(ctx, tx, n.ReporterID, "safety.report_created", rec.ReportId, map[string]any{
@@ -149,4 +149,12 @@ func (r SafetyRepo) CreateAppeal(ctx context.Context, userID, enforcementID, sta
 		return idAudit(ctx, tx, userID, "safety.appeal_submitted", rec.AppealId, map[string]any{"enforcement_id": enforcementID})
 	})
 	return rec, err
+}
+
+// nullIfEmptyTarget stores grievances (no target user) as NULL.
+func nullIfEmptyTarget(id string) *string {
+	if id == "" {
+		return nil
+	}
+	return &id
 }

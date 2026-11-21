@@ -68,7 +68,7 @@ func (r ModerationRepo) OpenAutomatedCase(ctx context.Context, c moderation.Auto
 }
 
 func (r ModerationRepo) Queue(ctx context.Context, after *moderation.QueueCursor, limit int) ([]moderation.ModerationCase, []moderation.QueueCursor, error) {
-	q := `select r.id, r.status, r.category, r.target_user_id, r.created_at, r.priority,
+	q := `select r.id, r.status, r.category, coalesce(r.target_user_id::text, ''), r.created_at, r.priority,
 		  (select count(*) from moderation.evidence e where e.report_id = r.id)::int
 		from safety.reports r where r.status in ('open','in_review')`
 	args := []any{limit}
@@ -108,7 +108,7 @@ func (r ModerationRepo) DecideReport(ctx context.Context, d moderation.ReportDec
 	err := r.Tx.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		var status, target string
 		var reporter *string
-		err := tx.QueryRow(ctx, `select status, target_user_id, reporter_id::text from safety.reports where id = $1 for update`, d.ReportID).Scan(&status, &target, &reporter)
+		err := tx.QueryRow(ctx, `select status, coalesce(target_user_id::text, ''), reporter_id::text from safety.reports where id = $1 for update`, d.ReportID).Scan(&status, &target, &reporter)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return moderation.ErrNotFound
 		}
@@ -117,6 +117,10 @@ func (r ModerationRepo) DecideReport(ctx context.Context, d moderation.ReportDec
 		}
 		if status != "open" && status != "in_review" {
 			return moderation.ErrAlreadyDecided
+		}
+		if target == "" && d.Action != "dismiss" {
+			// A grievance has no target user: it can only be closed.
+			return moderation.ErrInvalidDecision
 		}
 		if target == d.ModeratorID || (reporter != nil && *reporter == d.ModeratorID) {
 			return moderation.ErrSelfDecision
