@@ -1,63 +1,63 @@
 // Command worker runs scheduled jobs as Cloud Run Jobs, triggered by Cloud
 // Scheduler: `worker <job>`. Every job is idempotent (safe to re-run) and
-// processes work in bounded batches.
+// processes work in bounded batches. Jobs register themselves in
+// internal/jobs.
 package main
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
-	"sort"
+	"time"
 
-	"dashuri/backend/internal/platform/apperr"
+	"dashuri/backend/internal/adapters/supabase"
+	"dashuri/backend/internal/jobs"
+	"dashuri/backend/internal/modules/economy"
+	"dashuri/backend/internal/platform/clock"
+	"dashuri/backend/internal/platform/config"
+	"dashuri/backend/internal/platform/db"
 	"dashuri/backend/internal/platform/logging"
+	"dashuri/backend/internal/wiring"
 )
 
-type job struct {
-	schedule string
-	doc      string
-}
-
-// Jobs and their intended schedules (IST). None is implemented yet.
-var jobs = map[string]job{
-	"release-bean-holds":        {"every 15 min", "Post BeanRelease for Beans whose 7-day hold has ended (skip hosts under fraud review)."},
-	"expire-promo-diamonds":     {"hourly", "Post PromoExpiry for promotional grants older than 30 days."},
-	"build-payout-cycle":        {"weekly", "Collect requested withdrawals into a cycle, compute TDS, await finance approval. No-op while PAYOUTS_ENABLED=false."},
-	"sync-payout-status":        {"every 30 min", "Fetch provider outcomes; post PayoutSettled (paid or failed → Beans back to available)."},
-	"reconcile-ledger":          {"daily", "Rebuild balances from postings and compare with the projection; compare purchases with Google Play earnings reports; alert on any difference."},
-	"poll-voided-purchases":     {"daily", "Google Play Voided Purchases API → purchase reversals, fraud cases, Bean clawback."},
-	"settle-stale-calls":        {"every minute", "End and settle calls with no provider events past the timeout; release orphaned reservations."},
-	"mark-offline-hosts":        {"every minute", "Hosts without a heartbeat for 90 s become unavailable."},
-	"purge-expired-idempotency": {"daily", "Delete idempotency keys past their 24 h expiry."},
-	"retention-enforcement":     {"daily", "Delete or anonymise data past its retention period (periods need legal review)."},
-}
-
 func main() {
-	slog.SetDefault(logging.New(os.Getenv("DASHURI_ENV")))
-	if len(os.Args) < 2 {
-		names := make([]string, 0, len(jobs))
-		for n := range jobs {
-			names = append(names, n)
-		}
-		sort.Strings(names)
-		fmt.Println("usage: worker <job>")
-		for _, n := range names {
-			fmt.Printf("  %-27s %-14s %s\n", n, jobs[n].schedule, jobs[n].doc)
-		}
-		os.Exit(2)
-	}
-	name := os.Args[1]
-	if _, ok := jobs[name]; !ok {
-		slog.Error("unknown job", "job", name)
-		os.Exit(2)
-	}
-	if err := run(context.Background(), name); err != nil {
-		slog.Error("job failed", "job", name, "err", err)
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("config", "err", err)
 		os.Exit(1)
 	}
-}
-
-func run(_ context.Context, name string) error {
-	return apperr.NotImplemented("job " + name)
+	slog.SetDefault(logging.New(cfg.Env))
+	if len(os.Args) < 2 {
+		fmt.Println("usage: worker <job>")
+		for _, j := range jobs.All() {
+			fmt.Printf("  %-27s %-16s %s\n", j.Name, j.Schedule, j.Doc)
+		}
+		os.Exit(2)
+	}
+	job, ok := jobs.Get(os.Args[1])
+	if !ok {
+		slog.Error("unknown job", "job", os.Args[1])
+		os.Exit(2)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("database", "err", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+	env := wiring.Env{
+		Config: cfg, Pool: pool, Tx: db.TxManager{Pool: pool}, Rules: economy.Founder(), Clock: clock.System{},
+		Realtime: supabase.Publisher{BaseURL: cfg.SupabaseURL, APIKey: cfg.RealtimeAPIKey},
+		HTTP:     &http.Client{Timeout: 15 * time.Second},
+	}
+	start := time.Now()
+	if err := job.Run(ctx, env); err != nil {
+		slog.Error("job failed", "job", job.Name, "err", err)
+		os.Exit(1)
+	}
+	slog.Info("job done", "job", job.Name, "duration_ms", time.Since(start).Milliseconds())
 }
