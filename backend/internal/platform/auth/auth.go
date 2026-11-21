@@ -31,6 +31,20 @@ const (
 type Principal struct {
 	UserID string
 	Roles  []Role
+	// Status is identity.accounts.status: active or restricted (suspended,
+	// banned and deleted accounts never get a principal).
+	Status      string
+	AgeEligible bool
+}
+
+// Restricted reports an enforcement restriction (no calls, no messaging).
+func (p Principal) Restricted() bool { return p.Status == "restricted" }
+
+// Account is what a RoleSource loads for a verified user.
+type Account struct {
+	Roles       []Role
+	Status      string
+	AgeEligible bool
 }
 
 func (p Principal) Has(r Role) bool {
@@ -47,9 +61,11 @@ type TokenVerifier interface {
 	Verify(ctx context.Context, token string) (subject string, err error)
 }
 
-// RoleSource loads roles and restrictions for a user from the database.
+// RoleSource loads roles and restrictions for a user from the database. It
+// provisions the account row on first use (the Supabase user already exists)
+// and returns a Forbidden error for suspended, banned or deleted accounts.
 type RoleSource interface {
-	Roles(ctx context.Context, userID string) ([]Role, error)
+	Account(ctx context.Context, userID string) (Account, error)
 }
 
 type ctxKey int
@@ -81,12 +97,13 @@ func Middleware(v TokenVerifier, roles RoleSource) func(http.Handler) http.Handl
 				httpx.WriteError(w, r, apperr.Unauthenticated("invalid token"))
 				return
 			}
-			rs, err := roles.Roles(r.Context(), sub)
+			acct, err := roles.Account(r.Context(), sub)
 			if err != nil {
 				httpx.WriteError(w, r, err)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, Principal{UserID: sub, Roles: rs})))
+			p := Principal{UserID: sub, Roles: acct.Roles, Status: acct.Status, AgeEligible: acct.AgeEligible}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
 		})
 	}
 }
@@ -107,21 +124,4 @@ func Require(next http.HandlerFunc, any ...Role) http.HandlerFunc {
 		}
 		httpx.WriteError(w, r, apperr.Forbidden("role_required", "insufficient role"))
 	}
-}
-
-// JWKSVerifier verifies Supabase access tokens. NOT IMPLEMENTED.
-//
-// TODO(auth): implement with a maintained JOSE library: fetch and cache
-// SUPABASE_JWKS_URL, verify alg (ES256/RS256 per project settings), `iss`,
-// `aud` = "authenticated", `exp`/`nbf` with small leeway; return `sub`.
-// Reject HS256 tokens signed with the legacy shared secret once the project
-// uses asymmetric keys.
-type JWKSVerifier struct {
-	JWKSURL  string
-	Issuer   string
-	Audience string
-}
-
-func (JWKSVerifier) Verify(context.Context, string) (string, error) {
-	return "", apperr.NotImplemented("jwt verification")
 }
