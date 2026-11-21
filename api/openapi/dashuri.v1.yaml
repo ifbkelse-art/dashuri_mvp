@@ -2290,6 +2290,338 @@ paths:
           description: Ready
         "503":
           description: Not ready
+  /v1/me/rules-acceptance:
+    post:
+      operationId: acceptCommunityRules
+      tags:
+        - accounts
+      summary: "Accept the current community rules (A13)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RulesAcceptanceRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/locations/cities:
+    get:
+      operationId: listCities
+      tags:
+        - accounts
+      summary: "Supported cities (coarse location, ADR-012)."
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CityList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/locations/resolve:
+    post:
+      operationId: resolveCity
+      tags:
+        - accounts
+      summary: "Nearest supported city for rounded coordinates; coordinates are not stored."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveCityRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/City"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/discovery/hosts/{userId}:
+    get:
+      operationId: getHostCard
+      tags:
+        - discovery
+      summary: "Host detail (C07–C09); 404 when blocked either way."
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostDetail"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/discovery/summary:
+    get:
+      operationId: getDiscoverySummary
+      tags:
+        - discovery
+      summary: "Online host count."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverySummary"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/purchases/cashfree/orders:
+    post:
+      operationId: createCashfreeOrder
+      tags:
+        - purchases
+      summary: "Create a Cashfree PG order for a Diamond package (ADR-011)."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCashfreeOrderRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashfreeOrder"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: rail_disabled, product_unknown, phone_required"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/purchases/cashfree/orders/{orderId}:
+    get:
+      operationId: getCashfreeOrder
+      tags:
+        - purchases
+      summary: "Order state; re-verifies with Cashfree server-to-server and credits once."
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashfreeOrder"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/webhooks/cashfree:
+    post:
+      operationId: cashfreeWebhook
+      tags:
+        - webhooks
+      summary: "Cashfree PG webhook (x-webhook-signature HMAC-SHA256)."
+      security: []
+      responses:
+        "204":
+          description: OK
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/calls/history:
+    get:
+      operationId: listCallHistory
+      tags:
+        - calls
+      summary: "Own calls, newest first."
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallSessionPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/calls/{callId}/moderation-frames:
+    post:
+      operationId: submitModerationFrame
+      tags:
+        - calls
+      summary: "Own-camera JPEG during the first 180 s (S7, ADR-013)."
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationFrameRequest"
+      responses:
+        "202":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrameAccepted"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: moderation_window_closed, not_participant"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/conversations/{conversationId}/read:
+    post:
+      operationId: markConversationRead
+      tags:
+        - chat
+      summary: "Mark the conversation read up to now."
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/hosts/{userId}/kyc-decision:
+    post:
+      operationId: decideHostKyc
+      tags:
+        - admin
+      summary: "Moderator decision for manual KYC (MVP provider)."
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KycDecisionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     bearerAuth:
@@ -2315,6 +2647,90 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    City:
+      type: object
+      required: [id, name, state]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        state: {type: string}
+    CityList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/City"}
+    ResolveCityRequest:
+      type: object
+      additionalProperties: false
+      required: [latitude, longitude]
+      properties:
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+    RulesAcceptanceRequest:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: string}
+    HostDetail:
+      allOf:
+        - $ref: "#/components/schemas/HostCard"
+        - type: object
+          properties:
+            bio: {type: [string, "null"]}
+    DiscoverySummary:
+      type: object
+      required: [online_count]
+      properties:
+        online_count: {type: integer}
+    CreateCashfreeOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [product_id]
+      properties:
+        product_id: {type: string}
+    CashfreeOrder:
+      type: object
+      required: [order_id, product_id, amount_paise, diamonds, environment, state, diamonds_credited]
+      properties:
+        order_id: {type: string}
+        product_id: {type: string}
+        amount_paise: {type: integer, format: int64}
+        diamonds: {type: integer, format: int64}
+        payment_session_id: {type: [string, "null"]}
+        environment: {type: string, enum: [sandbox, production]}
+        state: {type: string, enum: [created, pending, credited, failed, expired]}
+        diamonds_credited: {type: integer, format: int64}
+    CallSessionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/CallSession"}
+        next_cursor: {type: [string, "null"]}
+    ModerationFrameRequest:
+      type: object
+      additionalProperties: false
+      required: [image_base64, captured_at]
+      properties:
+        image_base64: {type: string, description: "JPEG, at most 200 KB before encoding"}
+        captured_at: {type: string, format: date-time}
+    FrameAccepted:
+      type: object
+      required: [accepted]
+      properties:
+        accepted: {type: boolean}
+    KycDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approve, reject]}
+        date_of_birth: {type: string, format: date}
+        reason: {type: string, maxLength: 500}
     AccountStatus:
       type: object
       description: Server view of the signed-in account; route guards use this.

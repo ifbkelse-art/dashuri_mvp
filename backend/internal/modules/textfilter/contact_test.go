@@ -27,8 +27,8 @@ func TestFindContactDetails(t *testing.T) {
 		{"(987) 654.3210", Phone},
 		{"9 8 7 6 5 4 3 2 1 0", Phone},
 		{"+44 20 7946 0958", Phone},
-		{"९८७६५४३२१०", Phone},  // Devanagari digits
-		{"９８７６５４３２１０", Phone}, // fullwidth digits
+		{"९८७६५४३२१०", Phone},       // Devanagari digits
+		{"９８７６５４３２１０", Phone},       // fullwidth digits
 		{"98765\u200b43210", Phone}, // zero-width space
 
 		// Emails.

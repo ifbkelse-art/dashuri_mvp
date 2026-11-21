@@ -23,13 +23,6 @@ import (
 	"dashuri/backend/internal/wiring"
 )
 
-// hostWithBeans gives a host available Beans via free-call compensation + release.
-func hostWithBeans(t *testing.T, api, adm interface{}, host string, beans int64) {
-	t.Helper()
-	pool := api.(*pgxpoolPool)
-	_ = pool
-}
-
 func TestWithdrawalRefusedWhileDisabledAndNoBeansMove(t *testing.T) {
 	api, adm := pgtest.Pools(t)
 	ctx := context.Background()

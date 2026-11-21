@@ -120,3 +120,29 @@ func TestIdempotencyStoreClaimsOnce(t *testing.T) {
 		t.Fatalf("replay record wrong: %+v", rec)
 	}
 }
+
+// Regression: a debit from a user bucket with sufficient balance must post
+// (the first apply_posting trigger rejected every user debit).
+func TestValidDebitSettlesCall(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	ctx := context.Background()
+	customer := pgtest.NewUser(t, admin, true)
+	host := pgtest.NewUser(t, admin, true, "customer", "host")
+	store := postgres.LedgerStore{Pool: api}
+	if _, _, err := store.Post(ctx, ledger.PurchaseCredit(customer, pgtest.UUID(), "t-"+customer, 10000, "2026-11-17-founder", time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	entry, err := ledger.CallSettlement(ledger.CallCharge{CallID: pgtest.UUID(), CustomerID: customer, HostID: host,
+		FromPurchased: 4333, HostBeans: 2599, RuleSetVersion: "2026-11-17-founder", At: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Post(ctx, entry); err != nil {
+		t.Fatalf("valid settlement rejected: %v", err)
+	}
+	d, _ := store.Balance(ctx, ledger.User(customer, ledger.UserDiamondPurchased), ledger.Diamond)
+	b, _ := store.Balance(ctx, ledger.User(host, ledger.UserBeanHeld), ledger.Bean)
+	if d != 10000-4333 || b != 2599 {
+		t.Fatalf("balances after settlement: diamonds=%d beans=%d", d, b)
+	}
+}

@@ -1,6 +1,10 @@
 package com.bkenterprises.dashuri_mobile
 
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.provider.Settings
+import android.util.Base64
+import java.security.MessageDigest
 import com.google.android.play.core.integrity.IntegrityManagerFactory
 import com.google.android.play.core.integrity.IntegrityTokenRequest
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -21,9 +25,12 @@ class MainActivity : FlutterFragmentActivity() {
                     result.notImplemented()
                     return@setMethodCallHandler
                 }
-                val nonce = call.argument<String>("nonce")
-                if (nonce.isNullOrEmpty()) {
-                    result.error("bad_args", "nonce is required", null)
+                // Device binding (one Free Call Card per device): the nonce is
+                // derived here, not by Dart, as base64url(SHA-256(ANDROID_ID)).
+                // The server reads it back from the integrity-protected verdict.
+                val nonce = deviceBindingNonce()
+                if (nonce == null) {
+                    result.error("integrity_unavailable", "device id unavailable", null)
                     return@setMethodCallHandler
                 }
                 val builder = IntegrityTokenRequest.builder().setNonce(nonce)
@@ -33,6 +40,14 @@ class MainActivity : FlutterFragmentActivity() {
                     .addOnSuccessListener { response -> result.success(response.token()) }
                     .addOnFailureListener { e -> result.error("integrity_unavailable", e.message, null) }
             }
+    }
+
+    @SuppressLint("HardwareIds")
+    private fun deviceBindingNonce(): String? {
+        val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            ?: return null
+        val digest = MessageDigest.getInstance("SHA-256").digest(androidId.toByteArray(Charsets.UTF_8))
+        return Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
     }
 
     private fun cloudProjectNumber(): Long? {

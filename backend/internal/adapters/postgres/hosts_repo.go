@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dashuri/backend/internal/modules/hosts"
+	"dashuri/backend/internal/modules/ledger"
 	"dashuri/backend/internal/platform/db"
 )
 
@@ -195,4 +196,71 @@ func (r HostsRepo) DecideKyc(ctx context.Context, d hosts.KycDecision) error {
 		}
 		return callsAudit(ctx, tx, d.ModeratorID, "host.kyc_"+status, d.HostID, map[string]any{"session_id": sessionID, "reason": d.Reason})
 	})
+}
+
+// MarkOffline takes hosts offline whose last heartbeat is older than cutoff
+// (hosts in a live call are left alone).
+func (r HostsRepo) MarkOffline(ctx context.Context, cutoff time.Time) (int64, error) {
+	tag, err := r.Pool.Exec(ctx, `update hosting.hosts h set is_available = false
+		where h.is_available and (h.last_heartbeat_at is null or h.last_heartbeat_at < $1)
+		  and not exists (select 1 from calls.calls c where (c.caller_id = h.user_id or c.receiver_id = h.user_id)
+		                    and c.phase in ('requested','ringing','accepted','connecting','active','paused','ending'))`, cutoff)
+	return tag.RowsAffected(), err
+}
+
+// ReleaseDueBeanHolds posts BeanRelease (key bean_release:<source entry>) for
+// every Bean credit to bean_held older than the hold period, capped by the
+// current held balance (clawbacks may have reduced it). Bounded batch;
+// replays are no-ops through the ledger idempotency key.
+func (r HostsRepo) ReleaseDueBeanHolds(ctx context.Context, olderThan, at time.Time, limit int) (int, error) {
+	rows, err := r.Pool.Query(ctx, `
+		select p.entry_id, a.owner_user_id, p.amount
+		  from ledger.postings p
+		  join ledger.accounts a on a.id = p.account_id and a.kind = 'bean_held'
+		  join ledger.journal_entries e on e.id = p.entry_id
+		 where p.amount > 0 and e.entry_type in ('call_settlement','free_call_compensation') and e.occurred_at < $1
+		   and not exists (select 1 from ledger.journal_entries r where r.idempotency_key = 'bean_release:' || p.entry_id::text)
+		 order by e.occurred_at limit $2`, olderThan, limit)
+	if err != nil {
+		return 0, err
+	}
+	type due struct {
+		entry, host string
+		beans       int64
+	}
+	var items []due
+	for rows.Next() {
+		var d due
+		if err := rows.Scan(&d.entry, &d.host, &d.beans); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		items = append(items, d)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	released := 0
+	for _, d := range items {
+		err := r.Tx.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
+			bal, err := LockUserBalances(ctx, tx, d.host, ledger.UserBeanHeld, ledger.UserBeanAvailable)
+			if err != nil {
+				return err
+			}
+			beans := min(d.beans, bal[ledger.UserBeanHeld])
+			if beans <= 0 {
+				return nil
+			}
+			_, replayed, err := PostEntry(ctx, tx, ledger.BeanRelease(d.host, d.entry, beans, at))
+			if err == nil && !replayed {
+				released++
+			}
+			return err
+		})
+		if err != nil {
+			return released, err
+		}
+	}
+	return released, nil
 }

@@ -122,7 +122,10 @@ func (s *Service) settleTx(tx Tx, c Call, to Phase, reason string, now time.Time
 		}
 	} else {
 		wasActive := c.ConnectedAt != nil || billable > 0
-		if to == Ended && wasActive && !c.FreeCallCompensated {
+		// Host compensation (S4) is for an eligible free-call minute only:
+		// the server-observed connected time must reach the free-call cap.
+		eligible := billable >= s.deps.Rules.FreeCallSeconds
+		if to == Ended && eligible && !c.FreeCallCompensated {
 			b, err := s.compensate(tx, c, now)
 			if err != nil {
 				return c, err

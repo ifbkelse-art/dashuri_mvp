@@ -80,8 +80,10 @@ func (f fakeRepo) ListHosts(_ context.Context, q ListQuery) ([]HostRow, error) {
 	}
 	return f.rows, nil
 }
-func (f fakeRepo) Host(context.Context, string, string) (HostRow, error) { return HostRow{}, ErrNotFound }
-func (f fakeRepo) OnlineCount(context.Context, string) (int, error)      { return len(f.rows), nil }
+func (f fakeRepo) Host(context.Context, string, string) (HostRow, error) {
+	return HostRow{}, ErrNotFound
+}
+func (f fakeRepo) OnlineCount(context.Context, string) (int, error) { return len(f.rows), nil }
 
 func TestListPagination(t *testing.T) {
 	rows := []HostRow{

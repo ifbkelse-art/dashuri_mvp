@@ -346,7 +346,7 @@ func (s *Service) GetCallCredentials(ctx context.Context, p auth.Principal, call
 //     exhaustion; end the call at zero (and free calls at 60 s).
 func (s *Service) VideoProviderWebhook(ctx context.Context, provider string, raw []byte, headers map[string]string) error {
 	if provider != s.deps.ProviderName {
-		return apperr.NotFound("provider")
+		return apperr.Validation(map[string]string{"provider": "unknown_provider"})
 	}
 	if err := s.ready(); err != nil {
 		return err

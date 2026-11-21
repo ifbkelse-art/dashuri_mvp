@@ -2,6 +2,33 @@
 -- finance administration. See docs/mvp/api/wallet_payments.md.
 
 -- ---------------------------------------------------------------- ledger
+-- Fix: the original trigger used INSERT … ON CONFLICT DO UPDATE. Postgres
+-- checks CHECK constraints on the proposed INSERT row before resolving the
+-- conflict, so any debit (negative posting) from a non-negative user bucket
+-- failed with 23514 even when the balance was sufficient. Update first;
+-- insert only when the projection row does not exist yet.
+create or replace function ledger.apply_posting() returns trigger
+language plpgsql as $$
+declare
+  acct_currency text;
+  acct_non_negative boolean;
+begin
+  select currency, non_negative into acct_currency, acct_non_negative
+    from ledger.accounts where id = new.account_id;
+  if acct_currency is distinct from new.currency then
+    raise exception 'posting currency % does not match account % currency %', new.currency, new.account_id, acct_currency
+      using errcode = 'P0002';
+  end if;
+  update ledger.balances
+     set balance = balance + new.amount, version = version + 1, updated_at = now()
+   where account_id = new.account_id;
+  if not found then
+    insert into ledger.balances (account_id, balance, non_negative, version, updated_at)
+         values (new.account_id, new.amount, acct_non_negative, 1, now());
+  end if;
+  return new;
+end $$;
+
 -- Counter-accounts for dual-control manual adjustments (ledger.Adjustment).
 insert into ledger.accounts (owner_user_id, kind, currency, non_negative) values
   (null, 'sys_diamond_adjustment', 'DIAMOND', false),

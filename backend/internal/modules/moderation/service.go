@@ -149,7 +149,7 @@ func (s *Service) SubmitFrame(ctx context.Context, p auth.Principal, callID stri
 	}
 	if _, _, err := s.deps.Repo.OpenAutomatedCase(ctx, AutomatedCase{
 		CallID: c.ID, TargetUserID: p.UserID, Category: "nudity", Reason: "nudity_classifier", Priority: 1,
-		Details: fmt.Sprintf("automated: %s explicit score %.3f (threshold %.2f)", score.Vendor, score.Explicit(), s.deps.Threshold),
+		Details:     fmt.Sprintf("automated: %s explicit score %.3f (threshold %.2f)", score.Vendor, score.Explicit(), s.deps.Threshold),
 		EvidenceRef: "frame_checks/" + strconv.FormatInt(checkID, 10), RetainUntil: now.Add(EvidenceRetention),
 	}); err != nil {
 		slog.ErrorContext(ctx, "open automated case", "err", err)
