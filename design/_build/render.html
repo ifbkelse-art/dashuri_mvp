@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="ds.css">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="lib.js"></script>
+<script src="s_auth.js"></script><script src="s_customer.js"></script><script src="s_call.js"></script>
+<script src="s_wallet.js"></script><script src="s_chat.js"></script><script src="s_host.js"></script><script src="s_settings.js"></script>
+<style>body{margin:0}</style></head><body>
+<div id="root"></div>
+<script>
+const q=new URLSearchParams(location.search); if(q.get('wf')) document.body.classList.add('wf');
+const id=q.get('id'); const s=REG.find(r=>r.id===id);
+document.getElementById('root').innerHTML = s ? s.html() : `<pre>${REG.map(r=>r.id).join('\n')}</pre>`;
+window.__ids = REG.map(r=>({id:r.id,folder:r.folder,name:r.name}));
+async function ready(){
+  lucide.createIcons();
+  const urls=[...document.querySelectorAll('[style*="url("]')].map(e=>(e.getAttribute('style').match(/url\('([^']+)'\)/)||[])[1]).filter(Boolean);
+  if(!q.get('wf')) await Promise.all([...new Set(urls)].map(u=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=u;})));
+  await document.fonts.ready; await new Promise(r=>setTimeout(r,150)); window.__ready=true;
+}
+ready();
+</script></body></html>

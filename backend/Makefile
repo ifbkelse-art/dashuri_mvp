@@ -1,0 +1,9 @@
+.PHONY: build test vet lint run
+build:
+	go build ./...
+vet:
+	go vet ./...
+test:
+	go test -race ./...
+run:
+	go run ./cmd/api

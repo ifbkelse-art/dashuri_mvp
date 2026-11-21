@@ -1,0 +1,17 @@
+name: dashuri_core
+description: Pure-Dart foundation shared by every Dashuri package — results, failures, use-case contract, value types, config, session contract. No Flutter, no I/O.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  equatable: ^2.0.7
+  meta: ^1.15.0
+
+dev_dependencies:
+  dashuri_lints:
+    path: ../lints
+  test: ^1.25.0

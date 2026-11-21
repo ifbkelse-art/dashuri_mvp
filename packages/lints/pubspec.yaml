@@ -1,0 +1,11 @@
+name: dashuri_lints
+description: Shared static-analysis rules for every Dashuri Dart/Flutter package.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter_lints: ^6.0.0

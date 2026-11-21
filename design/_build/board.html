@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="ds.css">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="lib.js"></script>
+<script src="s_auth.js"></script><script src="s_customer.js"></script><script src="s_call.js"></script>
+<script src="s_wallet.js"></script><script src="s_chat.js"></script><script src="s_host.js"></script><script src="s_settings.js"></script>
+<script src="sheets.js"></script><script src="flows.js"></script>
+<style>
+body{margin:0;background:var(--n50)}
+.board{width:1600px;height:1000px;background:var(--n50);padding:40px 56px 0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.bhead{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:22px;border-bottom:1px solid var(--line);margin-bottom:26px;flex:none}
+.bt{font-family:var(--serif);font-size:38px;line-height:42px;margin-top:2px}
+.bbody{flex:1;min-height:0}
+.bfoot{height:40px;flex:none;display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;color:var(--ink-3);border-top:1px solid var(--line)}
+</style></head><body><div id="root"></div>
+<script>
+const q=new URLSearchParams(location.search); const id=q.get('id');
+const it=[...SHEETS,...FLOWS].find(s=>s.id===id);
+document.getElementById('root').innerHTML = it ? it.html() : '';
+(async()=>{lucide.createIcons();
+ const urls=[...document.querySelectorAll('[style*="url("]')].map(e=>(e.getAttribute('style').match(/url\('([^']+)'\)/)||[])[1]).filter(Boolean);
+ await Promise.all([...new Set(urls)].map(u=>new Promise(r=>{const i=new Image();i.onload=i.onerror=r;i.src=u;})));
+ await Promise.all([...document.images].map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r;})));
+ await document.fonts.ready; await new Promise(r=>setTimeout(r,150)); window.__ready=true;})();
+</script></body></html>

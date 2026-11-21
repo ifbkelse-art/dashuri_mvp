@@ -1,0 +1,36 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+pubspec_overrides.yaml
+*.iml
+.idea/
+.flutter-plugins
+.flutter-plugins-dependencies
+coverage/
+**/ios/Pods/
+**/ios/.symlinks/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/android/app/upload-keystore.jks
+
+# Secrets and local configuration (never commit real values)
+.env
+.env.*
+!.env.example
+apps/mobile/config/*.json
+!apps/mobile/config/*.example.json
+backend/.env
+supabase/.env
+supabase/.branches
+supabase/.temp
+*.pem
+*service-account*.json
+
+# Go
+backend/bin/
+backend/coverage.out
+
+# OS
+.DS_Store

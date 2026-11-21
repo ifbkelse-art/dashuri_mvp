@@ -1,0 +1,144 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="ds.css">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="lib.js"></script>
+<script src="s_auth.js"></script><script src="s_customer.js"></script><script src="s_call.js"></script>
+<script src="s_wallet.js"></script><script src="s_chat.js"></script><script src="s_host.js"></script><script src="s_settings.js"></script>
+<script src="sheets.js"></script><script src="flows.js"></script>
+<style>
+@page{size:1600px 1000px;margin:0}
+html,body{background:#fff}
+.page{width:1600px;height:1000px;position:relative;overflow:hidden;page-break-after:always;break-after:page;background:var(--n25);padding:56px 64px 0;display:flex;flex-direction:column}
+.page.full{padding:0}
+.pf{position:absolute;left:64px;right:64px;bottom:22px;display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:var(--ink-3)}
+.ph1{font-family:var(--serif);font-size:56px;line-height:58px}
+.sec{font-family:var(--serif);font-size:44px;line-height:48px}
+.k{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.shot{border-radius:28px;overflow:hidden;box-shadow:0 18px 50px rgba(28,24,22,.18),0 0 0 1px rgba(28,24,22,.06);flex:none;background:#fff}
+.shot img{display:block;width:100%;height:100%}
+ul.sp{list-style:none;padding:0;margin:0}
+ul.sp li{position:relative;padding-left:18px;font-size:14px;line-height:21px;font-weight:500;color:var(--ink-2);margin-bottom:7px}
+ul.sp li::before{content:'';position:absolute;left:2px;top:8px;width:6px;height:6px;border-radius:3px;background:var(--b400)}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t td,table.t th{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;line-height:18px}
+table.t th{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+</style></head><body><div id="root"></div>
+<script>
+const q=new URLSearchParams(location.search); const PART=q.get('part')||'all';
+const DEC = {
+ 'D-01':['Payment rail for Diamonds','Brief specifies Cashfree states; ADR-010 specifies Google Play Billing for digital goods on Play. Designs show Cashfree UPI/card flow; if Play Billing is required, W03–W04 are replaced by the Play purchase sheet and W05–W07 remain.','W02–W07'],
+ 'D-02':['Google sign-in','Architecture docs specify phone + OTP only. Brief asks for Google. Designs offer Google but still require a verified phone (one Free Call Card per phone).','A03, A04, A07'],
+ 'D-03':['Gender options & visibility','Option list (Man / Woman / Non-binary / Prefer not to say) and whether gender is ever shown publicly.','A11, S02'],
+ 'D-04':['Account roles','Can one account be both customer and host? Where does "Become a host" live after onboarding?','A12, S03'],
+ 'D-05':['Free Call Card lifecycle','Behaviour after dismissal, any expiry, and re-access from Wallet. Re-issue is unresolved in the business report.','C02, C10'],
+ 'D-06':['Discovery ranking & sort','What "Recommended" means; which sort options ship.','C01, C03'],
+ 'D-07':['Rupee approximation basis','"≈ ₹/min" uses the Popular pack (₹1,199 / 54,000 D ≈ ₹0.0222 per D) in these designs. Confirm basis or remove.','C07, V01, DS10'],
+ 'D-08':['"Last seen" for offline hosts','Show relative last-seen time or simply "Offline"?','C09'],
+ 'D-09':['Safety-check indicator','Whether and how to tell users the automated nudity check is active during the first 3 minutes.','V04'],
+ 'D-10':['In-call top-up','Allow buying Diamonds during a live call from the 30-second warning?','V05'],
+ 'D-11':['Post-call rating','Rating scale, whether ratings are public, and how they are used.','V09'],
+ 'D-12':['Legal & compliance copy','Terms, community rules, KYC data handling, host agreement, grievance officer — PRO-REVIEW before launch.','A13, H02, H03, H06, S08'],
+ 'D-13':['Interruption threshold','Billing pause threshold (10 s is a technical assumption).','V07'],
+ 'D-14':['Package prices','The six packages are simulation-only prices, not final.','W02, V06'],
+ 'D-15':['Chat model','Free or paid messaging; media; read receipts; typing indicators.','CH01, CH02'],
+ 'D-16':['Levels','Level names, thresholds, rewards, rate ladder and how levels are displayed.','H10, H23, S01'],
+ 'D-17':['Tax display on payouts','TDS section and whether/how deductions are shown before confirming a withdrawal.','H04, H06, H16, H17, H19'],
+ 'D-18':['Weekly payout day','Which weekday payouts run (designs show Monday as an example).','H16, H17, H18'],
+ 'D-19':['Payout provider & account verification','Provider acceptance is a launch blocker; name-match method (UPI lookup / penny drop).','H20'],
+ 'D-20':['Host report window','How long after a call a host (or customer) can still report it.','H22'],
+ 'D-21':['Account deletion & balances','Treatment of unspent Diamonds and unpaid Beans; grace / undo period.','S09, S10, H24'],
+ 'D-22':['Support channels','In-app chat vs email vs phone; response targets.','S07'],
+};
+const RULES = [
+ ['Customers buy Diamonds; hosts earn Beans','Brief · S3'],['Customers can call online hosts only; no scheduled bookings','Brief'],
+ ['Hosts set their rate: 500–10,000 Diamonds/min, limited by level','S2 (ladder unresolved)'],['16,670 Diamonds spent = 10,000 Beans; 200 Beans = ₹1; exact formula','S3'],
+ ['Billing per second; starts when both streams connect; 30 s warning; ends at 0','S6'],['At least 60 s of balance at the host\'s rate to start a call','Report §13 (P4)'],
+ ['Interruptions pause billing; failed connections refunded; final charge in customer\'s favour','S6'],['Purchased Diamonds never expire; promotional expire after 30 days; non-transferable','S5'],
+ ['Beans never expire; withdrawable 7 days after earning; weekly; minimum ₹500','S5 · C19'],['Payouts only to bank/UPI in the host\'s own name; withdrawals enabled after incorporation','Report §16 · R3-7'],
+ ['Free Call Card: 1 random free minute; ₹10 (2,000 Beans) per completed minute; opt-in; 20/host/day; Android only','S4'],
+ ['Women hosts only at launch; Aadhaar/DigiLocker + PAN + liveness KYC','Report §5'],['Hosts may decline or end any call; no quotas or penalties','C14 · C15'],
+ ['Messaging permission: Everyone or only past call partners; blocking & reporting','C11'],['No contact details in profiles; phone numbers/links filtered in chat','Report §7.3 (S9)'],
+ ['Report during a call ends it and keeps an evidence frame','Report §7.3 (S5)'],['18+ only; minor protection mandatory','S7'],
+];
+const SECTIONS=[['A','Authentication & onboarding'],['C','Customer — discovery & profiles'],['V','Video calling'],['W','Wallet & payments'],['CH','Chat'],['H','Host experience'],['S','Profile, settings & account']];
+const secOf = id => SECTIONS.find(([p])=> id.startsWith(p) && !(p==='C'&&id.startsWith('CH')))||SECTIONS[0];
+const foot = (l) => `<div class="pf"><span>Dashuri · MVP UI/UX Design Handoff · v1.0 · 19 Nov 2026</span><span>${l||''}</span></div>`;
+const pages=[]; const toc=[];
+const P=(html,cls='',tocName)=>{ if(tocName) toc.push([tocName,pages.length+1]); pages.push(`<div class="page ${cls}">${html}${cls.includes('full')?'':foot('Page '+(pages.length+1))}</div>`); };
+const scrPath = r => `Dashuri_Design/${r.folder}/${r.id}_${r.name}.png`;
+
+// COVER
+const coverTitle = PART==='wf'?'Wireframes':PART==='ds'?'Design System':'MVP UI/UX Design';
+P(`<div style="position:absolute;inset:0;background:radial-gradient(70% 90% at 25% 30%,#9A2D50 0%,#761C3B 40%,#451024 75%,#2B0A17 100%)"></div>
+ <div style="position:absolute;left:90px;top:110px;color:#fff;width:640px">${LOGO(84,'#fff','var(--b700)')}<div class="over mt40" style="color:#E9C98C;letter-spacing:.2em">Design handoff · v1.0</div>
+ <div style="font-family:var(--serif);font-size:96px;line-height:96px;margin-top:16px">Dashuri</div><div style="font-family:var(--serif);font-size:44px;line-height:50px;margin-top:8px;opacity:.9">${coverTitle}</div>
+ <div class="b-l mt24" style="opacity:.75;max-width:520px">Premium one-to-one video for India. Customer and Host experiences, design system, wireframes, high-fidelity screens and user flows — prepared for Flutter implementation.</div>
+ <div class="row g24 mt40" style="opacity:.8">${[['Screens',REG.length],['Design-system sheets',SHEETS.length],['User flows',FLOWS.length]].map(([a,b])=>`<div><div class="num" style="font-size:34px;font-weight:800">${b}</div><div class="cap">${a}</div></div>`).join('')}</div>
+ <div class="cap" style="position:absolute;bottom:-230px;opacity:.6">19 November 2026 · Prepared for the founder / Flutter engineering</div></div>
+ ${['C01','V04','H14'].map((id,i)=>`<div class="shot" style="position:absolute;width:300px;height:649px;left:${790+i*250}px;top:${[200,120,240][i]}px;transform:rotate(${[-6,0,6][i]}deg);border-radius:36px;z-index:${i===1?3:1}"><img src="pdfimg/${id}.jpg"></div>`).join('')}`,'full');
+
+const sheetPage = (s) => P(`<img src="pdfimg/${s.id}.jpg" style="width:1600px;height:1000px;display:block">`,'full',s.id+' · '+s.title);
+const divider = (num,title,sub) => P(`<div style="position:absolute;inset:0;background:var(--b950)"></div><div style="position:absolute;left:96px;top:300px;color:#fff;width:900px"><div class="over" style="color:#E9C98C;letter-spacing:.2em">Section ${num}</div><div style="font-family:var(--serif);font-size:84px;line-height:88px;margin-top:16px">${title}</div><div class="b-l mt24" style="opacity:.7;max-width:640px">${sub}</div></div><div style="position:absolute;right:-120px;top:-120px;width:620px;height:620px;border-radius:50%;border:1px solid rgba(255,255,255,.08)"></div><div style="position:absolute;right:-20px;top:-20px;width:420px;height:420px;border-radius:50%;border:1px solid rgba(233,201,140,.14)"></div>`,'full',title);
+
+// CONTENTS placeholder index (filled after)
+const tocIndex = pages.length; P('');
+
+// HOW TO USE
+if(PART!=='ds'){
+P(`<div class="over pri">Start here</div><div class="ph1 mt8">How to use this handoff</div>
+ <div class="row g24 ai-s mt32">
+  <div class="f1"><ul class="sp">
+   <li><b style="color:var(--ink)">Every screen has an ID</b> (A01, C07, V04, W02, CH02, H14, S09…). The same ID names its PNG, its wireframe and its page in this PDF.</li>
+   <li><b style="color:var(--ink)">PNG exports</b> are 1170 × 2532 px — a 390 × 844 pt artboard at @3x (9 : 19.5). Build at 390 pt logical width; measure in points (px ÷ 3).</li>
+   <li><b style="color:var(--ink)">Folders</b>: Authentication · Customer (discovery, chat, settings) · Video_Calling · Wallet · Host · Components (design system) · User_Flows · Wireframes.</li>
+   <li><b style="color:var(--ink)">Tokens</b> (DS02–DS04) map directly onto packages/design_system → DashuriTokens; spacing and radii extend the existing 4/8/12/16/24/32 and 8/12/20 values.</li>
+   <li><b style="color:var(--ink)">Fonts</b>: Instrument Serif (display) + Manrope (UI), both on Google Fonts. <b style="color:var(--ink)">Icons</b>: Lucide 1.75 stroke + two custom SVG currency glyphs.</li>
+  </ul></div>
+  <div class="f1"><ul class="sp">
+   <li><b style="color:var(--ink)">Money and time on screen come from the server</b> (WalletSummary, CallSession, PurchaseVerification). All sample figures in these mocks reconcile with the confirmed formulas.</li>
+   <li><b style="color:var(--ink)">Open decisions</b> are tagged <span class="tag warn" style="height:20px">D-xx</span> on each screen page and listed at the end. Nothing in those areas is a business rule.</li>
+   <li><b style="color:var(--ink)">Sample content</b>: names, cities and photos are placeholders. Photos are Unsplash images used for presentation only — replace with real, consented host photos.</li>
+   <li><b style="color:var(--ink)">Platform</b>: Android-first (Android status and gesture bars). The Free Call Card is hidden on iOS.</li>
+   <li><b style="color:var(--ink)">Wireframes</b> are grayscale versions of the exact same layouts, so structure is identical between low- and high-fidelity.</li>
+  </ul></div></div>
+ <div class="row g16 mt24">${[['Screens',REG.length,'monitor-smartphone'],['Wireframes',REG.length,'layout-template'],['System sheets',SHEETS.length,'palette'],['Flows',FLOWS.length,'workflow'],['Open decisions',Object.keys(DEC).length,'circle-help']].map(([a,b,ic])=>`<div class="card f1 row g12" style="padding:16px 18px"><div style="width:40px;height:40px;border-radius:12px;background:var(--b50);color:var(--primary);display:flex;align-items:center;justify-content:center">${I(ic,'ic-s')}</div><div><div class="t-l num">${b}</div><div class="cap ink3">${a}</div></div></div>`).join('')}</div>`,'','How to use this handoff');
+P(`<div class="over pri">Grounding</div><div class="ph1 mt8">Business rules reflected in the designs</div><div class="b-m ink2 mt8">Only confirmed rules from the brief, docs/discovery-log.md (§H) and docs/business-model-report.md were designed in. Anything else is marked as an open decision.</div>
+ <div class="card mt24" style="padding:4px 20px"><table class="t"><tr><th style="width:70%">Rule</th><th>Source</th></tr>${RULES.map(([a,b])=>`<tr><td style="font-weight:600">${a}</td><td class="ink3">${b}</td></tr>`).join('')}</table></div>`,'','Business rules reflected');
+}
+
+// DESIGN SYSTEM
+if(PART!=='wf'){ divider('01','Brand & design system','Visual identity, tokens and every reusable component, demonstrated visually.'); SHEETS.forEach(sheetPage); }
+// FLOWS
+if(PART!=='ds'){ divider('02','Navigation & user flows','Sitemap, customer and host journeys, and screen-to-screen flows for calls, purchases and withdrawals.'); FLOWS.forEach(sheetPage); }
+// WIREFRAMES
+if(PART!=='ds'){ divider('03','Wireframes','Grayscale structure for every MVP screen, grouped by area.');
+ SECTIONS.forEach(([p,name])=>{ const items=REG.filter(r=>secOf(r.id)[0]===p); for(let i=0;i<items.length;i+=6){ const chunk=items.slice(i,i+6);
+  P(`<div class="row between"><div><div class="over ink3">Wireframes</div><div class="sec mt4">${name}</div></div><span class="b-m ink3">${i/6+1} / ${Math.ceil(items.length/6)}</span></div>
+   <div class="row g24 mt24 ai-s">${chunk.map(r=>`<div style="width:212px"><div class="shot" style="width:212px;height:459px;border-radius:20px"><img src="pdfimg/${r.id}_wf.jpg"></div><div class="row g6 mt12"><span class="tag">${r.id}</span></div><div class="t-s mt4" style="font-size:14px;line-height:18px">${r.title}</div></div>`).join('')}</div>`,'',i===0?'Wireframes — '+name:null); } }); }
+// HIGH FIDELITY
+if(PART==='all'){ divider('04','High-fidelity screens','One page per screen: final design, wireframe, specification, navigation targets and open decisions.');
+ let cur=null; REG.forEach(r=>{ const sec=secOf(r.id); if(sec[0]!==cur){ cur=sec[0]; toc.push(['Screens — '+sec[1],pages.length+1]); }
+  const flags=(r.flags||[]).map(f=>`<div class="banner warn" style="padding:10px 12px"><span class="lbl" style="flex:none">${f}</span><span><b>${DEC[f][0]}.</b> ${DEC[f][1]}</span></div>`).join('');
+  const to=(r.to||[]).map(t=>{const x=REG.find(y=>y.id===t);return x?`<span class="chip sm" style="height:26px"><b class="pri">${t}</b>&nbsp;${x.title.split(' — ')[0].split(' (')[0]}</span>`:'';}).join('');
+  P(`<div class="row g32 ai-s" style="gap:40px;height:880px">
+   <div class="shot" style="width:407px;height:880px;border-radius:40px"><img src="pdfimg/${r.id}.jpg"></div>
+   <div class="col" style="width:240px;gap:10px;padding-top:4px"><div class="over ink3">Wireframe</div><div class="shot" style="width:240px;height:519px;border-radius:22px"><img src="pdfimg/${r.id}_wf.jpg"></div>
+    <div class="cap ink3 mt8" style="line-height:15px">Exports<br><span class="k" style="font-size:10.5px;color:var(--ink-2)">${scrPath(r)}</span></div></div>
+   <div class="f1 col" style="padding-top:4px;min-width:0"><div class="row g8"><span class="tag pri" style="height:28px;font-size:14px;padding:0 12px">${r.id}</span><span class="over ink3">${sec[1]}</span></div>
+    <div class="sec mt16">${r.title}</div><div class="b-l ink2 mt12">${r.desc}</div>
+    <div class="over ink3 mt24 mb12">Specification & states</div><ul class="sp">${(r.notes||[]).map(n=>`<li>${n}</li>`).join('')}</ul>
+    ${to?`<div class="over ink3 mt16 mb12">Navigates to</div><div class="row wrap g8">${to}</div>`:''}
+    ${flags?`<div class="over ink3 mt24 mb12">Needs a product decision</div><div class="col g8">${flags}</div>`:''}</div></div>`); }); }
+// DECISIONS + INDEX
+if(PART!=='ds'){
+P(`<div class="over pri">Before build</div><div class="ph1 mt8">Open product decisions</div><div class="b-m ink2 mt8">These areas are designed with a sensible default but are not confirmed business rules. Each is referenced on the affected screen pages.</div>
+ <div class="card mt20" style="padding:0 16px"><table class="t" style="font-size:12px">${Object.entries(DEC).slice(0,11).map(([k,[a,b,c]])=>`<tr><td style="width:56px"><span class="tag warn">${k}</span></td><td style="width:220px;font-weight:700">${a}</td><td class="ink2">${b}</td><td style="width:150px" class="ink3">${c}</td></tr>`).join('')}</table></div>`,'','Open product decisions');
+P(`<div class="ph1">Open product decisions <span class="ink3" style="font-size:32px">(cont.)</span></div>
+ <div class="card mt20" style="padding:0 16px"><table class="t" style="font-size:12px">${Object.entries(DEC).slice(11).map(([k,[a,b,c]])=>`<tr><td style="width:56px"><span class="tag warn">${k}</span></td><td style="width:220px;font-weight:700">${a}</td><td class="ink2">${b}</td><td style="width:150px" class="ink3">${c}</td></tr>`).join('')}</table></div>`);
+const idx=REG.map(r=>`<div class="row g8" style="height:22px;border-bottom:1px solid var(--line-2)"><span class="lbl pri" style="width:38px">${r.id}</span><span class="cap" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.title}</span></div>`);
+P(`<div class="ph1">Screen index</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0 28px;margin-top:20px;grid-auto-flow:column;grid-template-rows:repeat(${Math.ceil(REG.length/4)},22px)">${idx.join('')}</div>`,'','Screen index');
+}
+// fill TOC
+pages[tocIndex] = `<div class="page"><div class="over pri">Contents</div><div class="ph1 mt8">Contents</div><div style="column-count:2;column-gap:64px;margin-top:28px">${toc.map(([a,b])=>`<div class="row between" style="height:31px;border-bottom:1px solid var(--line-2);break-inside:avoid"><span class="b-m" style="font-weight:600">${a}</span><span class="b-m ink3 num">${b}</span></div>`).join('')}</div>${foot('Page 2')}</div>`;
+document.getElementById('root').innerHTML = pages.join('');
+(async()=>{lucide.createIcons(); await Promise.all([...document.images].map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r;}))); await document.fonts.ready; await new Promise(r=>setTimeout(r,300)); window.__ready=true;})();
+</script></body></html>

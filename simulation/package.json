@@ -1,0 +1,12 @@
+{
+  "name": "dashuri-simulation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dashuri six-month financial simulation engine, tests and dashboard build",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "build": "node scripts/build.mjs",
+    "report": "node scripts/generate-reports.mjs"
+  }
+}

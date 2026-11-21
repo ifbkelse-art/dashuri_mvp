@@ -1,0 +1,72 @@
+# Dashuri monorepo root. Melos 8 reads its configuration from the `melos:` key
+# below (melos.yaml no longer exists in Melos 7+). Packages are linked by pub
+# workspaces: every listed package declares `resolution: workspace`.
+name: dashuri_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+workspace:
+  - apps/mobile
+  - packages/lints
+  - packages/core
+  - packages/network
+  - packages/storage
+  - packages/supabase
+  - packages/navigation
+  - packages/design_system
+  - packages/features/auth
+  - packages/features/profile
+  - packages/features/discovery
+  - packages/features/free_call
+  - packages/features/video_call
+  - packages/features/chat
+  - packages/features/wallet
+  - packages/features/purchases
+  - packages/features/host
+  - packages/features/safety
+  - packages/features/notifications
+  - packages/features/settings
+
+dev_dependencies:
+  melos: ^8.9.0
+
+melos:
+  # TODO(founder): add `repository: https://github.com/<org>/dashuri` once the repo exists (used by `melos version`).
+  command:
+    bootstrap:
+      runPubGetInParallel: true
+  scripts:
+    analyze:
+      description: Static analysis for every Dart/Flutter package (fails on infos).
+      exec:
+        command: dart analyze --fatal-infos .
+        concurrency: 4
+    format:check:
+      description: Fail if any Dart file is not formatted.
+      run: dart format --output=none --set-exit-if-changed apps packages tool
+    test:
+      description: All tests — pure-Dart packages with `dart test`, Flutter packages with `flutter test`.
+      run: melos run test:dart && melos run test:flutter
+    test:dart:
+      description: Pure-Dart packages (no Flutter engine).
+      exec:
+        command: dart test
+      packageFilters:
+        dirExists: test
+        flutter: false
+    test:flutter:
+      description: Flutter packages and the app.
+      exec:
+        command: flutter test
+        concurrency: 2
+      packageFilters:
+        dirExists: test
+        flutter: true
+    deps:check:
+      description: Enforce dependency rules (features must not import each other or Supabase).
+      run: dart run tool/check_dependencies.dart
+    new:feature:
+      description: Scaffold a new feature package. Usage — melos run new:feature -- <name>
+      run: dart run tool/new_feature.dart

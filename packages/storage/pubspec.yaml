@@ -1,0 +1,22 @@
+name: dashuri_storage
+description: On-device key-value storage behind interfaces — secure storage for secrets, preferences for non-sensitive settings.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.5.3
+
+dev_dependencies:
+  dashuri_lints:
+    path: ../lints
+  flutter_test:
+    sdk: flutter
+  shared_preferences_platform_interface: ^2.4.1

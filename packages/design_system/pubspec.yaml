@@ -1,0 +1,19 @@
+name: dashuri_design_system
+description: Material 3 theme built from design tokens, plus the home for shared components. Visual values are the founder's to set.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  dashuri_lints:
+    path: ../lints
+  flutter_test:
+    sdk: flutter

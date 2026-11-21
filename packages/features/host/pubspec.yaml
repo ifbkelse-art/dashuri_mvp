@@ -1,0 +1,33 @@
+name: feature_host
+description: "Becoming a host, verification (KYC) status, availability, rate setting, Free Call pool opt-in, earnings and withdrawal requests."
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  bloc: ^9.0.0
+  dashuri_core:
+    path: ../../core
+  dashuri_design_system:
+    path: ../../design_system
+  dashuri_navigation:
+    path: ../../navigation
+  dashuri_network:
+    path: ../../network
+  equatable: ^2.0.7
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.1.1
+  get_it: ^9.2.1
+
+dev_dependencies:
+  bloc_test: ^10.0.0
+  dashuri_lints:
+    path: ../../lints
+  flutter_test:
+    sdk: flutter
+  mocktail: ^1.0.4

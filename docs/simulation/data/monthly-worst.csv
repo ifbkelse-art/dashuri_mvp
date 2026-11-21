@@ -1,0 +1,71 @@
+Scenario,Metric,Month 1,Month 2,Month 3,Month 4,Month 5,Month 6,Six-month total / end
+Worst case,Installs,2454.80,2563,2886.80,3401.20,3353.40,4132.80,18792
+Worst case,Registrations,1344.60,1415.40,1599.60,1863.20,1861.60,2274.80,10359.20
+Worst case,Eligible users,1248.40,1315.20,1489,1736.40,1732.80,2122.40,9644.20
+Worst case,Active customers,1248.40,1570.60,1795.20,2102.80,2143.40,2548.40,2548.40
+Worst case,Paying customers,14.80,25.80,25,38.60,36.80,47.60,47.60
+Worst case,New payers,14.80,21.80,20.80,31.20,28,37.40,154
+Worst case,Free Call Card users,627.40,659.80,755.80,870.40,845,1076.80,4835.20
+Worst case,Free calls served,481.60,587.80,686.20,870.40,789.20,1073.40,4488.60
+Worst case,Free calls completed,360,437.60,519,654.40,583.20,811.40,3365.60
+Worst case,Free-to-paid conversions,9.40,14,14.20,20.60,16.40,22,96.60
+Worst case,Active hosts,8,10,12,14,16,18,18
+Worst case,New hosts (KYC),8,3.80,4.20,4,6.80,6,32.80
+Worst case,Host utilisation,0.07,0.07,0.06,0.07,0.07,0.07,0.07
+Worst case,Avg Diamond rate (D/min),796.05,809.56,811.03,872.57,909.24,946.49,946.49
+Worst case,Incoming calls,80.44,134.89,110.71,202.68,306.93,226.84,1062.49
+Worst case,Accepted calls,60.33,101.17,83.04,152.01,230.19,170.13,796.87
+Worst case,Connected calls,55.51,93.07,76.39,139.85,211.78,156.52,733.12
+Worst case,Completed paid calls,55.51,93.07,76.39,139.85,211.78,156.52,733.12
+Worst case,Paid billable minutes,166.52,279.22,229.18,419.55,635.34,469.55,2199.35
+Worst case,Free-call minutes,420.80,512.70,602.60,762.40,686.20,942.40,3927.10
+Worst case,Top-ups,7.80,14.40,13.40,21.60,27,31,115.20
+Worst case,Average top-up (₹),534.98,597.78,426.30,500.38,710.75,423.76,423.76
+Worst case,"Top-up cash (₹, incl. GST)",4992.20,7725.60,5706.60,10458.40,18753,12349,59984.80
+Worst case,Refunds (₹),0,179.60,79.60,119.60,259.40,158.80,797
+Worst case,Chargebacks (₹),0,0,539.40,339,299.60,259.20,1437.20
+Worst case,Diamonds purchased,222400,347000,252200,462400,846900,541500,2672400
+Worst case,Diamonds consumed,131133.34,226495.78,187842.13,371447.44,574462.74,445131.08,1936512.51
+Worst case,Unspent purchased Diamonds,91266.66,204070.88,265128.75,351081.31,612318.57,702187.49,702187.49
+Worst case,Beans earned (paid calls),78664.27,135870.29,112682.74,222823.90,344608.73,267025.24,1161675.17
+Worst case,Beans earned (free calls),720000,875200,1038000,1308800,1166400,1622800,6731200
+Worst case,Beans withdrawn,413219.95,700332.28,827454.88,1511664.65,1052701.99,1230945.60,5736319.35
+Worst case,Beans in 7-day hold,193867.14,261089.42,292681.90,354698.61,376173.41,478050.80,478050.80
+Worst case,"Beans withdrawable, not withdrawn",191577.19,435092.91,720945.45,675408.69,1109049.26,1663412.04,1663412.04
+Worst case,Gross value consumed (₹),2948.98,5055.19,4216.95,8343.34,12852.35,9977.20,43394.01
+Worst case,GST on consumption (₹),449.84,771.13,643.26,1272.71,1960.53,1521.95,6619.42
+Worst case,"Recognised revenue (₹, ex GST)",2499.14,4284.06,3573.69,7070.63,10891.82,8455.25,36774.58
+Worst case,Play fee (₹),374.87,642.61,536.05,1060.59,1633.77,1268.29,5516.19
+Worst case,"Host Beans, paid calls (₹)",393.32,679.35,563.41,1114.12,1723.04,1335.13,5808.38
+Worst case,Clawback recovery (₹),0,0,28.91,17.40,15.96,13.20,75.46
+Worst case,"Video, paid calls (₹)",0,0,0,0,0,0,0
+Worst case,"Moderation bot, paid (₹)",351.69,589.70,484.02,886.08,1341.83,991.69,4645.02
+Worst case,Chargeback loss (₹),0,0,388.55,244.19,215.81,186.71,1035.27
+Worst case,Chargeback fees (₹),0,0,900,1500,600,1200,4200
+Worst case,"Contribution, paid calls (₹)",1379.26,2372.39,730.56,2283.03,5393.32,3486.63,15645.19
+Worst case,Free Call Card cost (₹),4617.14,5617.43,6639.25,8382.28,7498.79,10381.02,43135.92
+Worst case,Safety operations (₹),25000,25000,25000,25000,25000,25000,150000
+Worst case,Report review (₹),171.87,217.88,244.03,323.28,320.31,393.57,1670.95
+Worst case,OTP (₹),437.00,460.00,519.87,605.54,605.02,739.31,3366.74
+Worst case,Host KYC (₹),200,95,105,100,170,150,820
+Worst case,Payout fees (₹),24,41.60,51.20,89.60,64,76.80,347.20
+Worst case,Fixed infrastructure (₹),5460,5460,5460,5460,5460,5460,32760
+Worst case,Social levy (₹),0,0,0,0,0,0,0
+Worst case,Promo Diamond host cost (₹),0,0,0,0,0,0,0
+Worst case,Operating expenses (₹),31292.87,31274.48,31380.10,31578.42,31619.33,31819.68,188964.89
+Worst case,Pre-launch one-time (₹),100000,0,0,0,0,0,100000
+Worst case,Operating profit before acquisition (₹),-134530.75,-34519.53,-37288.79,-37677.67,-33724.81,-38714.07,-316455.62
+Worst case,Acquisition spend at what-if CAC (₹),0,0,0,0,0,0,0
+Worst case,Profit after acquisition (₹),-134530.75,-34519.53,-37288.79,-37677.67,-33724.81,-38714.07,-316455.62
+Worst case,Cash in: Google settlements (₹),0,4357.60,6586.76,3540.87,7228.64,15281.20,36995.07
+Worst case,Cash out: host payouts + fees (₹),2090.10,3543.26,4188.47,7647.92,5327.51,6231.53,29028.80
+Worst case,Cash out: GST (₹),0,761.52,1151.08,776.07,1525.39,2775.36,6989.43
+Worst case,Cash out: operating (₹),32637.70,33064.02,33262.18,34213.19,34563.96,35001.60,202742.64
+Worst case,Cash out: pre-launch (₹),100000,0,0,0,0,0,100000
+Worst case,Cash out: acquisition (₹),0,0,0,0,0,0,0
+Worst case,Net cash movement (₹),-134727.80,-33011.21,-32014.97,-39096.31,-34188.22,-28727.28,-301765.79
+Worst case,Closing cash balance (₹),-134727.80,-167739.00,-199753.98,-238850.29,-273038.51,-301765.79,-301765.79
+Worst case,Lowest balance in month (₹),-134727.80,-167739.00,-199753.98,-238850.29,-273038.51,-301765.79,-301765.79
+Worst case,"Customer wallet liability (₹, incl. GST)",2043.22,4534.03,5944.08,7939.54,13580.79,15793.79,15793.79
+Worst case,Host payout liability (₹),1927.22,3480.91,5068.14,5150.54,7426.11,10707.31,10707.31
+Worst case,Google receivable at end (₹),0,0,0,0,0,9214.35,9214.35

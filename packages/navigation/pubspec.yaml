@@ -1,0 +1,20 @@
+name: dashuri_navigation
+description: Route path catalogue and the FeatureRoutes contract, so features navigate to each other without importing each other.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  go_router: ^17.3.0
+
+dev_dependencies:
+  dashuri_lints:
+    path: ../lints
+  flutter_test:
+    sdk: flutter

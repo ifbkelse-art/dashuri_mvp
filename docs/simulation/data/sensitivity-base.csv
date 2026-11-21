@@ -1,0 +1,18 @@
+Variable,Who controls it,Low setting,Profit at low,High setting,Profit at high,Swing
+Acquisition cost per install,Founder / market,₹0,-119958.00,₹15 (what-if),-864273.00,744315
+Average top-up (package mix),Pricing,Small-pack heavy,-265551.62,Large-pack heavy,61009.17,326560.79
+Moderation cost,Founder (vendor),High,-284950.96,Low,-44962.22,239988.74
+Free-to-paid conversion,Product,−50%,-197782.82,+50%,-16419.87,181362.94
+Top-ups per payer per month,Product,−0.3,-183885.36,+0.3,-38405.79,145479.57
+Installs (paying-customer volume),Founder,−50%,-190428.31,+50%,-66031.48,124396.83
+Monthly repeat purchase rate,Product,−10 pts,-163881.73,+10 pts,-48427.62,115454.12
+Diamonds consumed (wallet burn),Product,−50%,-169537.48,+50%,-89071.37,80466.11
+Google Play fee,External,15%,-119958.00,30%,-189869.32,69911.32
+Fixed infrastructure,Founder,High,-163278.00,Low,-104898.00,58380.00
+Host rate ladder,Founder,C narrow,-141068.63,B fast,-107457.83,33610.80
+Refund & fraud rate,Partly founder,×2,-149282.17,×0.5,-124449.25,24832.92
+Average paid call length,Product,−40%,-129455.79,+40%,-114585.49,14870.30
+GST treatment,External (CA),Principal,-119958.00,Agent (hyp.),-108598.84,11359.16
+Host payout conversion (Bean value),Founder,₹0.006,-124366.34,₹0.004,-114820.70,9545.65
+Host availability (utilisation),Hosts,−40%,-119692.02,+30%,-127126.50,7434.48
+Video price,External,SD $0.75,-119958.00,Full HD $3.00,-119958.00,0
