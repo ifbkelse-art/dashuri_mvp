@@ -151,3 +151,29 @@ func BeanClawback(hostID, caseID string, beans int64, at time.Time) Entry {
 		},
 	}
 }
+
+// ErrAdjustment reports an adjustment that cannot be posted.
+var ErrAdjustment = errors.New("ledger: adjustment must target a user wallet account with a non-zero amount in its currency")
+
+// Adjustment posts a dual-control manual correction (proposal + a second,
+// different approver) to one user wallet account against the currency's
+// adjustment system account. History is never edited: a correction is a new
+// entry. Key: adjustment:<proposal id>.
+func Adjustment(proposalID string, account AccountRef, amount int64, reason, proposedBy, approvedBy string, at time.Time) (Entry, error) {
+	cur := currencyOf(account.Kind)
+	if account.UserID == "" || amount == 0 || cur == "" || proposalID == "" {
+		return Entry{}, ErrAdjustment
+	}
+	sys := System(SystemDiamondAdjustment)
+	if cur == Bean {
+		sys = System(SystemBeanAdjustment)
+	}
+	return Entry{
+		Type: EntryAdjustment, IdempotencyKey: "adjustment:" + proposalID, Reference: proposalID, OccurredAt: at,
+		Postings: []Posting{
+			{account, cur, amount},
+			{sys, cur, -amount},
+		},
+		Metadata: map[string]string{"reason": reason, "proposed_by": proposedBy, "approved_by": approvedBy},
+	}, nil
+}

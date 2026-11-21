@@ -43,6 +43,9 @@ const (
 	SystemBeanIssued             AccountKind = "sys_bean_issued"
 	SystemBeanPaidOut            AccountKind = "sys_bean_paid_out"
 	SystemBeanClawedBack         AccountKind = "sys_bean_clawed_back"
+	// Counter-accounts for dual-control manual adjustments.
+	SystemDiamondAdjustment AccountKind = "sys_diamond_adjustment"
+	SystemBeanAdjustment    AccountKind = "sys_bean_adjustment"
 )
 
 // AccountRef names an account: a user's bucket or a system account.
@@ -135,12 +138,16 @@ func (e Entry) Validate() error {
 	return nil
 }
 
+// CurrencyOf returns the currency an account kind holds ("" if unknown).
+func CurrencyOf(k AccountKind) Currency { return currencyOf(k) }
+
 func currencyOf(k AccountKind) Currency {
 	switch k {
 	case UserDiamondPurchased, UserDiamondPromotional, SystemDiamondIssuedPurchased, SystemDiamondIssuedPromo,
-		SystemDiamondConsumed, SystemDiamondExpired, SystemDiamondReversed:
+		SystemDiamondConsumed, SystemDiamondExpired, SystemDiamondReversed, SystemDiamondAdjustment:
 		return Diamond
-	case UserBeanHeld, UserBeanAvailable, UserBeanPayoutPending, SystemBeanIssued, SystemBeanPaidOut, SystemBeanClawedBack:
+	case UserBeanHeld, UserBeanAvailable, UserBeanPayoutPending, SystemBeanIssued, SystemBeanPaidOut, SystemBeanClawedBack,
+		SystemBeanAdjustment:
 		return Bean
 	}
 	return ""
