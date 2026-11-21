@@ -17,6 +17,8 @@ type HostStatus struct {
 	TodayEarnedBeans int64 `json:"today_earned_beans"`
 	TodayCalls       int64 `json:"today_calls"`
 	Level            int   `json:"level"`
+	// KycRejectionReason explains a rejected KYC (H08); null otherwise.
+	KycRejectionReason *string `json:"kyc_rejection_reason,omitempty"`
 }
 
 // KycDecisionRequest: POST /v1/admin/hosts/{userId}/kyc-decision (moderator).

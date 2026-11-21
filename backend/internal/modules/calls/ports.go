@@ -67,6 +67,7 @@ type Call struct {
 	LastEventAt              *time.Time
 	LowBalanceNotifiedAt     *time.Time
 	FreeCallCompensated      bool
+	BeansEarned              *int64 // from the settlement; nil until settled
 }
 
 // Participant reports whether the user is in the call.

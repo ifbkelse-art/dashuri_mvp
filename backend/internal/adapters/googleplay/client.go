@@ -232,13 +232,13 @@ func (c *Client) GetProductPurchase(ctx context.Context, pkg, productID, token s
 }
 
 // Acknowledge implements purchases.products.acknowledge.
-func (c *Client) Acknowledge(ctx context.Context, pkg, productID, token string) error {
-	status, _, err := c.do(ctx, http.MethodPost, productPath(pkg, productID, token)+":acknowledge", map[string]string{})
+func (c *Client) Consume(ctx context.Context, pkg, productID, token string) error {
+	status, _, err := c.do(ctx, http.MethodPost, productPath(pkg, productID, token)+":consume", map[string]string{})
 	if err != nil {
 		return err
 	}
 	if status/100 != 2 {
-		return fmt.Errorf("googleplay: acknowledge returned %d", status)
+		return fmt.Errorf("googleplay: consume returned %d", status)
 	}
 	return nil
 }

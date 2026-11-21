@@ -64,7 +64,7 @@ func newFakePlay(t *testing.T) *fakePlay {
 		rest := r.PathValue("rest")
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		if tok, ok := strings.CutSuffix(rest, ":acknowledge"); ok && r.Method == http.MethodPost {
+		if tok, ok := strings.CutSuffix(rest, ":consume"); ok && r.Method == http.MethodPost {
 			f.acks[tok]++
 			w.WriteHeader(204)
 			return

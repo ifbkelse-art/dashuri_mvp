@@ -37,8 +37,11 @@ func callsAudit(ctx context.Context, q Querier, actor, action, target string, de
 
 func (r HostsRepo) Host(ctx context.Context, userID string) (hosts.HostRow, error) {
 	var h hosts.HostRow
-	err := r.Pool.QueryRow(ctx, `select state, kyc_state, is_available, free_call_opt_in, rate_per_minute
-		from hosting.hosts where user_id = $1`, userID).Scan(&h.State, &h.KycState, &h.IsAvailable, &h.FreeCallOptIn, &h.RatePerMinute)
+	err := r.Pool.QueryRow(ctx, `select h.state, h.kyc_state, h.is_available, h.free_call_opt_in, h.rate_per_minute,
+		  case when h.kyc_state = 'rejected' then
+		    (select k.reason from hosting.kyc_sessions k where k.host_id = h.user_id and k.status = 'rejected'
+		      order by coalesce(k.completed_at, k.created_at) desc limit 1) end
+		from hosting.hosts h where h.user_id = $1`, userID).Scan(&h.State, &h.KycState, &h.IsAvailable, &h.FreeCallOptIn, &h.RatePerMinute, &h.KycRejectionReason)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return h, nil
 	}

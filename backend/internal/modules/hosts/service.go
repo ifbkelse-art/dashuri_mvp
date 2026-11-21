@@ -89,6 +89,7 @@ func (s *Service) status(ctx context.Context, userID string) (HostStatus, error)
 	}
 	out.State, out.KycState, out.IsAvailable, out.FreeCallOptIn, out.RatePerMinute =
 		h.State, h.KycState, h.IsAvailable, h.FreeCallOptIn, h.RatePerMinute
+	out.KycRejectionReason = h.KycRejectionReason
 	today, err := s.deps.Repo.Today(ctx, userID, DayStartIST(s.deps.Clock.Now()))
 	if err != nil {
 		return HostStatus{}, mapErr(err)

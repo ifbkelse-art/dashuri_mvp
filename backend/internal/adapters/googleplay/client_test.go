@@ -68,7 +68,7 @@ func TestClientMintsTokenAndCallsAPI(t *testing.T) {
 	mux.HandleFunc("GET /androidpublisher/v3/applications/app.dashuri/purchases/products/diamonds_4000/tokens/bad", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 	})
-	mux.HandleFunc("POST /androidpublisher/v3/applications/app.dashuri/purchases/products/diamonds_4000/tokens/good:acknowledge", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /androidpublisher/v3/applications/app.dashuri/purchases/products/diamonds_4000/tokens/good:consume", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 	})
 	srv := httptest.NewServer(mux)
@@ -86,7 +86,7 @@ func TestClientMintsTokenAndCallsAPI(t *testing.T) {
 	if _, err := c.GetProductPurchase(ctx, "app.dashuri", "diamonds_4000", "bad"); !errors.Is(err, purchases.ErrPlayTokenInvalid) {
 		t.Fatalf("want ErrPlayTokenInvalid, got %v", err)
 	}
-	if err := c.Acknowledge(ctx, "app.dashuri", "diamonds_4000", "good"); err != nil {
+	if err := c.Consume(ctx, "app.dashuri", "diamonds_4000", "good"); err != nil {
 		t.Fatal(err)
 	}
 	if tokenCalls != 1 {

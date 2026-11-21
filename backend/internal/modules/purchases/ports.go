@@ -18,7 +18,7 @@ type PlayDeveloperAPI interface {
 	GetProductPurchase(ctx context.Context, packageName, productID, token string) (PlayPurchase, error)
 	// Acknowledge acknowledges a purchase server-side (purchases.products.acknowledge).
 	// The app still consumes the consumable with Play Billing after the credit.
-	Acknowledge(ctx context.Context, packageName, productID, token string) error
+	Consume(ctx context.Context, packageName, productID, token string) error
 	// VoidedPurchases lists refunded/charged-back purchases since a time.
 	VoidedPurchases(ctx context.Context, packageName string, since time.Time) ([]VoidedPurchase, error)
 }

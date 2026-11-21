@@ -33,6 +33,8 @@ type HostRow struct {
 	IsAvailable   bool
 	FreeCallOptIn bool
 	RatePerMinute int64
+	// KycRejectionReason is the latest rejected KYC session's reason (H08).
+	KycRejectionReason *string
 }
 
 // Today is the host's activity in the current IST day.

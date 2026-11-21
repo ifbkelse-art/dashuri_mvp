@@ -216,10 +216,11 @@ func (s *Service) verifyPlay(ctx context.Context, userID string, pkg Package, to
 		if err != nil {
 			return PurchaseVerification{}, apperr.Internal(err)
 		}
-		if !gp.Acknowledged {
-			if err := s.deps.Play.Acknowledge(ctx, s.deps.PackageName, pkg.ProductID, token); err != nil {
-				// Credited already; the app also consumes, which acknowledges.
-				slog.WarnContext(ctx, "play acknowledge failed", "purchase_id", got.ID, "err", err)
+		if !gp.Consumed {
+			if err := s.deps.Play.Consume(ctx, s.deps.PackageName, pkg.ProductID, token); err != nil {
+				// Credited already (exactly once). A retry of this request or
+				// the RTDN path consumes again; consume is idempotent at Google.
+				slog.WarnContext(ctx, "play consume failed", "purchase_id", got.ID, "err", err)
 			}
 		}
 		if !replayed {
