@@ -1,6 +1,8 @@
 package stream
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -185,5 +187,23 @@ func TestNotConfigured(t *testing.T) {
 	}
 	if !errors.Is(err, err) {
 		t.Fatal()
+	}
+}
+
+// Stream may gzip the webhook body and sign the decompressed bytes.
+func TestVerifyWebhookGzipBody(t *testing.T) {
+	c := &Client{APIKey: "key", APISecret: secret}
+	plain := []byte(`{"type":"call.session_participant_joined","created_at":"2026-11-21T10:00:00Z","call_cid":"default:3f1c7b1e-0000-4000-8000-000000000001","participant":{"user":{"id":"u1"}}}`)
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	_, _ = zw.Write(plain)
+	_ = zw.Close()
+
+	evs, err := c.VerifyWebhook(buf.Bytes(), map[string]string{"X-Signature": Sign(secret, plain), "X-Api-Key": "key"})
+	if err != nil || len(evs) != 1 || evs[0].UserID != "u1" {
+		t.Fatalf("gzip body signed over plain bytes: %v %v", evs, err)
+	}
+	if _, err := c.VerifyWebhook(buf.Bytes(), map[string]string{"X-Signature": Sign("other", plain), "X-Api-Key": "key"}); err == nil {
+		t.Fatal("wrong secret must still be rejected")
 	}
 }

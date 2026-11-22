@@ -14,6 +14,7 @@ package stream
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -23,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -188,8 +190,18 @@ func (c *Client) CreateCall(ctx context.Context, callID, callerID, receiverID st
 			},
 			"settings_override": map[string]any{
 				"limits": map[string]any{"max_participants": 2},
-				"video":  map[string]any{"enabled": true, "camera_default_on": true},
-				"audio":  map[string]any{"default_device": "speaker"},
+				// Explicit target resolution: Stream validates the call type's stored
+				// value (>= 240) and rejects the request when the type has none.
+				"video": map[string]any{
+					"enabled":           true,
+					"camera_default_on": true,
+					// Required by the client SDK's response parser; the call type
+					// in a fresh Stream app can carry none.
+					"camera_facing":          "front",
+					"access_request_enabled": false,
+					"target_resolution":      map[string]any{"width": 1280, "height": 720, "bitrate": 1500000},
+				},
+				"audio": map[string]any{"default_device": "speaker"},
 			},
 		},
 	}
@@ -245,6 +257,20 @@ type webhookBody struct {
 	} `json:"call"`
 }
 
+// gunzip returns the decompressed bytes when b is a gzip stream (capped at 1 MiB).
+func gunzip(b []byte) ([]byte, bool) {
+	if len(b) < 2 || b[0] != 0x1f || b[1] != 0x8b {
+		return nil, false
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(b))
+	if err != nil {
+		return nil, false
+	}
+	defer zr.Close()
+	out, err := io.ReadAll(io.LimitReader(zr, 1<<20))
+	return out, err == nil
+}
+
 // VerifyWebhook checks X-Api-Key and X-Signature (constant time) over the raw
 // body, then maps the event. Unknown event types return no events (the
 // handler answers 204 so Stream does not retry them).
@@ -256,10 +282,21 @@ func (c *Client) VerifyWebhook(raw []byte, headers map[string]string) ([]calls.P
 	if err != nil || len(got) == 0 {
 		return nil, ErrInvalidSignature
 	}
-	mac := hmac.New(sha256.New, []byte(c.APISecret))
-	mac.Write(raw)
-	if !hmac.Equal(got, mac.Sum(nil)) {
-		return nil, ErrInvalidSignature
+	sign := func(b []byte) []byte {
+		mac := hmac.New(sha256.New, []byte(c.APISecret))
+		mac.Write(b)
+		return mac.Sum(nil)
+	}
+	if !hmac.Equal(got, sign(raw)) {
+		// Stream may gzip the body; accept a signature over the decompressed
+		// bytes too (same secret, so no weaker than the raw check).
+		plain, ok := gunzip(raw)
+		if !ok || !hmac.Equal(got, sign(plain)) {
+			slog.Warn("stream webhook signature mismatch",
+				"content_encoding", header(headers, "Content-Encoding"), "bytes", len(raw), "gzip", ok)
+			return nil, ErrInvalidSignature
+		}
+		raw = plain
 	}
 	var b webhookBody
 	if err := json.Unmarshal(raw, &b); err != nil {
