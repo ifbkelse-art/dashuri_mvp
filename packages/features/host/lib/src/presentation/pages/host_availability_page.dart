@@ -83,17 +83,19 @@ class _Body extends StatelessWidget {
                 subtitle: const Text('One-minute calls with new customers'),
               ),
               const Divider(),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'You earn per completed free minute',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  const CurrencyAmount.beans(2000),
-                  Text(' (≈ ₹10)', style: theme.textTheme.bodySmall),
-                ],
+              LabelValueRow(
+                label: Text(
+                  'You earn per completed free minute',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                value: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const CurrencyAmount.beans(2000),
+                    Text(' (≈ ₹10)', style: theme.textTheme.bodySmall),
+                  ],
+                ),
               ),
               const SizedBox(height: DashuriTokens.space2),
               Text(

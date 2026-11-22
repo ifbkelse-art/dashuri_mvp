@@ -97,7 +97,8 @@ class NotificationsPage extends StatelessWidget {
             ],
           ),
           body: switch (state) {
-            InboxStateInitial() || InboxStateLoading() => const LoadingView(),
+            InboxStateInitial() ||
+            InboxStateLoading() => const SkeletonList(avatar: false),
             InboxStateFailed(:final failure) => ErrorStateView(
               message: failureMessage(failure),
               onRetry: cubit.load,

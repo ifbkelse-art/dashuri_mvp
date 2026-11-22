@@ -8,6 +8,17 @@ import 'package:mocktail/mocktail.dart';
 
 import '../helpers/mocks.dart';
 
+// The same user after host approval.
+const approvedHost = AccountStatus(
+  userId: 'u1',
+  ageEligible: true,
+  isHost: true,
+  restriction: null,
+  profileComplete: true,
+  rulesAccepted: true,
+  hostState: 'approved',
+);
+
 void main() {
   late MockWatchSession watch;
   late MockGetAccountStatus getAccount;
@@ -85,4 +96,47 @@ void main() {
       isFalse,
     );
   });
+
+  // UI/UX pass: background refresh (app resumed / host approval).
+  blocTest<SessionCubit, SessionState>(
+    'refreshAccountQuietly applies a changed account',
+    setUp: () {
+      var calls = 0;
+      when(() => getAccount(any())).thenAnswer(
+        (_) async =>
+            calls++ == 0 ? const Success(account) : const Success(approvedHost),
+      );
+    },
+    build: () => SessionCubit(watch, getAccount),
+    act: (c) async {
+      c.start();
+      sessions.add(session);
+      await Future<void>.delayed(Duration.zero);
+      await c.refreshAccountQuietly();
+    },
+    expect: () => [
+      SessionSignedIn(session: session, account: account),
+      SessionSignedIn(session: session, account: approvedHost),
+    ],
+  );
+
+  blocTest<SessionCubit, SessionState>(
+    'refreshAccountQuietly keeps the account when the network fails',
+    setUp: () {
+      var calls = 0;
+      when(() => getAccount(any())).thenAnswer(
+        (_) async =>
+            calls++ == 0 ? const Success(account) : const Err(NetworkFailure()),
+      );
+    },
+    build: () => SessionCubit(watch, getAccount),
+    act: (c) async {
+      c.start();
+      sessions.add(session);
+      await Future<void>.delayed(Duration.zero);
+      await c.refreshAccountQuietly();
+    },
+    // No second state: a signed-in user is never sent back to the splash.
+    expect: () => [SessionSignedIn(session: session, account: account)],
+  );
 }

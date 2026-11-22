@@ -107,16 +107,13 @@ class AgeGatePage extends StatelessWidget {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(DashuriTokens.space4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text('Your age', style: theme.textTheme.bodyLarge),
-                    ),
-                    Text(
-                      '${state.age} years',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ],
+                child: LabelValueRow(
+                  label: Text('Your age', style: theme.textTheme.bodyLarge),
+                  value: Text(
+                    '${state.age} years',
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
               ),
             ),

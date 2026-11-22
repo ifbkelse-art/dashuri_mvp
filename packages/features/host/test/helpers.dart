@@ -9,6 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+// UI/UX pass: opt-in audit hook (no effect unless DASHURI_UIUX_* is set).
+import '../../../../tool/uiux/audit_hook.dart';
+
 class MockGetHostStatus extends Mock implements GetHostStatus {}
 
 class MockApplyAsHost extends Mock implements ApplyAsHost {}
@@ -250,6 +253,7 @@ Future<void> pumpHostPage(
     ..physicalSize = size
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  await uiuxBeforePump(tester);
   final router = GoRouter(
     initialLocation: '/test',
     routes: [
@@ -269,7 +273,7 @@ Future<void> pumpHostPage(
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(
           context,
-        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        ).copyWith(textScaler: TextScaler.linear(uiuxScale(textScale))),
         child: child!,
       ),
     ),
@@ -279,4 +283,5 @@ Future<void> pumpHostPage(
   } else {
     await tester.pump();
   }
+  await uiuxAfterPump(tester);
 }

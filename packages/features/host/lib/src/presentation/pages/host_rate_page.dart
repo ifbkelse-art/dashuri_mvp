@@ -65,14 +65,19 @@ class HostRatePage extends StatelessWidget {
                 ? null
                 : HostBottomBar(
                     children: [
+                      // In the application (before approval) there is no
+                      // "next call" yet: say what actually happens.
                       Text(
-                        'Changes apply from your next call.',
+                        fromApplication
+                            ? 'Your rate applies once you are approved. You '
+                                  'can change it any time.'
+                            : 'Changes apply from your next call.',
                         style: Theme.of(context).textTheme.bodySmall,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: DashuriTokens.space2),
                       PrimaryButton(
-                        label: 'Save rate',
+                        label: fromApplication ? 'Continue' : 'Save rate',
                         busy: state.status == HostRateStatus.saving,
                         onPressed: state.error == null ? cubit.save : null,
                       ),

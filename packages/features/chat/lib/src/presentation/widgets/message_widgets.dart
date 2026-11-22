@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../application/conversation_cubit.dart';
 import '../../domain/entities/chat_message.dart';
@@ -432,7 +435,10 @@ class MessageComposer extends StatelessWidget {
             const SizedBox(width: DashuriTokens.space2),
             IconButton.filled(
               tooltip: 'Send',
-              onPressed: onSend,
+              onPressed: () {
+                unawaited(HapticFeedback.selectionClick());
+                onSend();
+              },
               icon: const Icon(Icons.send_rounded),
             ),
           ],

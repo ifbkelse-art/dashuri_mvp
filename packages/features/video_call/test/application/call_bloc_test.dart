@@ -359,4 +359,59 @@ void main() {
       expect(b.state.failure?.code, 'video_not_configured');
     },
   );
+
+  // UI/UX pass: known bug "failed call join leaves Connecting securely…
+  // stuck". A media failure must stay on the failure screen (which offers
+  // End call); later server snapshots in a waiting phase must not flip it
+  // back to "Connecting…" or retry the join behind the user's back.
+  test('a failed media join stays failed while the server still says '
+      'connecting; a terminal phase still ends it', () async {
+    when(() => engine.join(any())).thenAnswer(
+      (_) async => const Err(PlatformFailure(code: 'video_join_failed')),
+    );
+    const connecting = CallSession(
+      callId: 'c1',
+      role: CallRole.caller,
+      peerUserId: 'h1',
+      phase: CallPhase.connecting,
+      ratePerMinute: 4000,
+      billedSeconds: 0,
+      diamondsCharged: 0,
+      isFreeCall: false,
+      endReason: null,
+    );
+    when(() => request(any())).thenAnswer((_) async => const Success(_ringing));
+    final b = build();
+    b.add(const CallOutgoingRequested('h1'));
+    await Future<void>.delayed(Duration.zero);
+    server.add(const CallUpdated(connecting)); // accepted → join → fails
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(b.state.status, CallUiStatus.failed);
+    expect(b.state.failure?.code, 'video_join_failed');
+
+    server.add(const CallUpdated(connecting)); // a later snapshot / refresh
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(b.state.status, CallUiStatus.failed);
+    verify(() => engine.join(any())).called(1); // no silent re-join loop
+    expect(b.state.failure?.code, 'video_join_failed'); // message kept
+
+    server.add(
+      const CallUpdated(
+        CallSession(
+          callId: 'c1',
+          role: CallRole.caller,
+          peerUserId: 'h1',
+          phase: CallPhase.ended,
+          ratePerMinute: 4000,
+          billedSeconds: 0,
+          diamondsCharged: 0,
+          isFreeCall: false,
+          endReason: 'connect_failed',
+        ),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(b.state.status, CallUiStatus.ended);
+    await b.close();
+  });
 }

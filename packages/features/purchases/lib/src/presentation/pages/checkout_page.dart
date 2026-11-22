@@ -266,21 +266,28 @@ class _Summary extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                PurchaseCopy.price(package),
-                style: theme.textTheme.titleLarge,
+              const SizedBox(width: DashuriTokens.space2),
+              // Natural width at the end, capped (wraps) at large text.
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * .4,
+                ),
+                child: Text(
+                  PurchaseCopy.price(package),
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.titleLarge,
+                ),
               ),
             ],
           ),
           const Divider(height: DashuriTokens.space6),
-          Row(
-            children: [
-              Expanded(child: Text('Total', style: theme.textTheme.titleSmall)),
-              Text(
-                PurchaseCopy.price(package),
-                style: theme.textTheme.titleSmall,
-              ),
-            ],
+          LabelValueRow(
+            label: Text('Total', style: theme.textTheme.titleSmall),
+            value: Text(
+              PurchaseCopy.price(package),
+              textAlign: TextAlign.end,
+              style: theme.textTheme.titleSmall,
+            ),
           ),
           const SizedBox(height: 4),
           Text('Includes GST', style: muted),
@@ -348,8 +355,10 @@ class _RailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Scrolls: sheets are capped at ~56% of the screen, and at large text
+    // the second payment option was cut off.
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: DashuriTokens.space4),
         child: Column(
           mainAxisSize: MainAxisSize.min,

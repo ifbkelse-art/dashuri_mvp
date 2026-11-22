@@ -97,10 +97,13 @@ abstract final class WalletFormat {
     return s.isEmpty ? 'Transaction' : s[0].toUpperCase() + s.substring(1);
   }
 
-  static String failureMessage(Failure f) => switch (f) {
-    NetworkFailure() => 'You seem to be offline. Check your connection.',
-    UnauthenticatedFailure() => 'Your session expired. Please sign in again.',
-    NotFoundFailure() => "We couldn't find this transaction.",
-    _ => "We couldn't load your wallet. Please try again.",
-  };
+  /// [subject] names what failed to load on this screen.
+  static String failureMessage(Failure f, {String subject = 'your wallet'}) =>
+      switch (f) {
+        NetworkFailure() => 'You seem to be offline. Check your connection.',
+        UnauthenticatedFailure() =>
+          'Your session expired. Please sign in again.',
+        NotFoundFailure() => "We couldn't find this transaction.",
+        _ => "We couldn't load $subject. Please try again.",
+      };
 }

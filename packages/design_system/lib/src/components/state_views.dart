@@ -95,7 +95,9 @@ class ErrorStateView extends StatelessWidget {
   const ErrorStateView({
     required this.message,
     super.key,
-    this.title = 'Something went wrong',
+    // Neutral and accurate for both offline and server errors ("Something
+    // went wrong" contradicted messages like "You're offline").
+    this.title = "Couldn't load this",
     this.onRetry,
   });
 
@@ -111,4 +113,112 @@ class ErrorStateView extends StatelessWidget {
     actionLabel: onRetry == null ? null : 'Try again',
     onAction: onRetry,
   );
+}
+
+/// Placeholder rows shown while a list loads (inbox, notifications, call
+/// history, transactions). Same pulse as the Discover card skeleton, so
+/// loading looks the same everywhere; static when the system asks for
+/// reduced motion. Announced once as "Loading".
+class SkeletonList extends StatefulWidget {
+  const SkeletonList({super.key, this.rows = 6, this.avatar = true});
+
+  final int rows;
+
+  /// Leading circle (people) or rounded square (transactions, calls).
+  final bool avatar;
+
+  @override
+  State<SkeletonList> createState() => _SkeletonListState();
+}
+
+class _SkeletonListState extends State<SkeletonList>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c
+        ..stop()
+        ..value = 1;
+    } else if (!_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHigh;
+    Widget bar(double widthFactor, double height) => FractionallySizedBox(
+      alignment: Alignment.centerLeft,
+      widthFactor: widthFactor,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(DashuriTokens.radiusSmall),
+        ),
+      ),
+    );
+    return Semantics(
+      label: 'Loading',
+      liveRegion: true,
+      child: ExcludeSemantics(
+        child: FadeTransition(
+          opacity: Tween<double>(begin: .45, end: 1).animate(_c),
+          child: ListView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.pageGutter,
+              vertical: DashuriTokens.space3,
+            ),
+            itemCount: widget.rows,
+            itemBuilder: (context, i) => Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: DashuriTokens.space3,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: widget.avatar
+                          ? BoxShape.circle
+                          : BoxShape.rectangle,
+                      borderRadius: widget.avatar
+                          ? null
+                          : BorderRadius.circular(DashuriTokens.radiusMedium),
+                    ),
+                  ),
+                  const SizedBox(width: DashuriTokens.space3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        bar(i.isEven ? .55 : .4, 14),
+                        const SizedBox(height: DashuriTokens.space2),
+                        bar(i.isEven ? .8 : .7, 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -4,6 +4,9 @@ import 'package:feature_discovery/feature_discovery.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// UI/UX pass: opt-in audit hook (no effect unless DASHURI_UIUX_* is set).
+import '../../../../tool/uiux/audit_hook.dart';
+
 const sizes = {
   'phone': Size(360, 640),
   'tablet': Size(1024, 768),
@@ -23,6 +26,7 @@ Future<void> pumpPage(
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
+  await uiuxBeforePump(t);
   final router = GoRouter(
     routes: [
       GoRoute(path: '/', builder: (_, _) => page),
@@ -41,9 +45,19 @@ Future<void> pumpPage(
   );
   addTearDown(router.dispose);
   await t.pumpWidget(
-    MaterialApp.router(theme: DashuriTheme.light(), routerConfig: router),
+    MaterialApp.router(
+      theme: DashuriTheme.light(),
+      routerConfig: router,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(uiuxScale(1))),
+        child: child!,
+      ),
+    ),
   );
   await t.pump();
+  await uiuxAfterPump(t);
 }
 
 HostCard host(

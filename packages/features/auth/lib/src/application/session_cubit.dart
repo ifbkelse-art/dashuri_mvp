@@ -33,6 +33,26 @@ class SessionCubit extends Cubit<SessionState>
   @override
   Future<void> refreshAccountStatus() => refreshAccount();
 
+  /// Re-reads `GET /v1/me` in the background (app resumed, host approval).
+  /// Unlike [refreshAccount], a failure keeps the current account, so a
+  /// flaky connection never sends a signed-in user back to the splash.
+  Future<void> refreshAccountQuietly() async {
+    if (state case SessionSignedIn(
+      :final session,
+      :final account,
+    ) when account != null) {
+      final result = await _getAccountStatus(const NoInput());
+      if (isClosed) return;
+      if (result case Success(:final value) when value != account) {
+        if (state case SessionSignedIn(
+          session: final current,
+        ) when current == session) {
+          emit(SessionSignedIn(session: session, account: value));
+        }
+      }
+    }
+  }
+
   /// Applies an AccountStatus returned by an onboarding endpoint
   /// (e.g. POST /v1/me/rules-acceptance) without another round trip.
   void applyAccount(AccountStatus account) {

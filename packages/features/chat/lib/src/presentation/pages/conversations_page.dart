@@ -1,7 +1,9 @@
 import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../application/conversations_cubit.dart';
 import '../../domain/entities/conversation.dart';
 import '../widgets/inbox_view.dart';
 
@@ -37,7 +39,12 @@ class _ConversationsPageState extends State<ConversationsPage> {
               if (context.windowSize.isExpanded) {
                 setState(() => _selected = c);
               } else {
-                context.push(conversationPath(c.id), extra: c);
+                // Coming back: re-fetch quietly so the unread count and
+                // last message reflect what was just read or sent.
+                final inbox = context.read<ConversationsCubit>();
+                context
+                    .push<void>(conversationPath(c.id), extra: c)
+                    .then((_) => inbox.isClosed ? null : inbox.refresh());
               }
             },
           ),

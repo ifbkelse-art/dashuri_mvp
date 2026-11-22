@@ -18,7 +18,7 @@ class CallHistoryPage extends StatelessWidget {
       builder: (context, s) {
         final cubit = context.read<CallHistoryCubit>();
         return switch (s) {
-          CallHistoryLoading() => const LoadingView(),
+          CallHistoryLoading() => const SkeletonList(),
           CallHistoryFailed(:final failure) => ErrorStateView(
             message: callFailureMessage(failure),
             onRetry: cubit.load,

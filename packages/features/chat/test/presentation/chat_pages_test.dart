@@ -83,6 +83,29 @@ void main() {
         }
       });
 
+      // UI/UX pass: known bug "Chats tab doesn't refresh" — coming back from
+      // a conversation re-fetches, so unread counts and previews update.
+      if (!expanded) {
+        testWidgets('CH01 returning from a conversation refreshes the inbox', (
+          tester,
+        ) async {
+          final cubit = InboxCubitMock();
+          when(() => cubit.state).thenReturn(
+            ConversationsStateLoaded(Page(items: [meera]), myUserId: 'me'),
+          );
+          when(() => cubit.isClosed).thenReturn(false);
+          when(cubit.refresh).thenAnswer((_) async {});
+          when(cubit.loadMore).thenAnswer((_) async {});
+          final router = await pumpPage(tester, inbox(cubit), size: size);
+          await tester.tap(find.text('Meera'));
+          await tester.pumpAndSettle();
+          verifyNever(cubit.refresh);
+          router.pop();
+          await tester.pumpAndSettle();
+          verify(cubit.refresh).called(1);
+        });
+      }
+
       testWidgets('CH01 search filters by name', (tester) async {
         final cubit = InboxCubitMock();
         when(

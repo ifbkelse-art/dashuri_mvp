@@ -17,3 +17,13 @@ final class HostModeSwitch {
 
   final Future<void> Function() switchToCustomer;
 }
+
+/// Enters host mode right after approval: the app re-reads the account (so
+/// the router knows the user is now an approved host) and selects host
+/// mode. Without it, "Go to host home" bounced back to Discover until the
+/// app was restarted. Optional: registered by the app.
+final class HostModeEnter {
+  const HostModeEnter(this.enter);
+
+  final Future<void> Function() enter;
+}

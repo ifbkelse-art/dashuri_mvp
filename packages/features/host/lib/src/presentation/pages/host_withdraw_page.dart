@@ -113,11 +113,10 @@ class HostWithdrawPage extends StatelessWidget {
         final theme = Theme.of(context);
         Widget row(String a, Widget b) => Padding(
           padding: const EdgeInsets.symmetric(vertical: DashuriTokens.space2),
-          child: Row(
-            children: [
-              Expanded(child: Text(a, style: theme.textTheme.bodyMedium)),
-              b,
-            ],
+          // Values (amounts, dates) sit at the end and wrap if needed.
+          child: LabelValueRow(
+            label: Text(a, style: theme.textTheme.bodyMedium),
+            value: b,
           ),
         );
         return SafeArea(

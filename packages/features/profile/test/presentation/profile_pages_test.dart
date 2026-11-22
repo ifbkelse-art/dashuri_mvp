@@ -43,7 +43,7 @@ void main() {
       expect(find.text('Arjun'), findsOneWidget);
       expect(find.text('Pune'), findsOneWidget);
       expect(find.text('68% to Level 3'), findsOneWidget);
-      expect(find.text('12,480'), findsOneWidget);
+      expect(find.textContaining(amount('12,480')), findsOneWidget);
       expect(find.text('Become a host'), findsOneWidget);
       await tapVisible(tester, find.text('Buy'));
       await tester.pumpAndSettle();
@@ -234,3 +234,7 @@ void main() {
     });
   });
 }
+
+/// A CurrencyAmount's text: the amount, after its inline glyph (UI/UX pass:
+/// the glyph is now an inline span so the amount can wrap).
+RegExp amount(String text) => RegExp('^\uFFFC?${RegExp.escape(text)}\$');

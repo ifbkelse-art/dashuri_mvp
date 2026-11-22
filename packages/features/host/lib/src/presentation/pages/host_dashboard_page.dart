@@ -337,14 +337,16 @@ class _TodayCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(child: Text('Today', style: theme.textTheme.titleLarge)),
-              TextButton(
-                onPressed: () => context.go(RoutePaths.hostEarnings),
-                child: const Text('Earnings'),
+          LabelValueRow(
+            label: Text('Today', style: theme.textTheme.titleLarge),
+            value: TextButton(
+              onPressed: () => context.go(RoutePaths.hostEarnings),
+              child: const Text(
+                'Earnings',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
+            ),
           ),
           const SizedBox(height: DashuriTokens.space2),
           HostCardGrid(

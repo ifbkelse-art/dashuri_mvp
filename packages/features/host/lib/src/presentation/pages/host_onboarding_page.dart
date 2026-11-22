@@ -6,12 +6,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../application/host_application_cubit.dart';
 import '../../application/host_application_flow.dart';
 import '../../domain/entities/host_status.dart';
+import '../../domain/ports/host_photo_picker.dart';
 import '../widgets/host_copy.dart';
 import '../widgets/host_widgets.dart';
 
 /// H01 host introduction and H02 verification steps (RoutePaths.hostOnboarding).
 class HostOnboardingPage extends StatelessWidget {
-  const HostOnboardingPage({super.key});
+  const HostOnboardingPage({super.key, this.hostModeEnter});
+
+  /// Enters host mode once approved (see [HostModeEnter]).
+  final HostModeEnter? hostModeEnter;
 
   @override
   Widget build(
@@ -20,12 +24,10 @@ class HostOnboardingPage extends StatelessWidget {
     listenWhen: (a, b) =>
         a.appliedNow != b.appliedNow || a.failure != b.failure,
     listener: (context, state) {
-      if (state.appliedNow) {
-        context.go(RoutePaths.hostAgreement);
-      } else if (state.status == HostApplicationStatus.ready &&
-          state.failure != null) {
-        showHostSnack(context, hostFailureMessage(state.failure!));
-      }
+      // A failed application is shown inline above the button (below): a
+      // floating SnackBar over the tall bottom bar could end up off screen
+      // at large text sizes, and this message must not vanish.
+      if (state.appliedNow) context.go(RoutePaths.hostAgreement);
     },
     builder: (context, state) {
       final cubit = context.read<HostApplicationCubit>();
@@ -43,8 +45,19 @@ class HostOnboardingPage extends StatelessWidget {
           final host = state.host ?? HostStatus.notApplied;
           if (!host.hasApplied) {
             body = const _Intro();
+            final failure = state.status == HostApplicationStatus.ready
+                ? state.failure
+                : null;
             bottom = HostBottomBar(
               children: [
+                if (failure != null) ...[
+                  InfoBanner(
+                    tone: InfoBannerTone.error,
+                    icon: Icons.info_outline,
+                    message: hostFailureMessage(failure),
+                  ),
+                  const SizedBox(height: DashuriTokens.space3),
+                ],
                 PrimaryButton(
                   label: 'Start application',
                   busy: state.status == HostApplicationStatus.submitting,
@@ -64,7 +77,15 @@ class HostOnboardingPage extends StatelessWidget {
               children: [
                 PrimaryButton(
                   label: 'Continue',
-                  onPressed: () => context.go(_routeFor(state.nextStep)),
+                  onPressed: () async {
+                    final router = GoRouter.of(context);
+                    // Approved: enter host mode first, or the router sends
+                    // the new host back to Discover (stale account).
+                    if (state.nextStep == HostApplicationStep.approved) {
+                      await hostModeEnter?.enter();
+                    }
+                    router.go(_routeFor(state.nextStep));
+                  },
                 ),
               ],
             );

@@ -52,11 +52,11 @@ void main() {
           size: size,
           textScale: 1.3,
         );
-        expect(find.text('54,000'), findsOneWidget);
+        expect(find.textContaining(amount('54,000')), findsOneWidget);
         expect(find.text('MOST POPULAR'), findsOneWidget);
         expect(find.text('≈ 22 min with Ananya'), findsOneWidget);
         expect(find.textContaining('provisional'), findsOneWidget);
-        expect(find.text('12,480'), findsOneWidget);
+        expect(find.textContaining(amount('12,480')), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tap(find.text('STARTER'));
         verify(
@@ -284,3 +284,7 @@ void main() {
     });
   }
 }
+
+/// A CurrencyAmount's text: the amount, after its inline glyph (UI/UX pass:
+/// the glyph is now an inline span so the amount can wrap).
+RegExp amount(String text) => RegExp('^\uFFFC?${RegExp.escape(text)}\$');

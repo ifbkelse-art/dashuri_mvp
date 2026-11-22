@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:feature_auth/feature_auth.dart';
@@ -27,15 +29,24 @@ class _DashuriAppState extends State<DashuriApp> {
     backendConfigured: backendConfigured,
   );
 
+  /// Re-reads the account when the app returns to the foreground, so changes
+  /// made elsewhere (e.g. host approval) apply without a restart. Quiet: a
+  /// failure keeps the current account.
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: () => unawaited(_session.refreshAccountQuietly()),
+  );
+
   @override
   void initState() {
     super.initState();
     _experience.bind(_session);
     _session.start();
+    _lifecycle; // start listening
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _router.dispose();
     super.dispose();
   }

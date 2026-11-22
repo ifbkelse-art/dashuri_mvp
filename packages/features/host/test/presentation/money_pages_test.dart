@@ -25,7 +25,7 @@ void main() {
           () => getEarnings(any()),
         ).thenAnswer((_) async => Success(sampleEarnings));
         await pumpHostPage(tester, page(), size: size);
-        expect(find.text('2,10,750'), findsOneWidget);
+        expect(find.textContaining(amount('2,10,750')), findsOneWidget);
         expect(find.text('Withdraw ₹621.50'), findsOneWidget);
         expect(find.text('ON HOLD · 7 DAYS'), findsOneWidget);
         expect(find.text('₹432.25'), findsOneWidget);
@@ -215,3 +215,7 @@ void main() {
     }
   });
 }
+
+/// A CurrencyAmount's text: the amount, after its inline glyph (UI/UX pass:
+/// the glyph is now an inline span so the amount can wrap).
+RegExp amount(String text) => RegExp('^\uFFFC?${RegExp.escape(text)}\$');

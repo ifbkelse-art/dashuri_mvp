@@ -277,12 +277,21 @@ class _Photos extends StatelessWidget {
           ),
         for (var i = 0; i < submitted; i++)
           tile(
+            // Fixed-size tile: the label truncates (the tile's semantic
+            // label carries the full text) rather than overflowing.
             const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.hourglass_top_rounded),
                 SizedBox(height: 4),
-                Text('In review', textAlign: TextAlign.center),
+                Flexible(
+                  child: Text(
+                    'In review',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             label: 'Photo in review',

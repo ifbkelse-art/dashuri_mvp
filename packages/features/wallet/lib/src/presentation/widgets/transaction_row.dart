@@ -67,22 +67,33 @@ class TransactionRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: DashuriTokens.space2),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  WalletFormat.signedAmount(entry),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: positive ? DashuriTokens.success : null,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+            // Natural width at the end, capped so a large amount at large
+            // text wraps instead of pushing the row past the screen edge.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * .4,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      WalletFormat.signedAmount(entry),
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        // AA-safe green for text (base green is 4.0:1 here).
+                        color: positive ? DashuriTokens.successText : null,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                if (WalletFormat.isBeans(entry))
-                  const BeanIcon(size: 14)
-                else
-                  const DiamondIcon(size: 14),
-              ],
+                  const SizedBox(width: 4),
+                  if (WalletFormat.isBeans(entry))
+                    const BeanIcon(size: 14)
+                  else
+                    const DiamondIcon(size: 14),
+                ],
+              ),
             ),
           ],
         ),

@@ -108,17 +108,27 @@ class HostBottomBar extends StatelessWidget {
           constraints: const BoxConstraints(
             maxWidth: DashuriTokens.maxContentWidth,
           ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              context.pageGutter,
-              DashuriTokens.space3,
-              context.pageGutter,
-              DashuriTokens.space3,
+          // Capped at 45% of the visible height so large text or a long
+          // notice never pushes the page off screen; scrolls inside.
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight:
+                  (MediaQuery.sizeOf(context).height -
+                      MediaQuery.viewInsetsOf(context).bottom) *
+                  .45,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                context.pageGutter,
+                DashuriTokens.space3,
+                context.pageGutter,
+                DashuriTokens.space3,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: children,
+              ),
             ),
           ),
         ),
@@ -252,13 +262,21 @@ class BeansHeroCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (trailing != null)
-                Text(
-                  trailing!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: onDark.withValues(alpha: .7),
+              if (trailing != null) ...[
+                const SizedBox(width: DashuriTokens.space2),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.sizeOf(context).width * .4,
+                  ),
+                  child: Text(
+                    trailing!,
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: onDark.withValues(alpha: .7),
+                    ),
                   ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: DashuriTokens.space3),
@@ -324,38 +342,73 @@ class HostLinkTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: DashuriTokens.space4,
-        vertical: DashuriTokens.space1,
-      ),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
-        ),
-        child: Icon(icon, color: theme.colorScheme.onSurface),
-      ),
-      title: Text(title, style: theme.textTheme.titleMedium),
-      subtitle: subtitle == null ? null : Text(subtitle!),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailingText != null)
-            Flexible(
-              child: Text(
-                trailingText!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+    // Not a ListTile: with large text a long trailing value made ListTile
+    // assert ("trailing consumes the entire tile width"). Title and subtitle
+    // wrap; the trailing value takes at most 40% of the row.
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: DashuriTokens.minTapTarget + 16,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DashuriTokens.space4,
+                vertical: DashuriTokens.space2,
+              ),
+              child: LayoutBuilder(
+                builder: (context, c) => Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(
+                          DashuriTokens.radiusMedium,
+                        ),
+                      ),
+                      child: Icon(icon, color: theme.colorScheme.onSurface),
+                    ),
+                    const SizedBox(width: DashuriTokens.space4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: theme.textTheme.titleMedium),
+                          if (subtitle != null)
+                            Text(subtitle!, style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    if (trailingText != null) ...[
+                      const SizedBox(width: DashuriTokens.space2),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: c.maxWidth * .4),
+                        child: Text(
+                          trailingText!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-          const Icon(Icons.chevron_right_rounded),
-        ],
+          ),
+        ),
       ),
     );
   }

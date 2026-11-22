@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../application/host_application_flow.dart';
 import '../../application/host_verification_cubit.dart';
 import '../../domain/entities/host_status.dart';
+import '../../domain/ports/host_photo_picker.dart';
 import '../host_paths.dart';
 import '../widgets/host_copy.dart';
 import '../widgets/host_widgets.dart';
@@ -18,7 +19,10 @@ import '../widgets/host_widgets.dart';
 /// starting a session puts the host in a staff review queue. No documents
 /// are collected here, because no document endpoint exists.
 class HostVerificationPage extends StatefulWidget {
-  const HostVerificationPage({super.key});
+  const HostVerificationPage({super.key, this.hostModeEnter});
+
+  /// Enters host mode once approved (see [HostModeEnter]).
+  final HostModeEnter? hostModeEnter;
 
   @override
   State<HostVerificationPage> createState() => _HostVerificationPageState();
@@ -28,6 +32,20 @@ class _HostVerificationPageState extends State<HostVerificationPage> {
   /// True when the session was started from the first-time step, so the
   /// flow continues to profile setup (a restart after H08 stays here).
   bool _firstStart = false;
+  bool _entering = false;
+
+  /// Approved: refresh the account and select host mode before going home,
+  /// so the router does not bounce the new host back to Discover.
+  Future<void> _goToHostHome() async {
+    final router = GoRouter.of(context);
+    setState(() => _entering = true);
+    try {
+      await widget.hostModeEnter?.enter();
+    } finally {
+      if (mounted) setState(() => _entering = false);
+    }
+    router.go(RoutePaths.hostDashboard);
+  }
 
   @override
   Widget build(
@@ -136,7 +154,8 @@ class _HostVerificationPageState extends State<HostVerificationPage> {
               children: [
                 PrimaryButton(
                   label: 'Go to host home',
-                  onPressed: () => context.go(RoutePaths.hostDashboard),
+                  busy: _entering,
+                  onPressed: _goToHostHome,
                 ),
               ],
             );
@@ -213,19 +232,15 @@ class _ManualVerification extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'What our team will check',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ),
-                  const StatusTag(
-                    label: 'Manual review',
-                    tone: StatusTone.info,
-                  ),
-                ],
+              LabelValueRow(
+                label: Text(
+                  'What our team will check',
+                  style: theme.textTheme.titleMedium,
+                ),
+                value: const StatusTag(
+                  label: 'Manual review',
+                  tone: StatusTone.info,
+                ),
               ),
               const SizedBox(height: DashuriTokens.space3),
               for (final (icon, title, body) in _checks)

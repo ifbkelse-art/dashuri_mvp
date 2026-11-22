@@ -14,41 +14,46 @@ class BalancePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Semantics(
-      button: onTap != null,
-      label: diamonds == null ? 'Wallet' : '${diamonds!} Diamonds. Buy more',
-      child: Material(
-        color: theme.colorScheme.surfaceContainerLow,
-        shape: StadiumBorder(
-          side: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
-        child: InkWell(
-          customBorder: const StadiumBorder(),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const DiamondIcon(),
-                const SizedBox(width: 8),
-                Text(
-                  diamonds == null ? '—' : DashuriFormat.count(diamonds!),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontFeatures: const [FontFeature.tabularFigures()],
+    // A compact header chip: its number must never truncate, so its text
+    // grows with the system size only up to 1.5x (still clearly larger).
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.5,
+      child: Semantics(
+        button: onTap != null,
+        label: diamonds == null ? 'Wallet' : '${diamonds!} Diamonds. Buy more',
+        child: Material(
+          color: theme.colorScheme.surfaceContainerLow,
+          shape: StadiumBorder(
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const DiamondIcon(),
+                  const SizedBox(width: 8),
+                  Text(
+                    diamonds == null ? '—' : DashuriFormat.count(diamonds!),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: theme.colorScheme.primary,
-                  child: Icon(
-                    Icons.add,
-                    size: 18,
-                    color: theme.colorScheme.onPrimary,
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: theme.colorScheme.primary,
+                    child: Icon(
+                      Icons.add,
+                      size: 18,
+                      color: theme.colorScheme.onPrimary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -77,16 +82,24 @@ class CurrencyAmount extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = style ?? Theme.of(context).textTheme.titleMedium!;
     final size = (s.fontSize ?? 16) * 1.05;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (beans) BeanIcon(size: size) else DiamondIcon(size: size),
-        const SizedBox(width: 6),
-        Text(
-          DashuriFormat.count(amount) + (suffix ?? ''),
-          style: s.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-        ),
-      ],
+    // One Text (glyph as an inline span), not a Row: it wraps when the
+    // space is bounded (narrow cells, large text) and keeps its natural
+    // width when it is not (inside FittedBox / IntrinsicHeight), where a
+    // Flexible or LayoutBuilder would throw.
+    return Text.rich(
+      TextSpan(
+        children: [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: beans ? BeanIcon(size: size) : DiamondIcon(size: size),
+            ),
+          ),
+          TextSpan(text: DashuriFormat.count(amount) + (suffix ?? '')),
+        ],
+      ),
+      style: s.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
     );
   }
 }
@@ -118,14 +131,23 @@ class StatusTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg) = switch (tone) {
-      StatusTone.online => (DashuriTokens.success100, DashuriTokens.success),
-      StatusTone.busy => (DashuriTokens.warning100, DashuriTokens.warning),
+      StatusTone.online => (
+        DashuriTokens.success100,
+        DashuriTokens.successText,
+      ),
+      StatusTone.busy => (DashuriTokens.warning100, DashuriTokens.warningText),
       StatusTone.offline => (
         DashuriTokens.neutral100,
         DashuriTokens.neutral600,
       ),
-      StatusTone.success => (DashuriTokens.success100, DashuriTokens.success),
-      StatusTone.warning => (DashuriTokens.warning100, DashuriTokens.warning),
+      StatusTone.success => (
+        DashuriTokens.success100,
+        DashuriTokens.successText,
+      ),
+      StatusTone.warning => (
+        DashuriTokens.warning100,
+        DashuriTokens.warningText,
+      ),
       StatusTone.error => (DashuriTokens.error100, DashuriTokens.error),
       StatusTone.info => (DashuriTokens.info100, DashuriTokens.info),
       StatusTone.neutral => (
@@ -283,6 +305,8 @@ Future<bool> showConfirmDialog(
     builder: (context) {
       final scheme = Theme.of(context).colorScheme;
       return AlertDialog(
+        // Long messages at large text sizes scroll instead of overflowing.
+        scrollable: true,
         title: Text(title),
         content: Text(message),
         actions: [

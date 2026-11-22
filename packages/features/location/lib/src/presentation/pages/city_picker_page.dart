@@ -56,72 +56,78 @@ class CityPickerPage extends StatelessWidget {
                 state.detectFailure!.code == 'location_services_disabled');
         return Scaffold(
           appBar: AppBar(title: const Text('Your city')),
+          // One scroll view: with a permission warning and large text the
+          // header no longer squeezes the results (or "Open settings") off
+          // screen; it scrolls away with them.
           body: SafeArea(
             top: false,
-            child: Column(
-              children: [
-                ResponsiveCenter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: DashuriTokens.space2),
-                      Text(
-                        'Shown on your profile as a city only. We never store '
-                        'your exact location.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: DashuriTokens.space4),
-                      TextField(
-                        onChanged: cubit.queryChanged,
-                        textInputAction: TextInputAction.search,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Search cities',
-                          labelText: 'Search cities',
-                        ),
-                      ),
-                      const SizedBox(height: DashuriTokens.space3),
-                      OutlinedButton.icon(
-                        onPressed: state.locating || state.saving != null
-                            ? null
-                            : cubit.useMyLocation,
-                        icon: state.locating
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.my_location),
-                        label: Text(
-                          state.locating
-                              ? 'Finding your city…'
-                              : 'Use my location',
-                        ),
-                      ),
-                      if (state.detectFailure != null) ...[
-                        const SizedBox(height: DashuriTokens.space3),
-                        InfoBanner(
-                          tone: InfoBannerTone.warning,
-                          icon: Icons.location_off_outlined,
-                          message: detectMessage(state.detectFailure!),
-                        ),
-                        if (permanentlyDenied)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              onPressed: cubit.openSettings,
-                              child: const Text('Open settings'),
-                            ),
+            child: CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                SliverToBoxAdapter(
+                  child: ResponsiveCenter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: DashuriTokens.space2),
+                        Text(
+                          'Shown on your profile as a city only. We never store '
+                          'your exact location.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
+                        ),
+                        const SizedBox(height: DashuriTokens.space4),
+                        TextField(
+                          onChanged: cubit.queryChanged,
+                          textInputAction: TextInputAction.search,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            hintText: 'Search cities',
+                            labelText: 'Search cities',
+                          ),
+                        ),
+                        const SizedBox(height: DashuriTokens.space3),
+                        OutlinedButton.icon(
+                          onPressed: state.locating || state.saving != null
+                              ? null
+                              : cubit.useMyLocation,
+                          icon: state.locating
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.my_location),
+                          label: Text(
+                            state.locating
+                                ? 'Finding your city…'
+                                : 'Use my location',
+                          ),
+                        ),
+                        if (state.detectFailure != null) ...[
+                          const SizedBox(height: DashuriTokens.space3),
+                          InfoBanner(
+                            tone: InfoBannerTone.warning,
+                            icon: Icons.location_off_outlined,
+                            message: detectMessage(state.detectFailure!),
+                          ),
+                          if (permanentlyDenied)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                onPressed: cubit.openSettings,
+                                child: const Text('Open settings'),
+                              ),
+                            ),
+                        ],
+                        const SizedBox(height: DashuriTokens.space3),
                       ],
-                      const SizedBox(height: DashuriTokens.space3),
-                    ],
+                    ),
                   ),
                 ),
-                Expanded(child: _results(context, state)),
+                _results(context, state),
               ],
             ),
           ),
@@ -133,20 +139,24 @@ class CityPickerPage extends StatelessWidget {
   Widget _results(BuildContext context, CityPickerState state) {
     final cubit = context.read<CityPickerCubit>();
     return switch (state.listStatus) {
-      CityListStatus.loading => const LoadingView(),
-      CityListStatus.failed => ErrorStateView(
-        message: failureMessage(state.listFailure!),
-        onRetry: cubit.retry,
+      CityListStatus.loading => const SliverFillRemaining(child: LoadingView()),
+      CityListStatus.failed => SliverFillRemaining(
+        child: ErrorStateView(
+          message: failureMessage(state.listFailure!),
+          onRetry: cubit.retry,
+        ),
       ),
-      CityListStatus.loaded when state.cities.isEmpty => EmptyStateView(
-        icon: Icons.location_city_outlined,
-        title: 'No matching cities',
-        message: state.query.trim().isEmpty
-            ? 'No cities are available yet.'
-            : 'Dashuri is available in selected Indian cities. Try another '
-                  'spelling or a nearby city.',
+      CityListStatus.loaded when state.cities.isEmpty => SliverFillRemaining(
+        child: EmptyStateView(
+          icon: Icons.location_city_outlined,
+          title: 'No matching cities',
+          message: state.query.trim().isEmpty
+              ? 'No cities are available yet.'
+              : 'Dashuri is available in selected Indian cities. Try another '
+                    'spelling or a nearby city.',
+        ),
       ),
-      CityListStatus.loaded => ListView.builder(
+      CityListStatus.loaded => SliverList.builder(
         itemCount: state.cities.length,
         itemBuilder: (context, i) {
           final city = state.cities[i];

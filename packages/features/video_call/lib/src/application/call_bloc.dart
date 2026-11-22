@@ -200,6 +200,18 @@ class CallBloc extends Bloc<CallBlocEvent, CallState> {
   ) async {
     if (state.status == CallUiStatus.ended) return;
     switch (e.event) {
+      // After a local failure (e.g. camera/microphone could not join), stay
+      // on the failure screen — it offers "End call" — until the server
+      // reports a terminal phase. Re-applying a waiting snapshot would flip
+      // the UI back to "Connecting…" and silently retry the join forever.
+      case CallUpdated(:final session)
+          when state.status == CallUiStatus.failed && !session.phase.isTerminal:
+        emit(
+          state.copyWith(
+            session: session.withPeerFrom(state.session),
+            failure: state.failure, // copyWith clears it otherwise
+          ),
+        );
       case CallUpdated(:final session):
         await _apply(session, emit);
         // Caller joins media once the receiver has accepted.

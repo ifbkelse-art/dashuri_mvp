@@ -3,6 +3,9 @@ import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// UI/UX pass: opt-in audit hook (no effect unless DASHURI_UIUX_* is set).
+import '../../../../../tool/uiux/audit_hook.dart';
+
 /// Window sizes required by the workstream rules.
 const phone = Size(360, 640);
 const tablet = Size(1024, 768);
@@ -20,6 +23,7 @@ Future<GoRouter> pumpPage(
     ..physicalSize = size
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  await uiuxBeforePump(tester);
   final router = GoRouter(
     initialLocation: '/test',
     routes: [
@@ -45,8 +49,8 @@ Future<GoRouter> pumpPage(
   await tester.pumpWidget(
     MediaQuery(
       data: MediaQueryData(
-        size: size,
-        textScaler: TextScaler.linear(textScale),
+        size: uiuxSize(size),
+        textScaler: TextScaler.linear(uiuxScale(textScale)),
       ),
       child: MaterialApp.router(
         theme: DashuriTheme.light(),
@@ -55,5 +59,6 @@ Future<GoRouter> pumpPage(
     ),
   );
   await tester.pump();
+  await uiuxAfterPump(tester);
   return router;
 }

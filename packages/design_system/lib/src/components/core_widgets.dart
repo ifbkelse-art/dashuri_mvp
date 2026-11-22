@@ -292,24 +292,33 @@ class InfoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg, defaultIcon) = switch (tone) {
+    // (background, text, icon colour, default icon). Text colours meet WCAG
+    // AA (4.5:1) on their tint; see test/chip_contrast_test.dart.
+    final (bg, fg, iconColor, defaultIcon) = switch (tone) {
+      // The token info blue (as HostNotice uses): burgundy-on-pink was
+      // nearly indistinguishable from the error tone, so guidance looked
+      // like a failure.
       InfoBannerTone.info => (
-        DashuriTokens.burgundy50,
-        DashuriTokens.burgundy700,
+        DashuriTokens.info100,
+        DashuriTokens.info,
+        DashuriTokens.info,
         Icons.info_outline,
       ),
       InfoBannerTone.warning => (
         DashuriTokens.warning100,
+        DashuriTokens.warningText,
         DashuriTokens.warning,
         Icons.warning_amber_rounded,
       ),
       InfoBannerTone.error => (
         DashuriTokens.error100,
         DashuriTokens.error,
+        DashuriTokens.error,
         Icons.error_outline,
       ),
       InfoBannerTone.success => (
         DashuriTokens.success100,
+        DashuriTokens.successText,
         DashuriTokens.success,
         Icons.check_circle_outline,
       ),
@@ -324,7 +333,7 @@ class InfoBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon ?? defaultIcon, color: fg, size: 22),
+          Icon(icon ?? defaultIcon, color: iconColor, size: 22),
           const SizedBox(width: DashuriTokens.space3),
           Expanded(
             child: Text(
@@ -371,29 +380,76 @@ class FormPageBody extends StatelessWidget {
     );
     return SafeArea(
       top: false,
-      child: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: DashuriTokens.space6),
-              child: constrain(
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
+      // LayoutBuilder: the cap below must use the height this body really
+      // has (Scaffold removes the keyboard inset from MediaQuery here).
+      child: LayoutBuilder(
+        builder: (context, c) => Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: DashuriTokens.space6),
+                child: constrain(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
                 ),
               ),
             ),
-          ),
-          if (bottom != null)
-            Padding(
-              padding: const EdgeInsets.only(
-                top: DashuriTokens.space2,
-                bottom: DashuriTokens.space4,
+            // The pinned actions take at most 45% of the visible height and
+            // scroll inside it, so a long error or large text never pushes
+            // the form (or the actions themselves) off screen.
+            if (bottom != null)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: c.maxHeight * .45),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(
+                    top: DashuriTokens.space2,
+                    bottom: DashuriTokens.space4,
+                  ),
+                  child: constrain(bottom!),
+                ),
               ),
-              child: constrain(bottom!),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// A label at the start of a row and a value at its end ("Your age · 28
+/// years", "Total · ₹1,199"). The label takes the remaining width and
+/// wraps; the value keeps its natural width at the end, up to
+/// [maxValueFraction] of the row, and wraps beyond that. Never overflows,
+/// and (unlike Expanded + Flexible) never splits the row in half.
+class LabelValueRow extends StatelessWidget {
+  const LabelValueRow({
+    required this.label,
+    required this.value,
+    super.key,
+    this.maxValueFraction = .5,
+    this.gap = DashuriTokens.space3,
+    this.crossAxisAlignment = CrossAxisAlignment.center,
+  });
+
+  final Widget label;
+  final Widget value;
+  final double maxValueFraction;
+  final double gap;
+  final CrossAxisAlignment crossAxisAlignment;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) => Row(
+      crossAxisAlignment: crossAxisAlignment,
+      children: [
+        Expanded(child: label),
+        SizedBox(width: gap),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: c.maxWidth * maxValueFraction),
+          child: value,
+        ),
+      ],
+    ),
+  );
 }

@@ -59,10 +59,13 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
             switch (state.status) {
               case WalletHistoryStatus.initial:
               case WalletHistoryStatus.loading:
-                return const LoadingView();
+                return const SkeletonList(avatar: false);
               case WalletHistoryStatus.failed:
                 return ErrorStateView(
-                  message: WalletFormat.failureMessage(state.failure!),
+                  message: WalletFormat.failureMessage(
+                    state.failure!,
+                    subject: 'your activity',
+                  ),
                   onRetry: cubit.load,
                 );
               case WalletHistoryStatus.loaded:

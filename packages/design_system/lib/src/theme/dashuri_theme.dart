@@ -148,8 +148,18 @@ abstract final class DashuriTheme {
       chipTheme: ChipThemeData(
         shape: shape,
         side: BorderSide(color: scheme.outlineVariant),
-        labelStyle: text.bodyMedium,
+        // The label colour is state-aware: FilterChip (unlike ChoiceChip)
+        // ignores secondaryLabelStyle, so its selected label was dark on the
+        // dark selected fill (unreadable).
+        labelStyle: text.bodyMedium?.copyWith(
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? scheme.onInverseSurface
+                : scheme.onSurface,
+          ),
+        ),
         selectedColor: scheme.inverseSurface,
+        checkmarkColor: scheme.onInverseSurface,
         secondaryLabelStyle: text.bodyMedium?.copyWith(
           color: scheme.onInverseSurface,
         ),

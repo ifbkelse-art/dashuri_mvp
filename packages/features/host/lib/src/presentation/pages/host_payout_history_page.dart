@@ -27,7 +27,7 @@ class HostPayoutHistoryPage extends StatelessWidget {
       builder: (context, state) {
         final cubit = context.read<HostPayoutsCubit>();
         return switch (state.status) {
-          PagedStatus.loading => const LoadingView(),
+          PagedStatus.loading => const SkeletonList(avatar: false),
           PagedStatus.failed => ErrorStateView(
             message: hostFailureMessage(state.failure!),
             onRetry: cubit.load,
@@ -96,7 +96,11 @@ class _Row extends StatelessWidget {
         style: theme.textTheme.titleMedium,
       ),
       subtitle: Text('$when · ${DashuriFormat.count(withdrawal.beans)} Beans'),
-      trailing: StatusTag(label: label, tone: tone),
+      // Capped so a long status at large text cannot take the whole row.
+      trailing: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 128),
+        child: StatusTag(label: label, tone: tone),
+      ),
     );
   }
 }

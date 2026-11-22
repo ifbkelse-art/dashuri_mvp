@@ -22,7 +22,10 @@ class TransactionDetailPage extends StatelessWidget {
           builder: (context, state) => switch (state) {
             TransactionDetailLoading() => const LoadingView(),
             TransactionDetailFailed(:final failure) => ErrorStateView(
-              message: WalletFormat.failureMessage(failure),
+              message: WalletFormat.failureMessage(
+                failure,
+                subject: 'this transaction',
+              ),
               onRetry: () => context.read<TransactionDetailCubit>().load(),
             ),
             TransactionDetailLoaded(:final entry) => _Receipt(entry: entry),
@@ -121,14 +124,20 @@ class _Receipt extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              label,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                            // Label and value share the row (2:3) so
+                            // neither overflows at large text.
+                            Flexible(
+                              flex: 2,
+                              child: Text(
+                                label,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
                             const SizedBox(width: DashuriTokens.space4),
                             Expanded(
+                              flex: 3,
                               child: SelectableText(
                                 value,
                                 textAlign: TextAlign.end,

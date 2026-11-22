@@ -54,9 +54,10 @@ class HostCallsPage extends StatelessWidget {
           Widget content;
           switch (list.status) {
             case PagedStatus.loading:
-              content = const Padding(
-                padding: EdgeInsets.only(top: DashuriTokens.space10),
-                child: LoadingView(),
+              // Inside the page's own list: a fixed-height skeleton block.
+              content = const SizedBox(
+                height: 360,
+                child: SkeletonList(rows: 5),
               );
             case PagedStatus.failed:
               content = ErrorStateView(
@@ -220,7 +221,7 @@ class _CallRow extends StatelessWidget {
             CurrencyAmount.beans(
               beans,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: DashuriTokens.success,
+                color: DashuriTokens.successText, // AA-safe green for text
               ),
             )
           else

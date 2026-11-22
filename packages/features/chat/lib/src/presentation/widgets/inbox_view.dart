@@ -43,14 +43,15 @@ class _ChatInboxViewState extends State<ChatInboxView> {
               IconButton.filledTonal(
                 tooltip: 'Messaging privacy',
                 onPressed: () => context.push(RoutePaths.privacyMessaging),
-                icon: const Icon(Icons.tune),
+                // Same icon as "Who can message me" in Settings.
+                icon: const Icon(Icons.mark_chat_read_outlined),
               ),
             ],
           ),
         );
         final Widget body = switch (state) {
           ConversationsStateInitial() ||
-          ConversationsStateLoading() => const LoadingView(),
+          ConversationsStateLoading() => const SkeletonList(),
           ConversationsStateFailed(:final failure) => ErrorStateView(
             message: ChatFormat.failure(failure),
             onRetry: cubit.load,

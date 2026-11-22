@@ -209,34 +209,45 @@ class _Header extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            PopupMenuButton<DiscoverySort>(
-              tooltip: 'Sort',
-              initialValue: filter.sort,
-              onSelected: cubit.setSort,
-              itemBuilder: (_) => [
-                for (final s in DiscoverySort.values)
-                  PopupMenuItem(value: s, child: Text(s.label)),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: DashuriTokens.space2,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      filter.sort == DiscoverySort.recommended
-                          ? 'Recommended'
-                          : filter.sort.label,
-                      style: theme.textTheme.labelLarge?.copyWith(
+            // At the end of the row with its natural width, capped so a long
+            // label at large text truncates instead of overflowing.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * .45,
+              ),
+              child: PopupMenuButton<DiscoverySort>(
+                tooltip: 'Sort',
+                initialValue: filter.sort,
+                onSelected: cubit.setSort,
+                itemBuilder: (_) => [
+                  for (final s in DiscoverySort.values)
+                    PopupMenuItem(value: s, child: Text(s.label)),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: DashuriTokens.space2,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          filter.sort == DiscoverySort.recommended
+                              ? 'Recommended'
+                              : filter.sort.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.expand_more_rounded,
                         color: theme.colorScheme.primary,
                       ),
-                    ),
-                    Icon(
-                      Icons.expand_more_rounded,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

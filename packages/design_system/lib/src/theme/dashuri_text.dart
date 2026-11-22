@@ -10,6 +10,11 @@ abstract final class DashuriText {
   /// Set to false in tests (no network) to use local font fallbacks.
   static bool useGoogleFonts = true;
 
+  /// Test-only: the UI font family used when [useGoogleFonts] is false
+  /// (null = engine default). The UI/UX audit hook sets it to a real font so
+  /// screenshots are readable. No effect in the app.
+  static String? testFontFamily;
+
   static TextStyle display(double size, double height, Color color) {
     final base = TextStyle(
       fontSize: size,
@@ -37,7 +42,9 @@ abstract final class DashuriText {
         color: c ?? ink,
         letterSpacing: ls,
       );
-      return useGoogleFonts ? GoogleFonts.manrope(textStyle: base) : base;
+      return useGoogleFonts
+          ? GoogleFonts.manrope(textStyle: base)
+          : base.copyWith(fontFamily: testFontFamily);
     }
 
     return TextTheme(

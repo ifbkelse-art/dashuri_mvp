@@ -110,7 +110,7 @@ final class HostRoutes implements TabFeatureRoutes {
       path: RoutePaths.hostOnboarding,
       builder: (context, state) => BlocProvider(
         create: (_) => _sl<HostApplicationCubit>()..load(),
-        child: const HostOnboardingPage(),
+        child: HostOnboardingPage(hostModeEnter: _optional<HostModeEnter>()),
       ),
     ),
     GoRoute(
@@ -123,7 +123,7 @@ final class HostRoutes implements TabFeatureRoutes {
       path: RoutePaths.hostVerification,
       builder: (context, state) => BlocProvider(
         create: (_) => _sl<HostVerificationCubit>()..load(),
-        child: const HostVerificationPage(),
+        child: HostVerificationPage(hostModeEnter: _optional<HostModeEnter>()),
       ),
     ),
     GoRoute(

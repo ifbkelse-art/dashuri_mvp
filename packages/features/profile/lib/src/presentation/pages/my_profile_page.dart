@@ -189,10 +189,12 @@ class _IdentityCard extends StatelessWidget {
                           color: theme.colorScheme.primary,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          'Level ${state.level?.level ?? p.level}',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.primary,
+                        Flexible(
+                          child: Text(
+                            'Level ${state.level?.level ?? p.level}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
                           ),
                         ),
                       ],
@@ -230,21 +232,18 @@ class _LevelCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Level ${level.level}',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                ),
-                Text(
-                  fraction == null
-                      ? 'Top level'
-                      : '${(fraction * 100).round()}% to Level ${level.level + 1}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
+            LabelValueRow(
+              label: Text(
+                'Level ${level.level}',
+                style: theme.textTheme.titleLarge,
+              ),
+              value: Text(
+                fraction == null
+                    ? 'Top level'
+                    : '${(fraction * 100).round()}% to Level ${level.level + 1}',
+                textAlign: TextAlign.end,
+                style: theme.textTheme.bodySmall,
+              ),
             ),
             const SizedBox(height: DashuriTokens.space3),
             ClipRRect(

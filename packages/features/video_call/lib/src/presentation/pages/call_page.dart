@@ -337,8 +337,10 @@ class _IncomingView extends StatelessWidget {
                           label: 'Decline',
                           destructive: true,
                           size: 72,
-                          onPressed: () =>
-                              bloc.add(CallIncomingDeclined(session.callId)),
+                          onPressed: () => _withHaptic(
+                            () =>
+                                bloc.add(CallIncomingDeclined(session.callId)),
+                          ),
                         ),
                       ),
                       _Labeled(
@@ -348,8 +350,11 @@ class _IncomingView extends StatelessWidget {
                           shape: const CircleBorder(),
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: () =>
-                                bloc.add(CallIncomingAccepted(session.callId)),
+                            onTap: () => _withHaptic(
+                              () => bloc.add(
+                                CallIncomingAccepted(session.callId),
+                              ),
+                            ),
                             child: const SizedBox.square(
                               dimension: 72,
                               child: Icon(
@@ -514,7 +519,8 @@ class _CallCanvas extends StatelessWidget {
                   ? 'Cancel call'
                   : 'End call',
               destructive: true,
-              onPressed: () => bloc.add(const CallEndRequested()),
+              onPressed: () =>
+                  _withHaptic(() => bloc.add(const CallEndRequested())),
             ),
           ],
         );
@@ -1130,4 +1136,11 @@ class _ReconnectingOverlay extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Accept, decline and end are consequential: confirm them with a short
+/// vibration (no-op where unsupported).
+void _withHaptic(VoidCallback action) {
+  unawaited(HapticFeedback.mediumImpact());
+  action();
 }

@@ -48,6 +48,12 @@ abstract final class DashuriTokens {
   static const Color info100 = Color(0xFFE2ECF4);
   static const Color online = Color(0xFF34C77B);
 
+  /// Text on the warning/success tints (warning100, success100). The base
+  /// colours measure 3.0:1 and 3.7:1 there, below WCAG AA (4.5:1) for body
+  /// text; these measure 5.5:1 and 5.6:1. Icons keep the base colours.
+  static const Color warningText = Color(0xFF8A5408);
+  static const Color successText = Color(0xFF1F6B4A);
+
   /// Kept for compatibility with the scaffold: the brand seed.
   static const Color seedColor = burgundy700;
 

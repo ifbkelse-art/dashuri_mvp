@@ -146,14 +146,28 @@ class _ConversationPageState extends State<ConversationPage> {
                         onRetry: cubit.retrySend,
                       ),
                     ),
-                    if (state.filterNotice) const FilterNotice(),
-                    if (state.sendFailure != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          ChatFormat.failure(state.sendFailure!),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: DashuriTokens.error),
+                    // Notices share the space with the messages (and scroll)
+                    // instead of pushing the composer off screen.
+                    if (state.filterNotice || state.sendFailure != null)
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (state.filterNotice) const FilterNotice(),
+                              if (state.sendFailure != null)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Text(
+                                    ChatFormat.failure(state.sendFailure!),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: DashuriTokens.error),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     MessageComposer(
@@ -184,66 +198,76 @@ class _Restricted extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(DashuriTokens.space6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  UserAvatar(name: name, url: photoUrl, radius: 44),
-                  const SizedBox(height: DashuriTokens.space4),
-                  Text(name, style: theme.textTheme.titleLarge),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Material(
-          color: theme.colorScheme.surface,
-          child: Padding(
-            padding: const EdgeInsets.all(DashuriTokens.space5),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    // One scroll view: at large text the explanation and "Call instead"
+    // stay reachable instead of overflowing a fixed bottom panel.
+    return LayoutBuilder(
+      builder: (context, c) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: c.maxHeight),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(DashuriTokens.space6),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.lock_outline),
-                    const SizedBox(width: DashuriTokens.space3),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '$name accepts messages after a call',
-                            style: theme.textTheme.titleSmall,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$name only accepts messages from people they have '
-                            'had a video call with. Start a video call first; after '
-                            "that, you'll be able to message each other.",
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
+                    UserAvatar(name: name, url: photoUrl, radius: 44),
+                    const SizedBox(height: DashuriTokens.space4),
+                    Text(
+                      name,
+                      style: theme.textTheme.titleLarge,
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
-                const SizedBox(height: DashuriTokens.space4),
-                PrimaryButton(
-                  label: 'Call instead',
-                  icon: Icons.videocam_outlined,
-                  onPressed: onCall,
+              ),
+              Material(
+                color: theme.colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(DashuriTokens.space5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.lock_outline),
+                          const SizedBox(width: DashuriTokens.space3),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '$name accepts messages after a call',
+                                  style: theme.textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$name only accepts messages from people they have '
+                                  'had a video call with. Start a video call first; after '
+                                  "that, you'll be able to message each other.",
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: DashuriTokens.space4),
+                      PrimaryButton(
+                        label: 'Call instead',
+                        icon: Icons.videocam_outlined,
+                        onPressed: onCall,
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

@@ -105,6 +105,15 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
     sl.registerLazySingleton<InCallChat>(() => FeatureChatInCallChat(sl));
   }
 
+  // UI/UX pass: after host approval, "Go to host home" re-reads the account
+  // and selects host mode (no app restart needed).
+  sl.registerLazySingleton<HostModeEnter>(
+    () => HostModeEnter(() async {
+      await sl<SessionCubit>().refreshAccountQuietly();
+      await sl<ExperienceController>().setMode(ExperienceMode.host);
+    }),
+  );
+
   // H23 "Switch to customer mode" (feature_host looks this up if present).
   sl.registerLazySingleton<HostModeSwitch>(
     () => HostModeSwitch(

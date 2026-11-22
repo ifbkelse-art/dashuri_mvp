@@ -110,19 +110,16 @@ class _NoticeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    EnforcementPage.actionLabel(notice.action),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                Text(
-                  '${d.day}/${d.month}/${d.year}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
+            LabelValueRow(
+              label: Text(
+                EnforcementPage.actionLabel(notice.action),
+                style: theme.textTheme.titleMedium,
+              ),
+              value: Text(
+                '${d.day}/${d.month}/${d.year}',
+                textAlign: TextAlign.end,
+                style: theme.textTheme.bodySmall,
+              ),
             ),
             const SizedBox(height: DashuriTokens.space2),
             Text(notice.reason, style: theme.textTheme.bodyMedium),

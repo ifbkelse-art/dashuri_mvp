@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dashuri_core/dashuri_core.dart';
 import 'package:feature_host/feature_host.dart';
 import 'package:flutter/material.dart';
@@ -131,9 +133,9 @@ void main() {
       startKyc = MockStartKyc();
     });
 
-    Widget page() => BlocProvider(
+    Widget page({HostModeEnter? enter}) => BlocProvider(
       create: (_) => HostVerificationCubit(getStatus, startKyc)..load(),
-      child: const HostVerificationPage(),
+      child: HostVerificationPage(hostModeEnter: enter),
     );
 
     for (final MapEntry(key: name, value: size) in testSizes.entries) {
@@ -204,6 +206,34 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('stub:/host'), findsOneWidget);
     });
+
+    // UI/UX pass: known bug "host role needs an app restart after approval".
+    testWidgets(
+      'approved: enters host mode (fresh account) before going home',
+      (tester) async {
+        when(
+          () => getStatus(any()),
+        ).thenAnswer((_) async => const Success(approvedOffline));
+        final entered = Completer<void>();
+        var calls = 0;
+        await pumpHostPage(
+          tester,
+          page(
+            enter: HostModeEnter(() {
+              calls++;
+              return entered.future;
+            }),
+          ),
+        );
+        await tester.tap(find.text('Go to host home'));
+        await tester.pump();
+        expect(calls, 1);
+        expect(find.text('stub:/host'), findsNothing); // waits for the refresh
+        entered.complete();
+        await tester.pumpAndSettle();
+        expect(find.text('stub:/host'), findsOneWidget);
+      },
+    );
   });
 
   group('H09 profile setup', () {
@@ -308,7 +338,7 @@ void main() {
     for (final MapEntry(key: name, value: size) in testSizes.entries) {
       testWidgets('rate editor renders at $name', (tester) async {
         await pumpHostPage(tester, page(), size: size);
-        expect(find.text('2,400'), findsOneWidget);
+        expect(find.textContaining(amount('2,400')), findsOneWidget);
         expect(find.text('Your limit 4,000'), findsOneWidget);
         expect(find.textContaining('≈ ₹'), findsWidgets);
       });
@@ -342,7 +372,11 @@ void main() {
         () => setRate(any()),
       ).thenAnswer((_) async => const Success(approvedOffline));
       await pumpHostPage(tester, page(apply: true));
-      await tester.tap(find.text('Save rate'));
+      // Before approval: no "Save rate … next call" wording.
+      expect(find.text('Save rate'), findsNothing);
+      expect(find.textContaining('next call'), findsNothing);
+      expect(find.textContaining('once you are approved'), findsOneWidget);
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       expect(find.text('stub:/host/verification'), findsOneWidget);
     });
@@ -358,3 +392,6 @@ void main() {
     }
   });
 }
+
+/// A CurrencyAmount's text: the amount, after its inline glyph.
+RegExp amount(String text) => RegExp('^\uFFFC?${RegExp.escape(text)}\$');
