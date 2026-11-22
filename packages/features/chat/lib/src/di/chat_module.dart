@@ -43,6 +43,9 @@ void registerChatFeature(GetIt sl) {
     ..registerFactory<WatchChatHints>(
       () => WatchChatHints(sl<ChatRepository>()),
     )
+    ..registerFactory<WatchReadHints>(
+      () => WatchReadHints(sl<ChatRepository>()),
+    )
     ..registerFactory<GetCurrentUserId>(
       () => GetCurrentUserId(sl<ChatRepository>()),
     )

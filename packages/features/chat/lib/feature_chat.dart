@@ -6,6 +6,7 @@ library;
 
 export 'src/application/conversation_cubit.dart';
 export 'src/application/conversations_cubit.dart';
+export 'src/application/in_call_chat_controller.dart';
 export 'src/di/chat_module.dart';
 export 'src/domain/entities/chat_message.dart';
 export 'src/domain/entities/conversation.dart';
@@ -20,4 +21,5 @@ export 'src/domain/usecases/start_conversation.dart';
 export 'src/domain/usecases/update_messaging_privacy.dart';
 export 'src/presentation/pages/conversation_page.dart';
 export 'src/presentation/pages/conversations_page.dart';
+export 'src/presentation/widgets/in_call_chat_panel.dart';
 export 'src/routes/chat_routes.dart';

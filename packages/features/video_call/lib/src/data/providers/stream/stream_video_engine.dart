@@ -185,10 +185,5 @@ final class StreamVideoEngine implements VideoEngine {
   }
 
   @override
-  Future<void> flipCamera() async {
-    await call.value?.flipCamera();
-  }
-
-  @override
   Stream<MediaEvent> events() => _events.stream;
 }

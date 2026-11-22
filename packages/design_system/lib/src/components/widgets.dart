@@ -133,32 +133,40 @@ class StatusTag extends StatelessWidget {
         DashuriTokens.neutral700,
       ),
     };
+    final text = Text(
+      label,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
+    );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(dot ? 99 : 14),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (dot) ...[
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: tone == StatusTone.online ? DashuriTokens.online : fg,
-                shape: BoxShape.circle,
-              ),
+      // Without a dot the tag is just text: it wraps when space is bounded
+      // (large text, narrow screens) and keeps its natural width when not
+      // (e.g. inside a FittedBox). Dot tags are short availability labels.
+      child: !dot
+          ? text
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ...[
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: tone == StatusTone.online
+                          ? DashuriTokens.online
+                          : fg,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                text,
+              ],
             ),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
-          ),
-        ],
-      ),
     );
   }
 }

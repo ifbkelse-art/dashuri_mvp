@@ -22,11 +22,7 @@ class _Hints extends Mock implements WatchChatHints {}
 
 class _Me extends Mock implements GetCurrentUserId {}
 
-typedef SendInput = ({
-  String conversationId,
-  String body,
-  IdempotencyKey idempotencyKey,
-});
+typedef SendInput = SendMessageInput;
 typedef ListInput = ({String conversationId, PageRequest page});
 
 void main() {
@@ -47,6 +43,7 @@ void main() {
       conversationId: 'c',
       body: 'b',
       idempotencyKey: IdempotencyKey.generate(),
+      callId: null,
     ));
     registerFallbackValue((
       peerUserId: 'p',

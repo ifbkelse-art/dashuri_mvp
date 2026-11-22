@@ -15,8 +15,5 @@ abstract interface class VideoEngine {
 
   Future<void> setCameraEnabled({required bool enabled});
 
-  /// Switches between the front and back camera.
-  Future<void> flipCamera();
-
   Stream<MediaEvent> events();
 }

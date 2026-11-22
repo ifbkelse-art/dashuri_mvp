@@ -13,6 +13,9 @@ enum ConversationStatus {
 
 enum BubbleStatus { sent, sending, failed, rejected }
 
+/// What the sender sees under their own message (delivery state).
+enum DeliveryState { sending, sent, read, failed, notSent }
+
 /// One row of the message list: a server message or a local optimistic one.
 final class ChatBubble extends Equatable {
   const ChatBubble({
@@ -22,6 +25,7 @@ final class ChatBubble extends Equatable {
     required this.mine,
     this.status = BubbleStatus.sent,
     this.serverId,
+    this.context = MessageContext.chat,
   });
 
   factory ChatBubble.fromMessage(ChatMessage m, {required String? myUserId}) =>
@@ -31,6 +35,7 @@ final class ChatBubble extends Equatable {
         body: m.body,
         sentAt: m.sentAt,
         mine: m.senderId == myUserId,
+        context: m.context,
       );
 
   /// Server id for sent messages; the idempotency key for local ones.
@@ -41,6 +46,9 @@ final class ChatBubble extends Equatable {
   final bool mine;
   final BubbleStatus status;
 
+  /// Sent from the inbox or during a video call (metadata only).
+  final MessageContext context;
+
   ChatBubble withStatus(BubbleStatus s) => ChatBubble(
     localId: localId,
     serverId: serverId,
@@ -48,10 +56,19 @@ final class ChatBubble extends Equatable {
     sentAt: sentAt,
     mine: mine,
     status: s,
+    context: context,
   );
 
   @override
-  List<Object?> get props => [localId, serverId, body, sentAt, mine, status];
+  List<Object?> get props => [
+    localId,
+    serverId,
+    body,
+    sentAt,
+    mine,
+    status,
+    context,
+  ];
 }
 
 final class ConversationState extends Equatable {
@@ -68,6 +85,9 @@ final class ConversationState extends Equatable {
     this.filterNotice = false,
     this.restoredDraft,
     this.sendFailure,
+    this.peerReadUpTo,
+    this.unseenCount = 0,
+    this.latestUnseen,
   });
 
   final ConversationStatus status;
@@ -93,7 +113,31 @@ final class ConversationState extends Equatable {
   /// Last send failure that is not a filter or privacy refusal.
   final Failure? sendFailure;
 
+  /// The peer has read my messages sent at or before this time.
+  final DateTime? peerReadUpTo;
+
+  /// Messages from the peer that arrived while the view was hidden (the
+  /// in-call panel closed). Reset when it becomes visible.
+  final int unseenCount;
+
+  /// The newest of those, for a short preview on the call screen.
+  final ChatBubble? latestUnseen;
+
   bool get hasOlder => olderCursor != null;
+
+  /// Delivery state of one of my bubbles (null for received messages).
+  DeliveryState? deliveryOf(ChatBubble b) {
+    if (!b.mine) return null;
+    return switch (b.status) {
+      BubbleStatus.sending => DeliveryState.sending,
+      BubbleStatus.failed => DeliveryState.failed,
+      BubbleStatus.rejected => DeliveryState.notSent,
+      BubbleStatus.sent =>
+        peerReadUpTo != null && !b.sentAt.isAfter(peerReadUpTo!)
+            ? DeliveryState.read
+            : DeliveryState.sent,
+    };
+  }
 
   ConversationState copyWith({
     ConversationStatus? status,
@@ -108,6 +152,9 @@ final class ConversationState extends Equatable {
     bool? filterNotice,
     String? restoredDraft,
     Failure? sendFailure,
+    DateTime? peerReadUpTo,
+    int? unseenCount,
+    ChatBubble? Function()? latestUnseen,
   }) => ConversationState(
     status: status ?? this.status,
     conversationId: conversationId ?? this.conversationId,
@@ -121,6 +168,9 @@ final class ConversationState extends Equatable {
     filterNotice: filterNotice ?? this.filterNotice,
     restoredDraft: restoredDraft,
     sendFailure: sendFailure,
+    peerReadUpTo: peerReadUpTo ?? this.peerReadUpTo,
+    unseenCount: unseenCount ?? this.unseenCount,
+    latestUnseen: latestUnseen != null ? latestUnseen() : this.latestUnseen,
   );
 
   @override
@@ -137,5 +187,8 @@ final class ConversationState extends Equatable {
     filterNotice,
     restoredDraft,
     sendFailure,
+    peerReadUpTo,
+    unseenCount,
+    latestUnseen,
   ];
 }

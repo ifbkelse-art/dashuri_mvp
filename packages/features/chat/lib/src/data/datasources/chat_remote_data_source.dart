@@ -44,14 +44,26 @@ class ChatRemoteDataSource {
     query: page.toQuery(),
   );
 
+  /// With [callId] the message is sent from the in-call panel: it carries
+  /// `context: call`, the call and a `client_message_id` (the idempotency
+  /// key) for server-side duplicate protection. Without it the body is the
+  /// original `{body}` so older servers keep working.
   Future<Result<ChatMessage>> sendMessage({
     required String conversationId,
     required String body,
     required IdempotencyKey idempotencyKey,
+    String? callId,
   }) => _api.post(
     '/v1/conversations/$conversationId/messages',
     decode: objectDecoder(chatMessageFromJson),
-    body: {'body': body},
+    body: {
+      'body': body,
+      if (callId != null) ...{
+        'context': 'call',
+        'call_id': callId,
+        'client_message_id': idempotencyKey.value,
+      },
+    },
     idempotencyKey: idempotencyKey,
   );
 

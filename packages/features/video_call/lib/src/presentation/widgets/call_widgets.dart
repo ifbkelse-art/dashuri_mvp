@@ -101,6 +101,7 @@ class RoundControl extends StatelessWidget {
     this.destructive = false,
     this.active = false,
     this.size = 56,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
@@ -112,6 +113,9 @@ class RoundControl extends StatelessWidget {
   final bool active;
   final double size;
 
+  /// Unread counter shown on the control (e.g. chat); 0 hides it.
+  final int badgeCount;
+
   @override
   Widget build(BuildContext context) {
     final bg = destructive
@@ -120,61 +124,130 @@ class RoundControl extends StatelessWidget {
         ? Colors.white
         : Colors.white.withValues(alpha: .16);
     final fg = active && !destructive ? DashuriTokens.neutral900 : Colors.white;
+    final button = Material(
+      color: bg,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: SizedBox.square(
+          dimension: size,
+          child: Icon(icon, color: fg, size: size * .42),
+        ),
+      ),
+    );
+    final badge = badgeCount > 99 ? '99+' : '$badgeCount';
     return Tooltip(
       message: label,
       child: Semantics(
         button: true,
-        label: label,
-        child: Material(
-          color: bg,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onPressed,
-            child: SizedBox.square(
-              dimension: size,
-              child: Icon(icon, color: fg, size: size * .42),
-            ),
-          ),
-        ),
+        label: badgeCount > 0 ? '$label, $badgeCount unread' : label,
+        excludeSemantics: true,
+        child: badgeCount == 0
+            ? button
+            : Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  button,
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 20,
+                        minHeight: 20,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: DashuriTokens.error,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.black, width: 1.5),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badge,
+                        // Fixed size: the badge must stay inside its circle.
+                        textScaler: TextScaler.noScaling,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
 }
 
 /// The floating control bar (DS13), width-capped on tablets.
+///
+/// Controls keep a real touch target: 56 px when there is room, shrinking
+/// to no less than [minControl] (48 px). If even that does not fit in one
+/// row (very narrow phones), they wrap onto a second row instead of being
+/// scaled down.
 class CallControlsBar extends StatelessWidget {
   const CallControlsBar({required this.children, super.key});
 
   final List<Widget> children;
 
+  static const maxControl = 56.0;
+  static const minControl = 48.0;
+  static const _pad = DashuriTokens.space2;
+
+  /// (control size, gap, fits in one row) for [n] controls in [width].
+  static (double, double, bool) layoutFor(int n, double width) {
+    if (n == 0) return (maxControl, 0, true);
+    final avail = width - 2 * _pad;
+    if (n * maxControl + (n - 1) * DashuriTokens.space3 <= avail) {
+      return (maxControl, DashuriTokens.space3, true);
+    }
+    const gap = 6.0;
+    final size = ((avail - (n - 1) * gap) / n).clamp(minControl, maxControl);
+    return (size, gap, n * size + (n - 1) * gap <= avail);
+  }
+
   @override
   Widget build(BuildContext context) => Center(
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 440),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: .5),
-          borderRadius: BorderRadius.circular(DashuriTokens.radiusXLarge),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: DashuriTokens.space3,
-            vertical: DashuriTokens.space3,
-          ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final (i, c) in children.indexed) ...[
-                  if (i > 0) const SizedBox(width: DashuriTokens.space3),
-                  c,
-                ],
-              ],
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final (size, gap, oneRow) = layoutFor(children.length, c.maxWidth);
+          final sized = [
+            for (final child in children)
+              SizedBox.square(dimension: size, child: child),
+          ];
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: .5),
+              borderRadius: BorderRadius.circular(DashuriTokens.radiusXLarge),
             ),
-          ),
-        ),
+            child: Padding(
+              padding: const EdgeInsets.all(_pad),
+              child: oneRow
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final (i, w) in sized.indexed) ...[
+                          if (i > 0) SizedBox(width: gap),
+                          w,
+                        ],
+                      ],
+                    )
+                  : Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: sized,
+                    ),
+            ),
+          );
+        },
       ),
     ),
   );

@@ -14,6 +14,10 @@ type Deps struct {
 	Realtime Publisher     // optional
 	Photos   PhotoSigner   // optional
 	Push     MessagePusher // optional
+	// MessageContext stores in-call metadata (context, call_id,
+	// client_message_id). Needs migration 20261123000200; config
+	// CHAT_MESSAGE_CONTEXT_ENABLED, default off.
+	MessageContext bool
 }
 
 // PageRequest is a parsed cursor page request.

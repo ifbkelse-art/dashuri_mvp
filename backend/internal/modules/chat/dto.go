@@ -48,17 +48,44 @@ type ChatMessage struct {
 	SenderId       string    `json:"sender_id"`
 	Body           string    `json:"body"`
 	SentAt         time.Time `json:"sent_at"`
+	// Context is where the message was sent from: "chat" (inbox) or "call"
+	// (the in-call panel). Metadata only; same conversation, same store.
+	Context string `json:"context"`
+	// ReadByPeer: for the viewer's own messages, the other participant has
+	// read up to (or past) this message. Always false for received ones.
+	ReadByPeer bool `json:"read_by_peer"`
 }
+
+// Message contexts.
+const (
+	ContextChat = "chat"
+	ContextCall = "call"
+)
 
 // MaxMessageChars is the message length limit in characters (D-15).
 const MaxMessageChars = 1000
 
 type SendMessageRequest struct {
 	Body string `json:"body"`
+	// Optional (unified chat). Omitted = "chat". "call" requires CallId: a
+	// call between the two participants.
+	Context *string `json:"context,omitempty"`
+	CallId  *string `json:"call_id,omitempty"`
+	// ClientMessageId is the sender's id for this message (the client sends
+	// its Idempotency-Key). A repeat returns the stored message.
+	ClientMessageId *string `json:"client_message_id,omitempty"`
 }
 
 // normalize trims surrounding whitespace.
 func (r *SendMessageRequest) normalize() { r.Body = strings.TrimSpace(r.Body) }
+
+// context returns the effective message context.
+func (r SendMessageRequest) context() string {
+	if r.Context == nil {
+		return ContextChat
+	}
+	return *r.Context
+}
 
 func (r SendMessageRequest) validate() map[string]string {
 	errs := map[string]string{}
@@ -76,6 +103,19 @@ func (r SendMessageRequest) validate() map[string]string {
 				break
 			}
 		}
+	}
+	switch ctx := r.context(); {
+	case ctx != ContextChat && ctx != ContextCall:
+		errs["context"] = "invalid_value"
+	case ctx == ContextCall && (r.CallId == nil || *r.CallId == ""):
+		errs["call_id"] = "required"
+	case r.CallId != nil && ctx != ContextCall:
+		errs["call_id"] = "only_for_call_context"
+	case r.CallId != nil && !isUUID(*r.CallId):
+		errs["call_id"] = "invalid_uuid"
+	}
+	if r.ClientMessageId != nil && !isUUID(*r.ClientMessageId) {
+		errs["client_message_id"] = "invalid_uuid"
 	}
 	return errs
 }

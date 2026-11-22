@@ -8,19 +8,32 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../application/call_bloc.dart';
 import '../../domain/entities/call_session.dart';
+import '../in_call_chat.dart';
 import '../video/video_view_factory.dart';
 import '../widgets/call_widgets.dart';
 
 /// The call screen for both sides: V02 ringing, V03 connecting, V04/V17
 /// active, V05 low balance, V07 interrupted, V15 free minute and V16
 /// incoming. Every billing figure shown comes from the server session.
+///
+/// EXPERIMENT — with [chat], a live call gets a chat control that opens the
+/// pair's conversation in a panel over the video. The panel is plain UI on
+/// this page: it never sends call events, so it cannot end, pause or bill.
 class CallPage extends StatefulWidget {
-  const CallPage({required this.views, super.key, this.manageSystemUi = true});
+  const CallPage({
+    required this.views,
+    super.key,
+    this.manageSystemUi = true,
+    this.chat,
+  });
 
   final VideoViewFactory views;
 
   /// Full-screen (immersive) while the page is open.
   final bool manageSystemUi;
+
+  /// In-call chat (null: no chat control).
+  final InCallChat? chat;
 
   @override
   State<CallPage> createState() => _CallPageState();
@@ -30,6 +43,8 @@ class _CallPageState extends State<CallPage> {
   int? _lowBalanceValue;
   DateTime? _lowBalanceAt;
   int _frozenElapsed = 0;
+  InCallChatSession? _chat;
+  bool _chatOpen = false;
 
   @override
   void initState() {
@@ -39,17 +54,49 @@ class _CallPageState extends State<CallPage> {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
       );
     }
+    // The listener only sees changes; pick up a call that is already live.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncChat(context.read<CallBloc>().state);
+    });
   }
 
   @override
   void dispose() {
+    unawaited(_chat?.close());
     if (widget.manageSystemUi) {
       unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     }
     super.dispose();
   }
 
+  static bool _isLive(CallState s) =>
+      s.status == CallUiStatus.active || s.status == CallUiStatus.paused;
+
+  /// Opens the chat session once the call is live (billing started, so the
+  /// peer counts as a call partner); closes the panel when the call ends.
+  void _syncChat(CallState s) {
+    final session = s.session;
+    if (_chat == null && widget.chat != null && session != null && _isLive(s)) {
+      setState(() {
+        _chat = widget.chat!.open(
+          callId: session.callId,
+          peerUserId: session.peerUserId,
+          peerName: session.peerName,
+        );
+      });
+    }
+    if (_chatOpen && !_isLive(s)) _setChatOpen(false);
+  }
+
+  void _setChatOpen(bool open) {
+    if (_chatOpen == open) return;
+    if (!open) FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _chatOpen = open);
+    _chat?.setVisible(open);
+  }
+
   void _onState(BuildContext context, CallState s) {
+    _syncChat(s);
     if (s.status != CallUiStatus.ended) return;
     final session = s.session;
     final router = GoRouter.of(context);
@@ -136,10 +183,18 @@ class _CallPageState extends State<CallPage> {
             s.status == CallUiStatus.ended ||
             s.status == CallUiStatus.idle,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) unawaited(_confirmLeave(context));
+          if (didPop) return;
+          // Back closes the chat panel first; it never ends the call.
+          if (_chatOpen) {
+            _setChatOpen(false);
+          } else {
+            unawaited(_confirmLeave(context));
+          }
         },
         child: Scaffold(
           backgroundColor: DashuriTokens.neutral950,
+          // The video stays full-screen; the call chrome handles the keyboard.
+          resizeToAvoidBottomInset: false,
           body: _body(context, s),
         ),
       ),
@@ -184,6 +239,9 @@ class _CallPageState extends State<CallPage> {
           frozenElapsed: _frozenElapsed,
           onElapsed: (v) => _frozenElapsed = v,
           onReport: () => unawaited(_confirmReport(context, session)),
+          chat: _isLive(s) ? _chat : null,
+          chatOpen: _chatOpen,
+          onChatOpen: _setChatOpen,
         );
     }
   }
@@ -350,6 +408,9 @@ class _CallCanvas extends StatelessWidget {
     required this.frozenElapsed,
     required this.onElapsed,
     required this.onReport,
+    required this.chat,
+    required this.chatOpen,
+    required this.onChatOpen,
   });
 
   final CallState state;
@@ -359,6 +420,13 @@ class _CallCanvas extends StatelessWidget {
   final int frozenElapsed;
   final ValueChanged<int> onElapsed;
   final VoidCallback onReport;
+  final InCallChatSession? chat;
+  final bool chatOpen;
+  final ValueChanged<bool> onChatOpen;
+
+  /// Height of the call screen (without keyboard) below which the top bar
+  /// gives way to the chat while typing.
+  static const _roomyHeight = 460.0;
 
   bool get _live =>
       state.status == CallUiStatus.active ||
@@ -378,10 +446,78 @@ class _CallCanvas extends StatelessWidget {
       ),
     );
     final isWaiting = !_live;
+    final chat = this.chat;
+    final showChat = chat != null && chatOpen;
     return LayoutBuilder(
       builder: (context, c) {
         final area = c.biggest;
         final padding = MediaQuery.paddingOf(context);
+        final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+        final typing = showChat && keyboard > 0;
+        final showTopBar = !typing || area.height - keyboard >= _roomyHeight;
+        final chromeHeight =
+            area.height -
+            keyboard -
+            padding.top -
+            (keyboard == 0 ? padding.bottom : 0);
+        final topBarMax =
+            (chromeHeight *
+                    (!showChat
+                        ? .6
+                        : chromeHeight < 520
+                        ? .25
+                        : .35))
+                .clamp(0.0, double.infinity);
+        final controls = CallControlsBar(
+          children: [
+            RoundControl(
+              icon: state.microphoneOn
+                  ? Icons.mic_rounded
+                  : Icons.mic_off_rounded,
+              label: state.microphoneOn
+                  ? 'Mute microphone'
+                  : 'Unmute microphone',
+              active: !state.microphoneOn,
+              onPressed: state.mediaJoined
+                  ? () => bloc.add(const CallMicrophoneToggled())
+                  : null,
+            ),
+            RoundControl(
+              icon: state.cameraOn
+                  ? Icons.videocam_rounded
+                  : Icons.videocam_off_rounded,
+              label: state.cameraOn ? 'Turn camera off' : 'Turn camera on',
+              active: !state.cameraOn,
+              onPressed: state.mediaJoined
+                  ? () => bloc.add(const CallCameraToggled())
+                  : null,
+            ),
+            if (chat != null)
+              ValueListenableBuilder<int>(
+                valueListenable: chat.unseen,
+                builder: (context, unseen, _) => RoundControl(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: chatOpen ? 'Close chat' : 'Open chat',
+                  active: chatOpen,
+                  badgeCount: chatOpen ? 0 : unseen,
+                  onPressed: () => onChatOpen(!chatOpen),
+                ),
+              ),
+            RoundControl(
+              icon: Icons.flag_rounded,
+              label: 'Report',
+              onPressed: onReport,
+            ),
+            RoundControl(
+              icon: Icons.call_end_rounded,
+              label: state.status == CallUiStatus.ringing
+                  ? 'Cancel call'
+                  : 'End call',
+              destructive: true,
+              onPressed: () => bloc.add(const CallEndRequested()),
+            ),
+          ],
+        );
         return Stack(
           children: [
             Positioned.fill(
@@ -398,7 +534,8 @@ class _CallCanvas extends StatelessWidget {
               Positioned.fill(
                 child: _WaitingOverlay(state: state, session: session),
               ),
-            if (_live && state.mediaJoined)
+            // Hidden while chatting so it never covers the conversation.
+            if (_live && state.mediaJoined && !showChat)
               DraggableCornerTile(
                 areaSize: area,
                 topInset: padding.top + 120,
@@ -419,81 +556,62 @@ class _CallCanvas extends StatelessWidget {
                         ),
                       ),
               ),
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 0,
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(DashuriTokens.space4),
-                  child: _TopBar(
-                    state: state,
-                    session: session,
-                    peerName: peerName,
-                    lowBalanceAt: lowBalanceAt,
-                    frozenElapsed: frozenElapsed,
-                    onElapsed: onElapsed,
-                  ),
-                ),
-              ),
-            ),
             if (_live && state.reconnecting)
               const Positioned.fill(child: _ReconnectingOverlay()),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(DashuriTokens.space4),
-                  child: CallControlsBar(
+            // Top bar, chat and controls share one column, so the chat can
+            // never sit under the controls or the timer, on any screen.
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: keyboard),
+                child: SafeArea(
+                  bottom: keyboard == 0,
+                  child: Column(
                     children: [
-                      RoundControl(
-                        icon: state.microphoneOn
-                            ? Icons.mic_rounded
-                            : Icons.mic_off_rounded,
-                        label: state.microphoneOn
-                            ? 'Mute microphone'
-                            : 'Unmute microphone',
-                        active: !state.microphoneOn,
-                        onPressed: state.mediaJoined
-                            ? () => bloc.add(const CallMicrophoneToggled())
-                            : null,
+                      if (showTopBar)
+                        // Capped so controls (and the chat) always fit;
+                        // scrolls on short landscape screens.
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: topBarMax),
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(DashuriTokens.space4),
+                            child: _TopBar(
+                              state: state,
+                              session: session,
+                              peerName: peerName,
+                              lowBalanceAt: lowBalanceAt,
+                              frozenElapsed: frozenElapsed,
+                              onElapsed: onElapsed,
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: showChat
+                            ? _ChatArea(
+                                chat: chat,
+                                fill: typing,
+                                screenHeight: area.height,
+                                onClose: () => onChatOpen(false),
+                              )
+                            : chat == null
+                            ? const SizedBox.shrink()
+                            : _ChatPreview(
+                                chat: chat,
+                                peerName: peerName,
+                                onOpen: () => onChatOpen(true),
+                              ),
                       ),
-                      RoundControl(
-                        icon: state.cameraOn
-                            ? Icons.videocam_rounded
-                            : Icons.videocam_off_rounded,
-                        label: state.cameraOn
-                            ? 'Turn camera off'
-                            : 'Turn camera on',
-                        active: !state.cameraOn,
-                        onPressed: state.mediaJoined
-                            ? () => bloc.add(const CallCameraToggled())
-                            : null,
-                      ),
-                      RoundControl(
-                        icon: Icons.cameraswitch_rounded,
-                        label: 'Flip camera',
-                        onPressed: state.mediaJoined
-                            ? () => bloc.add(const CallCameraFlipped())
-                            : null,
-                      ),
-                      RoundControl(
-                        icon: Icons.flag_rounded,
-                        label: 'Report',
-                        onPressed: onReport,
-                      ),
-                      RoundControl(
-                        icon: Icons.call_end_rounded,
-                        label: state.status == CallUiStatus.ringing
-                            ? 'Cancel call'
-                            : 'End call',
-                        destructive: true,
-                        onPressed: () => bloc.add(const CallEndRequested()),
-                      ),
+                      // While typing, the keyboard owns the bottom; closing
+                      // it (or the panel) brings the controls back.
+                      if (!typing)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            DashuriTokens.space3,
+                            DashuriTokens.space2,
+                            DashuriTokens.space3,
+                            DashuriTokens.space4,
+                          ),
+                          child: controls,
+                        ),
                     ],
                   ),
                 ),
@@ -504,6 +622,151 @@ class _CallCanvas extends StatelessWidget {
       },
     );
   }
+}
+
+/// Where the chat panel goes: bottom of the free space between the top bar
+/// and the controls; right-aligned and width-capped on wide screens so the
+/// video stays visible.
+class _ChatArea extends StatelessWidget {
+  const _ChatArea({
+    required this.chat,
+    required this.fill,
+    required this.screenHeight,
+    required this.onClose,
+  });
+
+  final InCallChatSession chat;
+
+  /// Use all the free height (keyboard open).
+  final bool fill;
+  final double screenHeight;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      final wide = c.maxWidth >= 600;
+      // The panel is see-through, but text still sits over the video: keep
+      // it to the lower part of the screen so the other person's face
+      // (usually upper-middle) stays clear.
+      final preferred = (screenHeight * .38).clamp(200.0, 400.0);
+      final height = fill ? c.maxHeight : preferred.clamp(0.0, c.maxHeight);
+      return Align(
+        alignment: wide ? Alignment.bottomRight : Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: DashuriTokens.space3),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: SizedBox(
+              width: double.infinity,
+              height: height,
+              child: chat.buildPanel(context, onClose: onClose),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// A short preview of a message that arrived while the panel was closed.
+/// Tap opens the chat; it hides itself after a few seconds.
+class _ChatPreview extends StatefulWidget {
+  const _ChatPreview({
+    required this.chat,
+    required this.peerName,
+    required this.onOpen,
+  });
+
+  final InCallChatSession chat;
+  final String peerName;
+  final VoidCallback onOpen;
+
+  static const visibleFor = Duration(seconds: 5);
+
+  @override
+  State<_ChatPreview> createState() => _ChatPreviewState();
+}
+
+class _ChatPreviewState extends State<_ChatPreview> {
+  Timer? _hide;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.chat.preview.addListener(_onPreview);
+  }
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    widget.chat.preview.removeListener(_onPreview);
+    super.dispose();
+  }
+
+  void _onPreview() {
+    _hide?.cancel();
+    if (widget.chat.preview.value != null) {
+      _hide = Timer(_ChatPreview.visibleFor, widget.chat.dismissPreview);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<String?>(
+    valueListenable: widget.chat.preview,
+    builder: (context, text, _) {
+      if (text == null) return const SizedBox.shrink();
+      final theme = Theme.of(context);
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: DashuriTokens.space4),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Semantics(
+              liveRegion: true,
+              button: true,
+              label: 'New message from ${widget.peerName}: $text. Open chat',
+              excludeSemantics: true,
+              child: Material(
+                color: Colors.black.withValues(alpha: .7),
+                borderRadius: BorderRadius.circular(DashuriTokens.radiusLarge),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(
+                    DashuriTokens.radiusLarge,
+                  ),
+                  onTap: widget.onOpen,
+                  child: Padding(
+                    padding: const EdgeInsets.all(DashuriTokens.space3),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        const SizedBox(width: DashuriTokens.space2),
+                        Expanded(
+                          child: Text(
+                            '${widget.peerName}: $text',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _TopBar extends StatelessWidget {

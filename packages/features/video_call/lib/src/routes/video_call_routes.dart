@@ -7,6 +7,7 @@ import '../application/call_history_cubit.dart';
 import '../application/call_summary_cubit.dart';
 import '../application/pre_call_cubit.dart';
 import '../di/video_call_module.dart';
+import '../presentation/in_call_chat.dart';
 import '../presentation/pages/call_history_page.dart';
 import '../presentation/pages/call_page.dart';
 import '../presentation/pages/call_summary_page.dart';
@@ -63,7 +64,11 @@ final class VideoCallRoutes implements FeatureRoutes {
           create: (_) =>
               createCallBloc(_sl, kit)
                 ..add(CallAttachRequested(callId, incoming: incoming)),
-          child: CallPage(views: kit.views),
+          child: CallPage(
+            views: kit.views,
+            // EXPERIMENT: in-call chat, when the app registered it.
+            chat: _sl.isRegistered<InCallChat>() ? _sl<InCallChat>() : null,
+          ),
         );
       },
     ),

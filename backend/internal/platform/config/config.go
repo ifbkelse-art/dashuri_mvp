@@ -62,6 +62,12 @@ type Config struct {
 	// read URLs for the private profile-photos bucket. Server only; empty
 	// makes photo uploads return 503 storage_not_configured.
 	StorageServiceKey string // secret
+
+	// EXPERIMENT — unified chat + in-call messaging (docs/chat). Stores the
+	// in-call metadata columns (context, call_id, client_message_id). Needs
+	// migration 20261123000200 applied FIRST. Off: in-call messages are
+	// still delivered, stored as plain chat messages.
+	ChatMessageContextEnabled bool
 }
 
 // Load reads and validates configuration. In production every required
@@ -97,6 +103,8 @@ func Load() (Config, error) {
 		SightengineSecret:      os.Getenv("SIGHTENGINE_API_SECRET"),
 		FCMProjectID:           os.Getenv("FCM_PROJECT_ID"),
 		StorageServiceKey:      os.Getenv("SUPABASE_STORAGE_SERVICE_KEY"),
+
+		ChatMessageContextEnabled: getBool("CHAT_MESSAGE_CONTEXT_ENABLED", false),
 	}
 	return c, c.Validate()
 }

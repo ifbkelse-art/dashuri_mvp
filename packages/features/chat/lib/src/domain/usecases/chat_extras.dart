@@ -25,6 +25,17 @@ class WatchChatHints implements StreamUseCase<String, NoInput> {
   Stream<String> call(NoInput input) => _repository.chatHints();
 }
 
+/// `chat.read` realtime hints (conversation ids): the peer read my messages.
+// Not final: application tests mock use cases.
+class WatchReadHints implements StreamUseCase<String, NoInput> {
+  const WatchReadHints(this._repository);
+
+  final ChatRepository _repository;
+
+  @override
+  Stream<String> call(NoInput input) => _repository.readHints();
+}
+
 /// The signed-in user's id, or `unauthenticated`.
 // Not final: application tests mock use cases.
 class GetCurrentUserId implements UseCase<String, NoInput> {

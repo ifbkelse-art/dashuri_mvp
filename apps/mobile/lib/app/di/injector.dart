@@ -20,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../experience/app_experience_controller.dart';
 import '../platform/device_photo_pickers.dart';
+import 'in_call_chat_adapter.dart';
 import 'unconfigured_backend.dart';
 
 /// The app's single service locator. Only this file and route builders use it.
@@ -97,6 +98,12 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
   registerNotificationsFeature(sl);
   registerSettingsFeature(sl);
   registerLocationFeature(sl);
+
+  // EXPERIMENT — chat inside video calls (DASHURI_IN_CALL_CHAT_ENABLED,
+  // default off). Same conversation as the inbox; see docs/chat.
+  if (config.inCallChatEnabled) {
+    sl.registerLazySingleton<InCallChat>(() => FeatureChatInCallChat(sl));
+  }
 
   // H23 "Switch to customer mode" (feature_host looks this up if present).
   sl.registerLazySingleton<HostModeSwitch>(

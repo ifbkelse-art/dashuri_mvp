@@ -56,7 +56,6 @@ class CallBloc extends Bloc<CallBlocEvent, CallState> {
     on<CallMediaEventReceived>(_onMediaEvent);
     on<CallMicrophoneToggled>(_onMic);
     on<CallCameraToggled>(_onCamera);
-    on<CallCameraFlipped>((_, _) => _engine.flipCamera());
     on<CallRefreshTicked>(_onRefresh);
   }
 

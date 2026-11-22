@@ -4,9 +4,13 @@ package chat_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dashuri/backend/internal/adapters/postgres"
 	"dashuri/backend/internal/modules/chat"
@@ -169,5 +173,234 @@ func TestMessagingPrivacyAndEligibility(t *testing.T) {
 	}
 	if _, err := s.StartConversation(ctx, pa, chat.StartConversationRequest{PeerUserId: a}); code(err) != "validation_failed" {
 		t.Fatalf("self: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// EXPERIMENT — unified chat + in-call messaging (docs/chat). Real Postgres,
+// migration 20261123000200 applied, CHAT_MESSAGE_CONTEXT_ENABLED on.
+
+func strp(s string) *string { return &s }
+
+// moneySnapshot is everything a message must never change: ledger rows,
+// balances, reservations and the call's billing columns.
+func moneySnapshot(t *testing.T, admin *pgxpool.Pool, callID string) string {
+	t.Helper()
+	var s string
+	err := admin.QueryRow(context.Background(), `
+		select concat_ws('|',
+		  (select count(*) from ledger.journal_entries),
+		  (select count(*) from ledger.postings),
+		  (select coalesce(sum(balance), 0) from ledger.balances),
+		  (select count(*) from ledger.diamond_reservations),
+		  (select concat_ws(',', phase, billed_seconds, diamonds_charged) from calls.calls where id = $1))`, callID).Scan(&s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestInCallChatIsTheSameConversation(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	ctx := context.Background()
+	rec := &recorder{}
+	var pushed []string
+	s := chat.NewService(chat.Deps{Repo: postgres.ChatRepo{Pool: api, MessageContext: true}, Realtime: rec, MessageContext: true,
+		Push: func(_ context.Context, to, _ string) { pushed = append(pushed, to) }})
+
+	cust, host := pgtest.NewUser(t, admin, true), pgtest.NewUser(t, admin, true, "customer", "host")
+	identitytest.Profile(t, admin, cust, "Arjun", nil, nil)
+	identitytest.Profile(t, admin, host, "Bina", nil, nil)
+	pc, ph := identitytest.Principal(cust), identitytest.Principal(host)
+
+	// Normal chat first (host accepts everyone for now).
+	conv, err := s.StartConversation(ctx, pc, chat.StartConversationRequest{PeerUserId: host})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SendMessage(ctx, pc, conv.Id, chat.SendMessageRequest{Body: "before the call"}); err != nil {
+		t.Fatal(err)
+	}
+	// Host restricts to past call partners, then they start a call.
+	if _, err := s.UpdateMessagingPrivacy(ctx, ph, chat.MessagingPrivacy{WhoCanMessage: "past_call_partners"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SendMessage(ctx, pc, conv.Id, chat.SendMessageRequest{Body: "no call yet"}); code(err) != "messaging_not_allowed" {
+		t.Fatalf("restricted before call: %v", err)
+	}
+	callID := identitytest.Call(t, admin, cust, host, "active", 0, 0)
+	before := moneySnapshot(t, admin, callID)
+
+	// The in-call panel opens the pair's conversation: same id, no new one.
+	again, err := s.StartConversation(ctx, pc, chat.StartConversationRequest{PeerUserId: host})
+	if err != nil || again.Id != conv.Id {
+		t.Fatalf("in-call start must reuse the conversation: %+v %v", again, err)
+	}
+	clientID := pgtest.UUID()
+	inCall := chat.SendMessageRequest{Body: "can you hear me?", Context: strp(chat.ContextCall), CallId: &callID, ClientMessageId: &clientID}
+	m1, err := s.SendMessage(ctx, pc, conv.Id, inCall)
+	if err != nil || m1.Context != chat.ContextCall {
+		t.Fatalf("in-call send: %+v %v", m1, err)
+	}
+	// Reconnect: the same message again stores nothing and announces nothing.
+	rec.events, pushed = nil, nil
+	dup, err := s.SendMessage(ctx, pc, conv.Id, inCall)
+	if err != nil || dup.Id != m1.Id || len(rec.events) != 0 {
+		t.Fatalf("duplicate: %+v %v events=%v", dup, err, rec.events)
+	}
+	var n int
+	_ = admin.QueryRow(ctx, `select count(*) from chat.messages where client_message_id = $1`, clientID).Scan(&n)
+	if n != 1 {
+		t.Fatalf("rows for client id: %d", n)
+	}
+	// The host replies from the in-call panel, the customer from the inbox.
+	m2, err := s.SendMessage(ctx, ph, conv.Id, chat.SendMessageRequest{Body: "yes, loud and clear", Context: strp(chat.ContextCall), CallId: &callID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m3, err := s.SendMessage(ctx, pc, conv.Id, chat.SendMessageRequest{Body: "typed in the inbox"})
+	if err != nil || m3.Context != chat.ContextChat {
+		t.Fatal(err)
+	}
+	if len(pushed) != 1 || pushed[0] != host {
+		t.Fatalf("push only for the inbox message: %v", pushed)
+	}
+
+	// A call between other people cannot be used as context.
+	stranger := pgtest.NewUser(t, admin, true)
+	foreign := identitytest.Call(t, admin, stranger, host, "ended", 60, time.Minute)
+	if _, err := s.SendMessage(ctx, pc, conv.Id, chat.SendMessageRequest{Body: "x", Context: strp(chat.ContextCall), CallId: &foreign}); apperr.As(err) == nil ||
+		apperr.As(err).Fields["call_id"] != "not_found" {
+		t.Fatalf("foreign call: %v", err)
+	}
+
+	// Messaging moved no money and did not touch the call.
+	if after := moneySnapshot(t, admin, callID); after != before {
+		t.Fatalf("money/call changed by messaging:\n before %s\n after  %s", before, after)
+	}
+
+	// The call ends (billed). History survives; both keep chatting.
+	if _, err := admin.Exec(ctx, `update calls.calls set phase = 'ended', billed_seconds = 120, ended_at = now() where id = $1`, callID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := s.ListMessages(ctx, ph, conv.Id, chat.PageRequest{Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bodies []string
+	for _, m := range page.Items {
+		bodies = append(bodies, m.Body+"/"+m.Context)
+	}
+	want := "typed in the inbox/chat,yes, loud and clear/call,can you hear me?/call,before the call/chat"
+	if got := strings.Join(bodies, ","); got != want {
+		t.Fatalf("history after call end:\n got  %s\n want %s", got, want)
+	}
+	if _, err := s.SendMessage(ctx, pc, conv.Id, chat.SendMessageRequest{Body: "thanks for the call"}); err != nil {
+		t.Fatalf("past partner after call: %v", err)
+	}
+	if list, _ := s.ListConversations(ctx, ph, chat.PageRequest{Limit: 20}); len(list.Items) != 1 || list.Items[0].Id != conv.Id {
+		t.Fatalf("one conversation per pair: %+v", list.Items)
+	}
+
+	// Read state: the host reads; the customer's messages show as read.
+	rec.events = nil
+	if err := s.MarkRead(ctx, ph, conv.Id); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MarkRead(ctx, ph, conv.Id); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.events) != 1 || rec.events[0] != "user:"+cust+" chat.read "+conv.Id {
+		t.Fatalf("read events: %v", rec.events)
+	}
+	mine, _ := s.ListMessages(ctx, pc, conv.Id, chat.PageRequest{Limit: 20})
+	for _, m := range mine.Items {
+		if (m.SenderId == cust) != m.ReadByPeer {
+			t.Fatalf("read_by_peer for %q: %v", m.Body, m.ReadByPeer)
+		}
+	}
+	_ = m2
+
+	// Outsiders see nothing; a block mid-conversation stops both panels.
+	outsider := identitytest.Principal(stranger)
+	if _, err := s.ListMessages(ctx, outsider, conv.Id, chat.PageRequest{Limit: 5}); apperr.As(err).Kind != apperr.KindNotFound {
+		t.Fatalf("outsider read: %v", err)
+	}
+	if _, err := s.SendMessage(ctx, outsider, conv.Id, chat.SendMessageRequest{Body: "hi", Context: strp(chat.ContextCall), CallId: &callID}); apperr.As(err).Kind != apperr.KindNotFound {
+		t.Fatalf("outsider in-call send: %v", err)
+	}
+	live := identitytest.Call(t, admin, cust, host, "active", 0, 0)
+	identitytest.Block(t, admin, host, cust)
+	if _, err := s.SendMessage(ctx, pc, conv.Id, chat.SendMessageRequest{Body: "hi", Context: strp(chat.ContextCall), CallId: &live}); code(err) != "blocked" {
+		t.Fatalf("blocked in-call send: %v", err)
+	}
+	if _, err := s.SendMessage(ctx, ph, conv.Id, chat.SendMessageRequest{Body: "hi"}); code(err) != "blocked" {
+		t.Fatalf("blocker cannot message either: %v", err)
+	}
+}
+
+func TestInCallChatOrderingAndPagination(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	ctx := context.Background()
+	s := chat.NewService(chat.Deps{Repo: postgres.ChatRepo{Pool: api, MessageContext: true}, MessageContext: true})
+	a, b := pgtest.NewUser(t, admin, true), pgtest.NewUser(t, admin, true)
+	pa, pb := identitytest.Principal(a), identitytest.Principal(b)
+	callID := identitytest.Call(t, admin, a, b, "active", 0, 0)
+	conv, err := s.StartConversation(ctx, pa, chat.StartConversationRequest{PeerUserId: b})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const total = 25
+	for i := range total {
+		p, req := pa, chat.SendMessageRequest{Body: fmt.Sprintf("m%02d", i)}
+		if i%2 == 1 {
+			p, req.Context, req.CallId = pb, strp(chat.ContextCall), &callID
+		}
+		if _, err := s.SendMessage(ctx, p, conv.Id, req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Walk every page; each message exactly once, strictly newest first.
+	var seen []string
+	cursor := ""
+	for range 10 {
+		page, err := s.ListMessages(ctx, pb, conv.Id, chat.PageRequest{Limit: 7, Cursor: cursor})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range page.Items {
+			seen = append(seen, m.Body)
+		}
+		if page.NextCursor == nil {
+			break
+		}
+		cursor = *page.NextCursor
+	}
+	if len(seen) != total {
+		t.Fatalf("got %d messages: %v", len(seen), seen)
+	}
+	for i, body := range seen {
+		if want := fmt.Sprintf("m%02d", total-1-i); body != want {
+			t.Fatalf("position %d: %s want %s (%v)", i, body, want, seen)
+		}
+	}
+}
+
+func TestChatWithContextDisabledUsesTheOldColumns(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	ctx := context.Background()
+	s := chat.NewService(chat.Deps{Repo: postgres.ChatRepo{Pool: api}})
+	a, b := pgtest.NewUser(t, admin, true), pgtest.NewUser(t, admin, true)
+	callID := identitytest.Call(t, admin, a, b, "active", 0, 0)
+	conv, _ := s.StartConversation(ctx, identitytest.Principal(a), chat.StartConversationRequest{PeerUserId: b})
+	m, err := s.SendMessage(ctx, identitytest.Principal(a), conv.Id,
+		chat.SendMessageRequest{Body: "from the call", Context: strp(chat.ContextCall), CallId: &callID})
+	if err != nil || m.Context != chat.ContextChat {
+		t.Fatalf("%+v %v", m, err)
+	}
+	var stored *string
+	_ = admin.QueryRow(ctx, `select context from chat.messages where id = $1`, m.Id).Scan(&stored)
+	if stored != nil {
+		t.Fatalf("metadata written with the flag off: %v", *stored)
 	}
 }

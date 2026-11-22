@@ -24,6 +24,12 @@ const messageRejected = 'message_rejected';
 /// CH02/CH04/CH05: one conversation. Sends with one idempotency key per
 /// message (reused on retry), shows an optimistic bubble until the server
 /// message replaces it, marks read on open and on new messages.
+///
+/// The same cubit drives the in-call chat panel ([callId] set): same
+/// conversation, same messages, same API. While the panel is closed
+/// ([setVisible] false) it keeps receiving, counts unseen messages and does
+/// NOT mark them read. [pollInterval] re-fetches as a fallback for missed
+/// realtime hints (used during calls).
 // Not final: page tests mock cubits.
 class ConversationCubit extends Cubit<ConversationState> {
   ConversationCubit({
@@ -39,7 +45,14 @@ class ConversationCubit extends Cubit<ConversationState> {
     String? peerName,
     Conversation? known,
     DateTime Function()? now,
+    WatchReadHints? watchReadHints,
+    this.callId,
+    Duration? pollInterval,
+    bool visible = true,
   }) : _list = listMessages,
+       _watchReadHints = watchReadHints,
+       _pollInterval = pollInterval,
+       _visible = visible,
        _send = sendMessage,
        _start = startConversation,
        _markRead = markRead,
@@ -73,6 +86,15 @@ class ConversationCubit extends Cubit<ConversationState> {
   final String _routeId;
   final Conversation? _known;
   final DateTime Function() _now;
+  final WatchReadHints? _watchReadHints;
+  final Duration? _pollInterval;
+
+  /// The call this conversation is open in (in-call panel); null in the inbox.
+  final String? callId;
+
+  bool _visible;
+  StreamSubscription<String>? _readHints;
+  Timer? _poll;
 
   IdempotencyKey? _startKey;
 
@@ -129,9 +151,50 @@ class ConversationCubit extends Cubit<ConversationState> {
       await _findPeer();
     }
     await _loadNewest();
+    if (isClosed) return;
     _hints ??= _watchHints(
       const NoInput(),
     ).where((id) => id == state.conversationId).listen((_) => _refreshNewest());
+    _readHints ??= _watchReadHints
+        ?.call(const NoInput())
+        .where((id) => id == state.conversationId)
+        .listen((_) => _refreshNewest());
+    final every = _pollInterval;
+    if (every != null) {
+      _poll ??= Timer.periodic(every, (_) => _refreshNewest());
+    }
+  }
+
+  /// The view showing this conversation was opened (true) or hidden.
+  /// Becoming visible clears the unseen count and marks the conversation read.
+  void setVisible(bool visible) {
+    if (_visible == visible) return;
+    _visible = visible;
+    if (!visible || isClosed) return;
+    if (state.unseenCount != 0 || state.latestUnseen != null) {
+      emit(state.copyWith(unseenCount: 0, latestUnseen: () => null));
+    }
+    final id = state.conversationId;
+    if (id != null && state.status == ConversationStatus.ready) {
+      unawaited(_markRead(id));
+    }
+  }
+
+  /// Hides the incoming-message preview without opening the conversation.
+  void dismissPreview() {
+    if (state.latestUnseen != null) {
+      emit(state.copyWith(latestUnseen: () => null));
+    }
+  }
+
+  DateTime? _readUpTo(List<ChatMessage> items) {
+    DateTime? at = state.peerReadUpTo;
+    for (final m in items) {
+      if (m.readByPeer && m.senderId == _myUserId) {
+        if (at == null || m.sentAt.isAfter(at)) at = m.sentAt;
+      }
+    }
+    return at;
   }
 
   Future<void> retry() => start();
@@ -173,9 +236,10 @@ class ConversationCubit extends Cubit<ConversationState> {
             status: ConversationStatus.ready,
             bubbles: _toBubbles(value.items),
             olderCursor: () => value.nextCursor,
+            peerReadUpTo: _readUpTo(value.items),
           ),
         );
-        unawaited(_markRead(id));
+        if (_visible) unawaited(_markRead(id));
     }
   }
 
@@ -192,25 +256,44 @@ class ConversationCubit extends Cubit<ConversationState> {
       conversationId: id,
       page: const PageRequest(limit: pageSize),
     ));
-    if (isClosed) return;
+    if (isClosed || state.status != ConversationStatus.ready) return;
     if (r case Success(:final value)) {
-      _merge(value.items);
-      unawaited(_markRead(id));
+      final freshFromPeer = _merge(value.items);
+      if (freshFromPeer > 0 && _visible) unawaited(_markRead(id));
     }
   }
 
-  void _merge(List<ChatMessage> incoming) {
+  /// Adds messages not shown yet (deduplicated by server id) and updates
+  /// read receipts. Returns how many new messages came from the peer.
+  int _merge(List<ChatMessage> incoming) {
     final known = {
       for (final b in state.bubbles)
         if (b.serverId != null) b.serverId!,
     };
-    final fresh = incoming.where((m) => !known.contains(m.id)).toList();
-    if (fresh.isEmpty) return;
-    final merged = [
-      ...state.bubbles,
-      for (final m in fresh) ChatBubble.fromMessage(m, myUserId: _myUserId),
-    ]..sort((a, b) => a.sentAt.compareTo(b.sentAt));
-    emit(state.copyWith(bubbles: merged));
+    final fresh = [
+      for (final m in incoming)
+        if (!known.contains(m.id))
+          ChatBubble.fromMessage(m, myUserId: _myUserId),
+    ];
+    final readUpTo = _readUpTo(incoming);
+    if (fresh.isEmpty) {
+      if (readUpTo != state.peerReadUpTo) {
+        emit(state.copyWith(peerReadUpTo: readUpTo));
+      }
+      return 0;
+    }
+    final merged = [...state.bubbles, ...fresh]
+      ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    final fromPeer = fresh.where((b) => !b.mine).toList();
+    emit(
+      state.copyWith(
+        bubbles: merged,
+        peerReadUpTo: readUpTo,
+        unseenCount: _visible ? 0 : state.unseenCount + fromPeer.length,
+        latestUnseen: _visible || fromPeer.isEmpty ? null : () => fromPeer.last,
+      ),
+    );
+    return fromPeer.length;
   }
 
   Future<void> loadOlder() async {
@@ -265,6 +348,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       sentAt: _now(),
       mine: true,
       status: BubbleStatus.sending,
+      context: callId == null ? MessageContext.chat : MessageContext.call,
     );
     emit(
       state.copyWith(bubbles: [...state.bubbles, bubble], filterNotice: false),
@@ -293,6 +377,7 @@ class ConversationCubit extends Cubit<ConversationState> {
       conversationId: conversationId,
       body: bubble.body,
       idempotencyKey: key,
+      callId: callId,
     ));
     if (isClosed) return;
     switch (r) {
@@ -315,12 +400,19 @@ class ConversationCubit extends Cubit<ConversationState> {
               body: value.body,
               sentAt: value.sentAt,
               mine: true,
+              context: value.context,
             ),
           );
         }
       case Err(:final failure) when failure.code == messageRejected:
         _replace(bubble.localId, bubble.withStatus(BubbleStatus.rejected));
         emit(state.copyWith(filterNotice: true, restoredDraft: bubble.body));
+      // A block (either way) or a restricted account: retrying cannot help.
+      case Err(:final failure)
+          when failure.code == 'blocked' ||
+              failure.code == 'account_restricted':
+        _replace(bubble.localId, bubble.withStatus(BubbleStatus.rejected));
+        emit(state.copyWith(sendFailure: failure));
       case Err(:final failure) when failure.code == messagingNotAllowed:
         emit(
           state.copyWith(
@@ -351,6 +443,8 @@ class ConversationCubit extends Cubit<ConversationState> {
 
   @override
   Future<void> close() async {
+    _poll?.cancel();
+    await _readHints?.cancel();
     await _hints?.cancel();
     return super.close();
   }

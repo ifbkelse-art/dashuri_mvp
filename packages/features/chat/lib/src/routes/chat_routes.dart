@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 
 import '../application/conversation_cubit.dart';
 import '../application/conversations_cubit.dart';
+import '../application/in_call_chat_controller.dart';
 import '../domain/entities/conversation.dart';
 import '../presentation/pages/conversation_page.dart';
 import '../presentation/pages/conversations_page.dart';
@@ -28,8 +29,37 @@ ConversationCubit _conversationCubit({
     peerUserId: peerUserId,
     peerName: peerName,
     known: known,
+    watchReadHints: sl(),
   )..start();
 }
+
+/// EXPERIMENT — the in-call chat for [callId]: the pair's conversation
+/// (found or created by peer), starting hidden. Call
+/// [InCallChatController.close] when the call screen goes away.
+InCallChatController openInCallChat(
+  GetIt sl, {
+  required String callId,
+  required String peerUserId,
+  required String peerName,
+}) => InCallChatController(
+  ConversationCubit(
+    listMessages: sl(),
+    sendMessage: sl(),
+    startConversation: sl(),
+    markRead: sl(),
+    listConversations: sl(),
+    watchHints: sl(),
+    watchReadHints: sl(),
+    currentUserId: sl(),
+    conversationId: newConversationId,
+    peerUserId: peerUserId,
+    peerName: peerName.isEmpty ? null : peerName,
+    callId: callId,
+    pollInterval: InCallChatController.pollInterval,
+    visible: false,
+  ),
+  peerName: peerName,
+);
 
 /// Chat routes. [tabRoutes] is the CH01 inbox tab; [routes] holds the
 /// conversation (CH02/CH04/CH05). `/messages/new?peerUserId=&name=` starts a

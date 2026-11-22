@@ -15,6 +15,7 @@ final class AppConfig extends Equatable {
     required this.supabasePublishableKey,
     this.supportEmail = '',
     this.cashfreeEnabled = false,
+    this.inCallChatEnabled = false,
   });
 
   /// Reads `--dart-define` values. Missing values are empty strings;
@@ -32,6 +33,9 @@ final class AppConfig extends Equatable {
     ),
     supportEmail: const String.fromEnvironment('DASHURI_SUPPORT_EMAIL'),
     cashfreeEnabled: const bool.fromEnvironment('DASHURI_CASHFREE_ENABLED'),
+    inCallChatEnabled: const bool.fromEnvironment(
+      'DASHURI_IN_CALL_CHAT_ENABLED',
+    ),
   );
 
   final AppEnvironment environment;
@@ -51,6 +55,10 @@ final class AppConfig extends Equatable {
   /// Off by default; Play Billing stays the default rail.
   final bool cashfreeEnabled;
 
+  /// EXPERIMENT — chat panel inside video calls (docs/chat). Off by default:
+  /// the call screen then has no chat control.
+  final bool inCallChatEnabled;
+
   /// Names of missing required values; empty when the config is usable.
   List<String> validate() => [
     if (apiBaseUrl.toString().isEmpty) 'DASHURI_API_BASE_URL',
@@ -66,5 +74,6 @@ final class AppConfig extends Equatable {
     supabasePublishableKey,
     supportEmail,
     cashfreeEnabled,
+    inCallChatEnabled,
   ];
 }

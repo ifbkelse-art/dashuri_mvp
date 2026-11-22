@@ -14,8 +14,14 @@ import (
 // PhotoTTL is the lifetime of signed peer photo URLs.
 const PhotoTTL = time.Hour
 
-// Realtime event published to user:<recipient> after a message commits.
-const EventChatMessage = "chat.message"
+// Realtime events (hints only; clients re-fetch from the API).
+const (
+	// EventChatMessage goes to user:<recipient> after a message commits.
+	EventChatMessage = "chat.message"
+	// EventChatRead goes to user:<peer> when the reader's marker passed at
+	// least one of the peer's messages (drives "Read" on sent messages).
+	EventChatRead = "chat.read"
+)
 
 // Service implements chat (Go API + Supabase Realtime hints, F5).
 type Service struct {
@@ -76,6 +82,10 @@ func (s *Service) canMessage(ctx context.Context, repo Repository, p auth.Princi
 	}
 	if peer.WhoCanMessage == "past_call_partners" {
 		ok, err := repo.HadBilledCall(ctx, p.UserID, peerID)
+		if err == nil && !ok {
+			// The partner of the call in progress counts (in-call chat).
+			ok, err = repo.InLiveCall(ctx, p.UserID, peerID)
+		}
 		if err != nil {
 			return internal(err)
 		}
@@ -190,7 +200,7 @@ func (s *Service) ListMessages(ctx context.Context, p auth.Principal, conversati
 	} else if err != nil {
 		return Page[ChatMessage]{}, internal(err)
 	}
-	msgs, err := repo.ListMessages(ctx, conversationId, after, page.Limit+1)
+	msgs, err := repo.ListMessages(ctx, conversationId, p.UserID, after, page.Limit+1)
 	if err != nil {
 		return Page[ChatMessage]{}, internal(err)
 	}
@@ -208,6 +218,10 @@ func (s *Service) ListMessages(ctx context.Context, p auth.Principal, conversati
 // SendMessage: POST /v1/conversations/{id}/messages. Enforces blocks,
 // eligibility, the receiver's privacy and the contact-detail filter, then
 // publishes chat.message to the recipient after commit.
+//
+// Messages sent from the in-call panel (context "call") are the same kind
+// of message in the same conversation; the call is only validated and
+// recorded. Messaging never touches calls, billing or the ledger.
 func (s *Service) SendMessage(ctx context.Context, p auth.Principal, conversationId string, in SendMessageRequest) (ChatMessage, error) {
 	if !isUUID(conversationId) {
 		return ChatMessage{}, apperr.NotFound("conversation")
@@ -233,9 +247,27 @@ func (s *Service) SendMessage(ctx context.Context, p auth.Principal, conversatio
 	if textfilter.ContainsContactDetails(in.Body) {
 		return ChatMessage{}, errMessageRejected()
 	}
-	msg, err := repo.InsertMessage(ctx, conversationId, p.UserID, in.Body)
+	nm := NewMessage{ConversationID: conversationId, SenderID: p.UserID, Body: in.Body, Context: in.context()}
+	if s.deps.MessageContext {
+		if nm.Context == ContextCall {
+			if err := repo.CallBetween(ctx, *in.CallId, p.UserID, peerID); errors.Is(err, ErrNotFound) {
+				return ChatMessage{}, validationError(map[string]string{"call_id": "not_found"})
+			} else if err != nil {
+				return ChatMessage{}, internal(err)
+			}
+			nm.CallID = in.CallId
+		}
+		nm.ClientMessageID = in.ClientMessageId
+	} else {
+		// Metadata disabled (migration not applied): stored as a plain message.
+		nm.Context = ContextChat
+	}
+	msg, inserted, err := repo.InsertMessage(ctx, nm)
 	if err != nil {
 		return ChatMessage{}, internal(err)
+	}
+	if !inserted {
+		return msg, nil // duplicate of a stored message: already announced
 	}
 	// After commit: hints only; failures never undo the message.
 	if s.deps.Realtime != nil {
@@ -243,7 +275,9 @@ func (s *Service) SendMessage(ctx context.Context, p auth.Principal, conversatio
 			slog.WarnContext(ctx, "chat realtime publish failed", "err", err)
 		}
 	}
-	if s.deps.Push != nil {
+	// No push for in-call messages: the recipient is on the call screen and
+	// gets the realtime hint there.
+	if s.deps.Push != nil && msg.Context != ContextCall {
 		s.deps.Push(ctx, peerID, conversationId)
 	}
 	return msg, nil
@@ -258,13 +292,21 @@ func (s *Service) MarkRead(ctx context.Context, p auth.Principal, conversationId
 	if err != nil {
 		return err
 	}
-	if _, err := repo.ConversationPeer(ctx, conversationId, p.UserID); errors.Is(err, ErrNotFound) {
+	peerID, err := repo.ConversationPeer(ctx, conversationId, p.UserID)
+	if errors.Is(err, ErrNotFound) {
 		return apperr.NotFound("conversation")
 	} else if err != nil {
 		return internal(err)
 	}
-	if err := repo.MarkRead(ctx, conversationId, p.UserID); err != nil {
+	advanced, err := repo.MarkRead(ctx, conversationId, p.UserID)
+	if err != nil {
 		return internal(err)
+	}
+	// Only when something new was read, so two open screens cannot ping-pong.
+	if advanced && s.deps.Realtime != nil {
+		if err := s.deps.Realtime.Publish(ctx, "user:"+peerID, EventChatRead, map[string]string{"conversation_id": conversationId}); err != nil {
+			slog.WarnContext(ctx, "chat realtime publish failed", "err", err)
+		}
 	}
 	return nil
 }

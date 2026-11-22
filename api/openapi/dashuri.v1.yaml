@@ -2572,6 +2572,11 @@ paths:
       tags:
         - chat
       summary: "Mark the conversation read up to now."
+      description: >-
+        EXPERIMENT (docs/chat): when the marker passes at least one of the
+        peer's messages, the server publishes `chat.read`
+        `{conversation_id}` on `user:<peer>` (drives "Read" receipts). No event
+        when nothing new was read, so two open screens cannot loop.
       parameters:
         - name: conversationId
           in: path
@@ -3442,6 +3447,20 @@ components:
         sent_at:
           type: string
           format: date-time
+        context:
+          type: string
+          enum: [chat, call]
+          description: >-
+            EXPERIMENT (unified chat, docs/chat). Where the message was sent
+            from: `chat` (inbox) or `call` (the in-call panel). Metadata only:
+            same conversation, same store. `chat` unless the server runs with
+            CHAT_MESSAGE_CONTEXT_ENABLED. Older servers omit it.
+        read_by_peer:
+          type: boolean
+          description: >-
+            EXPERIMENT. For the viewer's own messages: the other participant's
+            read marker is at or after `sent_at`. Always false for received
+            messages. A `chat.read` hint on `user:<sender>` announces changes.
     SendMessageRequest:
       type: object
       additionalProperties: false
@@ -3452,6 +3471,29 @@ components:
           type: string
           minLength: 1
           maxLength: 1000
+        context:
+          type: string
+          enum: [chat, call]
+          default: chat
+          description: >-
+            EXPERIMENT. `call` = sent from the in-call panel; requires
+            `call_id`. The message still goes to the pair's one conversation.
+            Sending is never billed and never changes the call.
+        call_id:
+          type: string
+          format: uuid
+          description: >-
+            EXPERIMENT. Only with `context: call`: a call between the two
+            participants (else 422 `call_id: not_found`). Stored server-side
+            only; never returned.
+        client_message_id:
+          type: string
+          format: uuid
+          description: >-
+            EXPERIMENT. The sender's id for this message (the client sends its
+            Idempotency-Key). A repeat returns the stored message without a
+            second row, realtime hint or push — also after the 24 h
+            Idempotency-Key window.
     MessagingPrivacy:
       type: object
       additionalProperties: false

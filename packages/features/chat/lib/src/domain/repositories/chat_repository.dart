@@ -22,10 +22,12 @@ abstract interface class ChatRepository {
     required PageRequest page,
   });
 
+  /// [callId]: sent from the in-call panel of that call (same conversation).
   Future<Result<ChatMessage>> sendMessage({
     required String conversationId,
     required String body,
     required IdempotencyKey idempotencyKey,
+    String? callId,
   });
 
   /// POST /v1/conversations/{id}/read
@@ -43,4 +45,7 @@ abstract interface class ChatRepository {
   /// Conversation ids from `chat.message` hints on `user:<id>`. Hints only:
   /// callers re-fetch from the API.
   Stream<String> chatHints();
+
+  /// Conversation ids from `chat.read` hints (the peer read my messages).
+  Stream<String> readHints();
 }

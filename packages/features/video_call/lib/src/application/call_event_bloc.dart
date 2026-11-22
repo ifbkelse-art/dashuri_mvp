@@ -85,10 +85,6 @@ final class CallCameraToggled extends CallBlocEvent {
   const CallCameraToggled();
 }
 
-final class CallCameraFlipped extends CallBlocEvent {
-  const CallCameraFlipped();
-}
-
 /// Periodic re-fetch while waiting on the other side (realtime is a hint).
 final class CallRefreshTicked extends CallBlocEvent {
   const CallRefreshTicked();

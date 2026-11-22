@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../application/conversation_cubit.dart';
 import '../widgets/chat_format.dart';
+import '../widgets/message_widgets.dart';
 import 'conversations_page.dart';
 
 /// CH02 conversation, CH04 messaging restricted, CH05 filtered message.
@@ -139,9 +140,13 @@ class _ConversationPageState extends State<ConversationPage> {
                 ConversationStatus.ready => Column(
                   children: [
                     Expanded(
-                      child: _Messages(state: state, cubit: cubit),
+                      child: MessageList(
+                        state: state,
+                        onLoadOlder: cubit.loadOlder,
+                        onRetry: cubit.retrySend,
+                      ),
                     ),
-                    if (state.filterNotice) const _FilterNotice(),
+                    if (state.filterNotice) const FilterNotice(),
                     if (state.sendFailure != null)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -151,7 +156,7 @@ class _ConversationPageState extends State<ConversationPage> {
                               ?.copyWith(color: DashuriTokens.error),
                         ),
                       ),
-                    _Composer(
+                    MessageComposer(
                       controller: _text,
                       focusNode: _focus,
                       hint: 'Message $name…',
@@ -165,243 +170,6 @@ class _ConversationPageState extends State<ConversationPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _Messages extends StatelessWidget {
-  const _Messages({required this.state, required this.cubit});
-
-  final ConversationState state;
-  final ConversationCubit cubit;
-
-  @override
-  Widget build(BuildContext context) {
-    final bubbles = state.bubbles;
-    if (bubbles.isEmpty) {
-      return const EmptyStateView(
-        icon: Icons.waving_hand_outlined,
-        title: 'Say hello',
-        message: 'Messages are text only. Keep conversations on Dashuri.',
-      );
-    }
-    return NotificationListener<ScrollNotification>(
-      onNotification: (n) {
-        // reverse: true, so "after" is towards older messages.
-        if (n.metrics.extentAfter < 300) cubit.loadOlder();
-        return false;
-      },
-      child: ListView.builder(
-        reverse: true,
-        padding: const EdgeInsets.symmetric(
-          horizontal: DashuriTokens.space4,
-          vertical: DashuriTokens.space3,
-        ),
-        itemCount: bubbles.length + 1,
-        itemBuilder: (context, i) {
-          if (i == bubbles.length) {
-            return state.loadingOlder
-                ? const Padding(
-                    padding: EdgeInsets.all(DashuriTokens.space3),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                : const SizedBox.shrink();
-          }
-          final b = bubbles[bubbles.length - 1 - i];
-          return _Bubble(
-            bubble: b,
-            onRetry: b.status == BubbleStatus.failed
-                ? () => cubit.retrySend(b.localId)
-                : null,
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.bubble, this.onRetry});
-
-  final ChatBubble bubble;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final mine = bubble.mine;
-    final notSent =
-        bubble.status == BubbleStatus.failed ||
-        bubble.status == BubbleStatus.rejected;
-    final meta = switch (bubble.status) {
-      BubbleStatus.sending => 'Sending…',
-      BubbleStatus.failed => 'Not sent · Tap to retry',
-      BubbleStatus.rejected => 'Not sent',
-      BubbleStatus.sent => ChatFormat.time(bubble.sentAt),
-    };
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: mine
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
-        children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width * .75,
-            ),
-            child: GestureDetector(
-              onTap: onRetry,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: mine ? scheme.primary : scheme.surface,
-                  borderRadius: BorderRadius.circular(
-                    DashuriTokens.radiusLarge,
-                  ),
-                  border: notSent
-                      ? Border.all(color: DashuriTokens.error, width: 1.5)
-                      : mine
-                      ? null
-                      : Border.all(color: scheme.outlineVariant),
-                ),
-                child: Text(
-                  bubble.body,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: mine ? scheme.onPrimary : null,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (notSent) ...[
-                const Icon(
-                  Icons.error_outline,
-                  size: 14,
-                  color: DashuriTokens.error,
-                ),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                meta,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: notSent
-                      ? DashuriTokens.error
-                      : scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterNotice extends StatelessWidget {
-  const _FilterNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      padding: const EdgeInsets.all(DashuriTokens.space3),
-      decoration: BoxDecoration(
-        color: DashuriTokens.error100,
-        borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.shield_outlined, color: DashuriTokens.error),
-          const SizedBox(width: DashuriTokens.space3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Keep conversations on Dashuri',
-                  style: theme.textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Phone numbers, UPI IDs, emails and links aren't allowed in "
-                  'messages. This protects you from scams. Edit your message '
-                  'and send it again.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Composer extends StatelessWidget {
-  const _Composer({
-    required this.controller,
-    required this.focusNode,
-    required this.hint,
-    required this.onChanged,
-    required this.onSend,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final String hint;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onSend;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                minLines: 1,
-                maxLines: 5,
-                maxLength: ConversationCubit.maxLength,
-                buildCounter:
-                    (
-                      _, {
-                      required currentLength,
-                      required isFocused,
-                      maxLength,
-                    }) => currentLength > 900
-                    ? Text('$currentLength / $maxLength')
-                    : null,
-                textInputAction: TextInputAction.newline,
-                onChanged: onChanged,
-                decoration: InputDecoration(hintText: hint),
-              ),
-            ),
-            const SizedBox(width: DashuriTokens.space2),
-            IconButton.filled(
-              tooltip: 'Send',
-              onPressed: onSend,
-              icon: const Icon(Icons.send_rounded),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -30,12 +30,17 @@ final class ChatRepositoryImpl implements ChatRepository {
   String? currentUserId() => _session.currentSession?.userId;
 
   @override
-  Stream<String> chatHints() {
+  Stream<String> chatHints() => _hints('chat.message');
+
+  @override
+  Stream<String> readHints() => _hints('chat.read');
+
+  Stream<String> _hints(String type) {
     final userId = currentUserId();
     if (userId == null) return const Stream.empty();
     return _realtime
         .subscribe('user:$userId')
-        .where((e) => e.type == 'chat.message')
+        .where((e) => e.type == type)
         .map((e) => e.payload['conversation_id'])
         .where((id) => id is String)
         .cast<String>();
@@ -66,10 +71,12 @@ final class ChatRepositoryImpl implements ChatRepository {
     required String conversationId,
     required String body,
     required IdempotencyKey idempotencyKey,
+    String? callId,
   }) => _remote.sendMessage(
     conversationId: conversationId,
     body: body,
     idempotencyKey: idempotencyKey,
+    callId: callId,
   );
 
   @override

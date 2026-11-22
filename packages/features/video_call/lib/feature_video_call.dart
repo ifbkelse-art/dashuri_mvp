@@ -31,6 +31,7 @@ export 'src/domain/usecases/request_call.dart';
 export 'src/domain/usecases/submit_moderation_frame.dart';
 export 'src/domain/usecases/watch_call.dart';
 export 'src/domain/usecases/watch_incoming_calls.dart';
+export 'src/presentation/in_call_chat.dart';
 export 'src/presentation/pages/call_history_page.dart';
 export 'src/presentation/pages/call_page.dart';
 export 'src/presentation/pages/call_summary_page.dart';
