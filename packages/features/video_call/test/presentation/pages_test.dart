@@ -1,5 +1,6 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:dashuri_core/dashuri_core.dart';
+import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:feature_video_call/feature_video_call.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -144,6 +145,12 @@ void main() {
           );
           expect(find.text('Connecting securely…'), findsOneWidget);
           expect(find.text("You haven't been charged yet"), findsOneWidget);
+          // One big avatar only: a second under the overlay shows through as
+          // a doubled circle. (The small one in the top bar is separate.)
+          expect(
+            find.byWidgetPredicate((w) => w is UserAvatar && w.radius >= 40),
+            findsOneWidget,
+          );
         });
 
         testWidgets('V04/V05 active with safety chip and low balance', (
@@ -253,6 +260,17 @@ void main() {
             ),
           );
           expect(find.text('Incoming video call'), findsOneWidget);
+          // Everything is centred on the screen, not pushed to the left edge.
+          final centre = t.getSize(find.byType(Scaffold).first).width / 2;
+          expect(
+            t.getCenter(find.text('Incoming video call')).dx,
+            closeTo(centre, 8),
+          );
+          final pair =
+              (t.getCenter(find.text('Decline')).dx +
+                  t.getCenter(find.text('Accept')).dx) /
+              2;
+          expect(pair, closeTo(centre, 8), reason: 'buttons off-centre');
           await t.tap(find.byIcon(Icons.videocam_rounded));
           verify(() => b.add(const CallIncomingAccepted('c1'))).called(1);
           await t.tap(find.byTooltip('Decline'));

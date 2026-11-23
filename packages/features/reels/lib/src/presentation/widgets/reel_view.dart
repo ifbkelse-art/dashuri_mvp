@@ -499,6 +499,9 @@ Future<void> showReelMoreSheet(
   context: context,
   showDragHandle: true,
   isScrollControlled: true,
+  // Keep the sheet below the status bar so its handle and close button stay
+  // reachable when the list is taller than the screen.
+  useSafeArea: true,
   builder: (sheet) => SafeArea(
     child: SingleChildScrollView(
       child: Column(
@@ -506,12 +509,21 @@ Future<void> showReelMoreSheet(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DashuriTokens.space4,
-            ),
-            child: Text(
-              'Report this reel',
-              style: Theme.of(sheet).textTheme.titleMedium,
+            padding: const EdgeInsets.only(left: DashuriTokens.space4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Report this reel',
+                    style: Theme.of(sheet).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(sheet),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
             ),
           ),
           const Padding(

@@ -91,6 +91,24 @@ void main() {
     expect(find.text('more'), findsNothing);
   });
 
+  testWidgets('the report sheet can be closed without choosing anything', (
+    t,
+  ) async {
+    when(() => c.state).thenReturn(
+      ReelsFeedLoaded(FeedTab.forYou, items: [reel('x')], nextCursor: null),
+    );
+    await pumpPage(t, _page(c));
+    await t.tap(find.byTooltip('Report or block'));
+    await t.pumpAndSettle();
+    expect(find.text('Report this reel'), findsOneWidget);
+    // A visible, reachable close control (plus the drag handle).
+    expect(find.byTooltip('Close').hitTestable(), findsOneWidget);
+    await t.tap(find.byTooltip('Close'));
+    await t.pumpAndSettle();
+    expect(find.text('Report this reel'), findsNothing);
+    verifyNever(() => c.report(any(), any()));
+  });
+
   for (final confirmed in [true, false]) {
     testWidgets(
       'block from a reel: ${confirmed ? 'confirmed → the creator\'s '

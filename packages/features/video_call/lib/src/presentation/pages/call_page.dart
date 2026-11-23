@@ -280,7 +280,12 @@ class _IncomingView extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, c) => SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: c.maxHeight),
+            // Full width as well as full height: without minWidth the column
+            // is only as wide as its widest line and sits at the left edge.
+            constraints: BoxConstraints(
+              minHeight: c.maxHeight,
+              minWidth: c.maxWidth,
+            ),
             child: Padding(
               padding: EdgeInsets.all(context.pageGutter),
               child: Column(
@@ -527,8 +532,16 @@ class _CallCanvas extends StatelessWidget {
         return Stack(
           children: [
             Positioned.fill(
-              child: isWaiting && state.status == CallUiStatus.ringing
-                  ? const ColoredBox(color: DashuriTokens.burgundy950)
+              // While ringing or connecting, _WaitingOverlay already shows
+              // the avatar: a second one under it would show through as a
+              // doubled circle. The video placeholder avatar is for a live
+              // call whose remote camera is off.
+              child: isWaiting
+                  ? ColoredBox(
+                      color: state.status == CallUiStatus.ringing
+                          ? DashuriTokens.burgundy950
+                          : DashuriTokens.neutral900,
+                    )
                   : views.remoteVideo(
                       placeholder: ColoredBox(
                         color: DashuriTokens.neutral900,
