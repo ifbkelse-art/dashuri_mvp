@@ -205,5 +205,101 @@ void main() {
       await cubit.close();
       await controller.close();
     });
+
+    group('backup check (a missed realtime message must not lose a call)', () {
+      late _WatchIncoming w;
+      late _History h;
+      late bool expecting;
+      setUp(() {
+        w = _WatchIncoming();
+        h = _History();
+        expecting = true;
+        // Realtime delivers nothing at all.
+        when(() => w(any())).thenAnswer((_) => const Stream.empty());
+      });
+
+      IncomingCallCubit build({Duration every = const Duration(hours: 1)}) =>
+          IncomingCallCubit(
+            w,
+            recentCalls: h,
+            gate: IncomingCallCheckGate(() => expecting),
+            backupInterval: every,
+          )..start();
+
+      test('reports a ringing call for me found in recent calls', () async {
+        when(() => h(any())).thenAnswer(
+          (_) async => Success(
+            Page(
+              items: [
+                session(role: CallRole.receiver, phase: CallPhase.ringing),
+              ],
+            ),
+          ),
+        );
+        final cubit = build();
+        await cubit.checkNow();
+        expect(cubit.state, const IncomingCallState(callId: 'c1', sequence: 1));
+        await cubit.checkNow(); // the same call is reported once
+        expect(cubit.state.sequence, 1);
+        await cubit.close();
+      });
+
+      test(
+        'ignores my own outgoing call and calls no longer ringing',
+        () async {
+          when(() => h(any())).thenAnswer(
+            (_) async => Success(
+              Page(
+                items: [
+                  session(role: CallRole.caller, phase: CallPhase.ringing),
+                  session(role: CallRole.receiver, phase: CallPhase.ended),
+                ],
+              ),
+            ),
+          );
+          final cubit = build();
+          await cubit.checkNow();
+          expect(cubit.state, const IncomingCallState());
+          await cubit.close();
+        },
+      );
+
+      test(
+        'does not check when the gate is closed (not an online host)',
+        () async {
+          expecting = false;
+          final cubit = build();
+          await cubit.checkNow();
+          verifyNever(() => h(any()));
+          await cubit.close();
+        },
+      );
+
+      test('checks periodically on its own', () async {
+        when(() => h(any())).thenAnswer(
+          (_) async => Success(
+            Page(
+              items: [
+                session(role: CallRole.receiver, phase: CallPhase.ringing),
+              ],
+            ),
+          ),
+        );
+        final cubit = build(every: const Duration(milliseconds: 10));
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        expect(cubit.state.callId, 'c1');
+        await cubit.close();
+      });
+
+      test('a failed check is ignored', () async {
+        when(() => h(any())).thenAnswer(
+          (_) async => const Err(NetworkFailure(message: 'offline')),
+        );
+        final cubit = build();
+        await cubit.checkNow();
+        expect(cubit.state, const IncomingCallState());
+        await cubit.close();
+      });
+    });
   });
 }

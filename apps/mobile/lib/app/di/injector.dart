@@ -126,6 +126,16 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
     }),
   );
 
+  // A ring for a host is normally pushed over realtime; while the host is
+  // online with the app open, the call feature also checks for ringing calls
+  // every few seconds so a missed message cannot lose a call.
+  sl.registerLazySingleton<IncomingCallCheckGate>(
+    () => IncomingCallCheckGate(() {
+      final presence = sl<HostPresenceController>();
+      return presence.isOnline && presence.isInForeground;
+    }),
+  );
+
   // H23 "Switch to customer mode" (feature_host looks this up if present).
   sl.registerLazySingleton<HostModeSwitch>(
     () => HostModeSwitch(

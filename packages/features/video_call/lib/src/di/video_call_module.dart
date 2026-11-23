@@ -119,7 +119,15 @@ void registerVideoCallFeature(GetIt sl) {
       () => CallHistoryCubit(sl<GetCallHistory>()),
     )
     ..registerFactory<IncomingCallCubit>(
-      () => IncomingCallCubit(sl<WatchIncomingCalls>()),
+      () => IncomingCallCubit(
+        sl<WatchIncomingCalls>(),
+        // Backup check for missed rings; the app registers the gate (host
+        // online and in the foreground). Without one, realtime only.
+        recentCalls: sl<GetCallHistory>(),
+        gate: sl.isRegistered<IncomingCallCheckGate>()
+            ? sl<IncomingCallCheckGate>()
+            : null,
+      ),
     );
 }
 
