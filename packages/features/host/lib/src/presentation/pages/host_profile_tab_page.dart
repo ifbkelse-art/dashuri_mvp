@@ -114,6 +114,13 @@ class HostProfileTabPage extends StatelessWidget {
                 title: 'Photos & bio',
                 onTap: () => context.push(RoutePaths.hostProfileSetup),
               ),
+              // EXPERIMENT: Reels are posted from host mode only.
+              if (const bool.fromEnvironment('DASHURI_REELS_ENABLED'))
+                HostLinkTile(
+                  icon: Icons.movie_outlined,
+                  title: 'My reels',
+                  onTap: () => context.push(RoutePaths.reelMine),
+                ),
               HostLinkTile(
                 icon: Icons.diamond_outlined,
                 title: 'My rate',

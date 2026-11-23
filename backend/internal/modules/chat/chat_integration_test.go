@@ -360,30 +360,44 @@ func TestInCallChatOrderingAndPagination(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Walk every page; each message exactly once, strictly newest first.
-	var seen []string
-	cursor := ""
-	for range 10 {
-		page, err := s.ListMessages(ctx, pb, conv.Id, chat.PageRequest{Limit: 7, Cursor: cursor})
-		if err != nil {
-			t.Fatal(err)
+	walk := func(call *string) []string {
+		var seen []string
+		cursor := ""
+		for range 10 {
+			page, err := s.ListMessages(ctx, pb, conv.Id, chat.PageRequest{Limit: 7, Cursor: cursor, CallID: call})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, m := range page.Items {
+				seen = append(seen, m.Body)
+			}
+			if page.NextCursor == nil {
+				break
+			}
+			cursor = *page.NextCursor
 		}
-		for _, m := range page.Items {
-			seen = append(seen, m.Body)
-		}
-		if page.NextCursor == nil {
-			break
-		}
-		cursor = *page.NextCursor
+		return seen
 	}
-	if len(seen) != total {
-		t.Fatalf("got %d messages: %v", len(seen), seen)
-	}
-	for i, body := range seen {
-		if want := fmt.Sprintf("m%02d", total-1-i); body != want {
-			t.Fatalf("position %d: %s want %s (%v)", i, body, want, seen)
+	check := func(seen []string, want func(i int) bool) {
+		t.Helper()
+		var exp []string
+		for i := total - 1; i >= 0; i-- {
+			if want(i) {
+				exp = append(exp, fmt.Sprintf("m%02d", i))
+			}
+		}
+		if strings.Join(seen, ",") != strings.Join(exp, ",") {
+			t.Fatalf("got  %v\nwant %v", seen, exp)
 		}
 	}
+	// Call live: the session holds the odd messages, normal Chat the even.
+	check(walk(&callID), func(i int) bool { return i%2 == 1 })
+	check(walk(nil), func(i int) bool { return i%2 == 0 })
+	// Call ended: every message exactly once, strictly newest first.
+	if _, err := admin.Exec(ctx, `update calls.calls set phase = 'ended', ended_at = now() where id = $1`, callID); err != nil {
+		t.Fatal(err)
+	}
+	check(walk(nil), func(int) bool { return true })
 }
 
 func TestChatWithContextDisabledUsesTheOldColumns(t *testing.T) {

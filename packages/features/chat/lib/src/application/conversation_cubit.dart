@@ -25,8 +25,11 @@ const messageRejected = 'message_rejected';
 /// message (reused on retry), shows an optimistic bubble until the server
 /// message replaces it, marks read on open and on new messages.
 ///
-/// The same cubit drives the in-call chat panel ([callId] set): same
-/// conversation, same messages, same API. While the panel is closed
+/// The same cubit drives the in-call chat panel ([callId] set): the same
+/// canonical conversation and API, but it shows only THIS call's session
+/// messages (`call_id` filter, server-side). Normal Chat leaves a live
+/// call's session out; the server adds it, in place, once the call ends,
+/// so nothing is copied and nothing can be lost. While the panel is closed
 /// ([setVisible] false) it keeps receiving, counts unseen messages and does
 /// NOT mark them read. [pollInterval] re-fetches as a fallback for missed
 /// realtime hints (used during calls).
@@ -223,6 +226,7 @@ class ConversationCubit extends Cubit<ConversationState> {
     final r = await _list((
       conversationId: id,
       page: const PageRequest(limit: pageSize),
+      callId: callId,
     ));
     if (isClosed) return;
     switch (r) {
@@ -255,6 +259,7 @@ class ConversationCubit extends Cubit<ConversationState> {
     final r = await _list((
       conversationId: id,
       page: const PageRequest(limit: pageSize),
+      callId: callId,
     ));
     if (isClosed || state.status != ConversationStatus.ready) return;
     if (r case Success(:final value)) {
@@ -308,6 +313,7 @@ class ConversationCubit extends Cubit<ConversationState> {
     final r = await _list((
       conversationId: id,
       page: PageRequest(cursor: state.olderCursor, limit: pageSize),
+      callId: callId,
     ));
     if (isClosed) return;
     switch (r) {

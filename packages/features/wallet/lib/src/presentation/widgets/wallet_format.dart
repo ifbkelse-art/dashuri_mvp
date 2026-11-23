@@ -75,14 +75,17 @@ abstract final class WalletFormat {
   };
 
   /// (background, foreground) of the row icon tile.
-  static (Color, Color) iconColors(WalletEntry e, ColorScheme scheme) =>
-      switch (e.kind) {
-        'purchase_credit' ||
-        'promo_grant' => (DashuriTokens.success100, DashuriTokens.success),
-        'purchase_reversal' ||
-        'payout_failed' => (DashuriTokens.info100, DashuriTokens.info),
-        _ => (scheme.surfaceContainerHighest, scheme.onSurface),
-      };
+  static (Color, Color) iconColors(
+    WalletEntry e,
+    ColorScheme scheme,
+    DashuriColors tones,
+  ) => switch (e.kind) {
+    'purchase_credit' ||
+    'promo_grant' => (tones.success.container, tones.success.icon),
+    'purchase_reversal' ||
+    'payout_failed' => (tones.info.container, tones.info.icon),
+    _ => (scheme.surfaceContainerHighest, scheme.onSurface),
+  };
 
   static String signedAmount(WalletEntry e) =>
       '${e.amount > 0

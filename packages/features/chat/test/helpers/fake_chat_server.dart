@@ -8,6 +8,9 @@ import 'package:feature_chat/feature_chat.dart';
 /// Idempotency-Key replay, read markers / `read_by_peer`, and realtime
 /// hints (`chat.message`, `chat.read`) to the OTHER participant only.
 ///
+/// Video-call session chat: messages sent with a call id form that call's
+/// session; normal Chat leaves them out until [endCall].
+///
 /// Each user talks to it through [repoFor], so two real cubits (inbox and
 /// in-call) on two "devices" exercise the real synchronisation path.
 /// Backend semantics are verified separately against Postgres
@@ -19,6 +22,8 @@ final class FakeChatServer {
   final _readAt = <String, DateTime>{}; // "$conv|$user"
   final _blocked = <String>{};
   final _replay = <String, ChatMessage>{}; // "$user|$key"
+  final _msgCall = <String, String>{}; // message id -> call id (session)
+  final _endedCalls = <String>{};
   final _hints =
       StreamController<({String to, String type, String conv})>.broadcast();
 
@@ -39,6 +44,26 @@ final class FakeChatServer {
   String _pairKey(String x, String y) => x.compareTo(y) < 0 ? '$x|$y' : '$y|$x';
 
   void block(String a, String b) => _blocked.add(_pairKey(a, b));
+
+  /// The call reaches a terminal phase server-side (by /end or the
+  /// stale-call job): its session joins normal Chat and both participants
+  /// get a `chat.message` hint, like the Go `CallEnded` hook. Idempotent.
+  void endCall(String callId) {
+    _endedCalls.add(callId);
+    for (final e in _messages.entries) {
+      if (e.value.any((m) => _msgCall[m.id] == callId)) {
+        final c = _convs[e.key]!;
+        _emit(c.a, 'chat.message', e.key);
+        _emit(c.b, 'chat.message', e.key);
+      }
+    }
+  }
+
+  /// Normal-Chat visibility: not a session message of a live call.
+  bool _inChat(ChatMessage m) {
+    final call = _msgCall[m.id];
+    return call == null || _endedCalls.contains(call);
+  }
 
   /// Every stored message in [conversationId], oldest first.
   List<ChatMessage> stored(String conversationId) =>
@@ -71,7 +96,7 @@ final class _UserRepo implements ChatRepository {
 
   Conversation _conversation(String id) {
     final peer = _s._peer(id, _me)!;
-    final msgs = _s._messages[id] ?? const [];
+    final msgs = (_s._messages[id] ?? const []).where(_s._inChat).toList();
     return Conversation(
       id: id,
       peerUserId: peer,
@@ -121,24 +146,26 @@ final class _UserRepo implements ChatRepository {
   Future<Result<Page<ChatMessage>>> listMessages({
     required String conversationId,
     required PageRequest page,
+    String? callId,
   }) async {
     final peer = _s._peer(conversationId, _me);
     if (peer == null) return const Err(NotFoundFailure());
     final peerRead = _s._readAt['$conversationId|$peer'];
     final newestFirst = [
       for (final m in (_s._messages[conversationId] ?? const []).reversed)
-        ChatMessage(
-          id: m.id,
-          conversationId: m.conversationId,
-          senderId: m.senderId,
-          body: m.body,
-          sentAt: m.sentAt,
-          context: m.context,
-          readByPeer:
-              m.senderId == _me &&
-              peerRead != null &&
-              !peerRead.isBefore(m.sentAt),
-        ),
+        if (callId == null ? _s._inChat(m) : _s._msgCall[m.id] == callId)
+          ChatMessage(
+            id: m.id,
+            conversationId: m.conversationId,
+            senderId: m.senderId,
+            body: m.body,
+            sentAt: m.sentAt,
+            context: m.context,
+            readByPeer:
+                m.senderId == _me &&
+                peerRead != null &&
+                !peerRead.isBefore(m.sentAt),
+          ),
     ];
     final start = page.cursor == null ? 0 : int.parse(page.cursor!);
     final end = (start + page.limit).clamp(0, newestFirst.length);
@@ -174,6 +201,7 @@ final class _UserRepo implements ChatRepository {
       context: callId == null ? MessageContext.chat : MessageContext.call,
     );
     (_s._messages[conversationId] ??= []).add(m);
+    if (callId != null) _s._msgCall[m.id] = callId;
     _s._replay['$_me|${idempotencyKey.value}'] = m;
     _s._readAt['$conversationId|$_me'] = m.sentAt;
     _s._emit(peer, 'chat.message', conversationId);

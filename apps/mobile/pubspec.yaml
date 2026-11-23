@@ -40,6 +40,8 @@ dependencies:
     path: ../../packages/features/profile
   feature_purchases:
     path: ../../packages/features/purchases
+  feature_reels: # EXPERIMENT: Dashuri Reels (DASHURI_REELS_ENABLED)
+    path: ../../packages/features/reels
   feature_safety:
     path: ../../packages/features/safety
   feature_settings:

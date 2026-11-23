@@ -108,8 +108,8 @@ void main() {
     return bloc;
   }
 
-  testWidgets('send in the call → it is in the peer\'s inbox; the call got '
-      'no events', (t) async {
+  testWidgets('send in the call → the peer\'s normal Chat gets it when the '
+      'call ends; the call got no events', (t) async {
     final bloc = await pumpCall(t);
     await t.tap(find.byTooltip('Open chat'));
     await real(t);
@@ -132,7 +132,8 @@ void main() {
     expect(stored.senderId, customer);
     expect(bloc.events, isEmpty);
 
-    // The host opens normal Chat: same conversation, same message.
+    // The host opens normal Chat during the call: same conversation, but
+    // the live call's session is not in it yet.
     final inbox = cubitFor(
       server,
       host,
@@ -148,12 +149,18 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
+    expect(find.text('Your audio is breaking up'), findsNothing);
+
+    // The call ends server-side: the open Chat refreshes and shows it.
+    server.endCall('call-1');
+    await real(t);
+    await t.pumpAndSettle();
     expect(find.text('Your audio is breaking up'), findsOneWidget);
     expect(find.textContaining('During video call'), findsOneWidget);
   });
 
-  testWidgets('a reply from the peer\'s inbox reaches the closed panel: '
-      'badge, preview, then the message', (t) async {
+  testWidgets('a reply from the peer\'s in-call panel reaches the closed '
+      'panel (badge, preview, message); inbox messages stay out', (t) async {
     final bloc = await pumpCall(t);
     final conv = server.conversationOf(customer, host);
     final hostInbox = cubitFor(
@@ -162,24 +169,35 @@ void main() {
       peerUserId: customer,
       conversationId: conv,
     );
+    final hostPanel = cubitFor(
+      server,
+      host,
+      peerUserId: customer,
+      conversationId: conv,
+      callId: 'call-1',
+    );
     addTearDown(hostInbox.close);
+    addTearDown(hostPanel.close);
     await t.runAsync(() async {
       await hostInbox.start();
-      await hostInbox.send('Replying from my inbox');
+      await hostInbox.send('Old-style inbox message');
+      await hostPanel.start();
+      await hostPanel.send('Replying in the call');
     });
     await real(t);
     expect(find.bySemanticsLabel('Open chat, 1 unread'), findsOneWidget);
-    expect(find.textContaining('Replying from my inbox'), findsOneWidget);
+    expect(find.textContaining('Replying in the call'), findsOneWidget);
 
     await t.tap(find.byTooltip('Open chat'));
     await real(t);
     await t.pumpAndSettle();
-    expect(find.text('Replying from my inbox'), findsOneWidget);
+    expect(find.text('Replying in the call'), findsOneWidget);
+    expect(find.text('Old-style inbox message'), findsNothing);
     expect(find.bySemanticsLabel(RegExp('unread')), findsNothing);
     // Opening marked it read: the host's side shows Read.
     await real(t);
     expect(
-      hostInbox.state.deliveryOf(hostInbox.state.bubbles.single),
+      hostPanel.state.deliveryOf(hostPanel.state.bubbles.single),
       DeliveryState.read,
     );
     expect(bloc.events, isEmpty);

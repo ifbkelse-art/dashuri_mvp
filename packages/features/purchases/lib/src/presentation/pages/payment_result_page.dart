@@ -73,24 +73,21 @@ class _Result extends StatelessWidget {
         : DashuriFormat.rupees(result.amountPaise!);
     final (
       IconData icon,
-      Color bg,
-      Color fg,
+      DashuriTone tone,
       String over,
       String title,
       String body,
     ) = switch (result.outcome) {
       PaymentOutcome.success => (
         Icons.check_rounded,
-        DashuriTokens.success100,
-        DashuriTokens.success,
+        DashuriColors.of(context).success,
         'Payment successful',
         '+${DashuriFormat.count(result.diamondsCredited)}',
         'Diamonds added to your wallet',
       ),
       PaymentOutcome.failed => (
         Icons.close_rounded,
-        DashuriTokens.error100,
-        DashuriTokens.error,
+        DashuriColors.of(context).error,
         'Payment failed',
         "Payment didn't go through",
         '${PurchaseCopy.failureReason(result.failureCode)} '
@@ -98,8 +95,7 @@ class _Result extends StatelessWidget {
       ),
       PaymentOutcome.pending => (
         Icons.schedule_rounded,
-        DashuriTokens.warning100,
-        DashuriTokens.warning,
+        DashuriColors.of(context).warning,
         'Pending',
         'Confirming your payment',
         'This is taking a little longer than usual. Your Diamonds will be '
@@ -177,17 +173,24 @@ class _Result extends StatelessWidget {
                 child: Container(
                   width: 96,
                   height: 96,
-                  decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: tone.container,
+                    shape: BoxShape.circle,
+                  ),
                   child: result.outcome == PaymentOutcome.success
                       ? const Center(child: DiamondIcon(size: 48))
-                      : Icon(icon, color: fg, size: 48),
+                      : Icon(icon, color: tone.icon, size: 48),
                 ),
               ),
               const SizedBox(height: DashuriTokens.space5),
               Text(
                 over.toUpperCase(),
                 textAlign: TextAlign.center,
-                style: theme.textTheme.labelMedium?.copyWith(color: fg),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  // onContainer is AA on the page surface too (the base
+                  // success green is 4.0:1 there).
+                  color: tone.onContainer,
+                ),
               ),
               const SizedBox(height: DashuriTokens.space2),
               Text(
@@ -212,7 +215,7 @@ class _Result extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(DashuriTokens.space3),
                   decoration: BoxDecoration(
-                    color: DashuriTokens.info100,
+                    color: DashuriColors.of(context).info.container,
                     borderRadius: BorderRadius.circular(
                       DashuriTokens.radiusMedium,
                     ),
@@ -221,7 +224,11 @@ class _Result extends StatelessWidget {
                     'If money was debited from your account, it will be '
                     'reversed automatically by your bank or credited here '
                     'once confirmed.${ref == null ? '' : ' Reference $ref.'}',
-                    style: theme.textTheme.bodyMedium,
+                    // Dark mode: the default text colour is light; the
+                    // tint needs its own on-colour.
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: DashuriColors.of(context).info.onContainer,
+                    ),
                   ),
                 ),
               ],

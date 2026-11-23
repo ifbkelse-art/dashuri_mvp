@@ -29,6 +29,7 @@ workspace:
   - packages/features/notifications
   - packages/features/settings
   - packages/features/location
+  - packages/features/reels # EXPERIMENT: Dashuri Reels
 
 dev_dependencies:
   melos: ^8.9.0

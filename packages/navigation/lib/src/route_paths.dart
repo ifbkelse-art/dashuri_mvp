@@ -72,6 +72,17 @@ abstract final class RoutePaths {
   static const hostPayoutMethod = '/host/payout-method'; // H20
   static const hostSettings = '/host/settings'; // H24
 
+  // EXPERIMENT — Dashuri Reels (registered only when DASHURI_REELS_ENABLED).
+  static const reels = '/reels'; // customer-shell tab: vertical feed
+  static const reelDetail = '/reels/watch/:reelId'; // one reel
+  static const reelCreator =
+      '/reels/creators/:userId'; // creator profile ("me" = own)
+  static const reelUpload =
+      '/reels/upload'; // record / gallery → caption → status
+  // Own reels (host mode). Full-screen, so it opens above the host shell
+  // instead of jumping into the customer Reels tab.
+  static const reelMine = '/my-reels';
+
   /// Fills `:param` segments, e.g. `RoutePaths.withParams(RoutePaths.call, {'callId': id})`.
   static String withParams(String path, Map<String, String> params) =>
       params.entries.fold(

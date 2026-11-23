@@ -188,7 +188,11 @@ class _Header extends StatelessWidget {
         const SizedBox(height: DashuriTokens.space4),
         Row(
           children: [
-            const Icon(Icons.circle, size: 12, color: DashuriTokens.online),
+            Icon(
+              Icons.circle,
+              size: 12,
+              color: DashuriColors.of(context).onlineDot,
+            ),
             const SizedBox(width: DashuriTokens.space2),
             Expanded(
               child: Text.rich(

@@ -39,7 +39,7 @@ Future<void> pumpPage(WidgetTester t, Widget page, {Size size = phone}) async {
   addTearDown(router.dispose);
   await t.pumpWidget(
     MaterialApp.router(
-      theme: DashuriTheme.light(),
+      theme: uiuxTheme(DashuriTheme.light()),
       routerConfig: router,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(

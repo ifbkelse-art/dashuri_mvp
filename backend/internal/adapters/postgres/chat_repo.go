@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,26 @@ func (r ChatRepo) contextExpr(alias string) string {
 }
 
 var _ chat.Repository = ChatRepo{}
+
+// SessionRevealAfter is a safety net: a call session message shows in
+// normal Chat at the latest this long after it was sent, even if its call
+// row is somehow still live (e.g. the stale-call job is not running). The
+// stale-call job normally ends abandoned calls within ~90 s.
+const SessionRevealAfter = 6 * time.Hour
+
+// liveCallPhases are the non-terminal calls.calls phases.
+const liveCallPhases = `'requested','ringing','accepted','connecting','active','paused','ending'`
+
+// inChat is the normal-Chat visibility of message alias: everything except
+// the session messages of a call that is still live.
+func (r ChatRepo) inChat(alias string) string {
+	if !r.MessageContext {
+		return `true`
+	}
+	return `(` + alias + `.call_id is null
+	  or ` + alias + `.sent_at < now() - interval '` + strconv.Itoa(int(SessionRevealAfter.Hours())) + ` hours'
+	  or not exists (select 1 from calls.calls lc where lc.id = ` + alias + `.call_id and lc.phase in (` + liveCallPhases + `)))`
+}
 
 func (r ChatRepo) Peer(ctx context.Context, userID string) (chat.PeerAccount, error) {
 	var p chat.PeerAccount
@@ -108,7 +129,7 @@ func (r ChatRepo) ConversationPeer(ctx context.Context, conversationID, userID s
 
 // $1 is always the viewing user.
 func (r ChatRepo) conversationSelect() string {
-	return strings.Replace(idConversationSelectTmpl, "{{ctx}}", r.contextExpr("m"), 1)
+	return strings.NewReplacer("{{ctx}}", r.contextExpr("m"), "{{inchat}}", r.inChat("m")).Replace(idConversationSelectTmpl)
 }
 
 const idConversationSelectTmpl = `
@@ -118,14 +139,14 @@ const idConversationSelectTmpl = `
 	       c.updated_at, lm.id, lm.sender_id, lm.body, lm.sent_at, lm.context,
 	       (select count(*) from chat.messages m
 	         where m.conversation_id = c.id and m.sender_id <> $1 and m.removed_at is null
-	           and m.sent_at > coalesce(rm.last_read_at, '-infinity'::timestamptz))
+	           and m.sent_at > coalesce(rm.last_read_at, '-infinity'::timestamptz) and {{inchat}})
 	  from chat.conversations c
 	  cross join lateral (select case when c.user_a = $1 then c.user_b else c.user_a end as id) peer
 	  left join identity.profiles pp on pp.user_id = peer.id
 	  left join chat.read_markers rm on rm.conversation_id = c.id and rm.user_id = $1
 	  left join lateral (
 	    select m.id, m.sender_id, m.body, m.sent_at, {{ctx}} as context from chat.messages m
-	     where m.conversation_id = c.id and m.removed_at is null
+	     where m.conversation_id = c.id and m.removed_at is null and {{inchat}}
 	     order by m.sent_at desc, m.id desc limit 1) lm on true
 	 where (c.user_a = $1 or c.user_b = $1)`
 
@@ -190,18 +211,27 @@ func scanMessage(row pgx.Row, m *chat.ChatMessage) error {
 	return row.Scan(&m.Id, &m.ConversationId, &m.SenderId, &m.Body, &m.SentAt, &m.Context, &m.ReadByPeer)
 }
 
-func (r ChatRepo) ListMessages(ctx context.Context, conversationID, viewerID string, after *chat.Cursor, limit int) ([]chat.ChatMessage, error) {
+func (r ChatRepo) ListMessages(ctx context.Context, conversationID, viewerID string, callID *string, after *chat.Cursor, limit int) ([]chat.ChatMessage, error) {
 	var at *time.Time
 	afterID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	if after != nil {
 		at, afterID = &after.At, after.ID
 	}
+	scope := r.inChat("m") // normal Chat
+	args := []any{conversationID, at, afterID, limit, viewerID}
+	if callID != nil {
+		if !r.MessageContext {
+			return []chat.ChatMessage{}, nil
+		}
+		scope = `m.call_id = $6::uuid` // one call's session only
+		args = append(args, *callID)
+	}
 	rows, err := r.Pool.Query(ctx, `
 		select `+r.messageColumns("$5::uuid")+` from chat.messages m
-		 where m.conversation_id = $1 and m.removed_at is null
+		 where m.conversation_id = $1 and m.removed_at is null and `+scope+`
 		   and ($2::timestamptz is null or (m.sent_at, m.id) < ($2::timestamptz, $3::uuid))
 		 order by m.sent_at desc, m.id desc
-		 limit $4`, conversationID, at, afterID, limit, viewerID)
+		 limit $4`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -259,6 +289,22 @@ func (r ChatRepo) InsertMessage(ctx context.Context, nm chat.NewMessage) (chat.C
 		return err
 	})
 	return m, inserted, err
+}
+
+func (r ChatRepo) CallSession(ctx context.Context, callID string) (string, [2]string, error) {
+	var conv string
+	var users [2]string
+	if !r.MessageContext {
+		return conv, users, chat.ErrNotFound
+	}
+	err := r.Pool.QueryRow(ctx, `
+		select c.id, c.user_a, c.user_b from chat.messages m
+		  join chat.conversations c on c.id = m.conversation_id
+		 where m.call_id = $1 limit 1`, callID).Scan(&conv, &users[0], &users[1])
+	if errors.Is(err, pgx.ErrNoRows) {
+		return conv, users, chat.ErrNotFound
+	}
+	return conv, users, err
 }
 
 func (r ChatRepo) MarkRead(ctx context.Context, conversationID, userID string) (bool, error) {

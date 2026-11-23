@@ -76,8 +76,8 @@ class MessageList extends StatelessWidget {
                 padding: const EdgeInsets.all(DashuriTokens.space4),
                 child: dense
                     ? Text(
-                        'No messages yet. Messages are text only and stay '
-                        'in your chat after the call.',
+                        'No messages in this call yet. Text only; they are '
+                        'added to your chat when the call ends.',
                         textAlign: TextAlign.center,
                         style: overlay
                             ? Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -183,7 +183,7 @@ class MessageBubble extends StatelessWidget {
         'During video call',
     ];
     final metaColor = notSent
-        ? (overlay ? const Color(0xFFFF8A80) : DashuriTokens.error)
+        ? (overlay ? const Color(0xFFFF8A80) : scheme.error)
         : (overlay ? Colors.white : scheme.onSurfaceVariant);
     final bubbleColor = overlay
         ? (mine ? ChatOverlayStyle.myBubble : ChatOverlayStyle.theirBubble)
@@ -219,7 +219,12 @@ class MessageBubble extends StatelessWidget {
                           DashuriTokens.radiusLarge,
                         ),
                         border: notSent
-                            ? Border.all(color: DashuriTokens.error, width: 1.5)
+                            ? Border.all(
+                                color: overlay
+                                    ? const Color(0xFFFF8A80)
+                                    : scheme.error,
+                                width: 1.5,
+                              )
                             : mine || overlay
                             ? null
                             : Border.all(color: scheme.outlineVariant),
@@ -241,11 +246,7 @@ class MessageBubble extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (notSent) ...[
-                      const Icon(
-                        Icons.error_outline,
-                        size: 14,
-                        color: DashuriTokens.error,
-                      ),
+                      Icon(Icons.error_outline, size: 14, color: metaColor),
                       const SizedBox(width: 4),
                     ],
                     Flexible(
@@ -278,19 +279,20 @@ class FilterNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tone = DashuriColors.of(context).error;
     return Container(
       margin: dense
           ? const EdgeInsets.fromLTRB(8, 4, 8, 4)
           : const EdgeInsets.fromLTRB(16, 4, 16, 8),
       padding: const EdgeInsets.all(DashuriTokens.space3),
       decoration: BoxDecoration(
-        color: DashuriTokens.error100,
+        color: tone.container,
         borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.shield_outlined, color: DashuriTokens.error),
+          Icon(Icons.shield_outlined, color: tone.icon),
           const SizedBox(width: DashuriTokens.space3),
           Expanded(
             child: Column(
@@ -299,7 +301,7 @@ class FilterNotice extends StatelessWidget {
                 Text(
                   'Keep conversations on Dashuri',
                   style: theme.textTheme.titleSmall?.copyWith(
-                    color: DashuriTokens.neutral900,
+                    color: tone.onContainer,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -310,7 +312,7 @@ class FilterNotice extends StatelessWidget {
                   maxLines: dense ? 3 : null,
                   overflow: dense ? TextOverflow.ellipsis : null,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: DashuriTokens.neutral900,
+                    color: tone.onContainer,
                   ),
                 ),
               ],

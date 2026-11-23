@@ -11,6 +11,7 @@ import 'package:feature_location/feature_location.dart';
 import 'package:feature_notifications/feature_notifications.dart';
 import 'package:feature_profile/feature_profile.dart';
 import 'package:feature_purchases/feature_purchases.dart';
+import 'package:feature_reels/feature_reels.dart';
 import 'package:feature_safety/feature_safety.dart';
 import 'package:feature_settings/feature_settings.dart';
 import 'package:feature_video_call/feature_video_call.dart';
@@ -20,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../experience/app_experience_controller.dart';
 import '../platform/device_photo_pickers.dart';
+import '../platform/device_video_picker.dart';
 import 'in_call_chat_adapter.dart';
 import 'unconfigured_backend.dart';
 
@@ -29,6 +31,9 @@ final GetIt sl = GetIt.instance;
 /// False when running on [UnconfiguredBackend] (development without config):
 /// the welcome page then says the backend is not configured.
 bool backendConfigured = true;
+
+/// EXPERIMENT — Reels tab and routes (DASHURI_REELS_ENABLED, default off).
+bool reelsEnabled = false;
 
 /// Composition root: platform adapters first, then each feature.
 /// To add a feature: depend on it in pubspec.yaml, call its `register…Feature(sl)`
@@ -98,6 +103,13 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
   registerNotificationsFeature(sl);
   registerSettingsFeature(sl);
   registerLocationFeature(sl);
+
+  // EXPERIMENT — Dashuri Reels. Nothing is registered when the flag is off.
+  reelsEnabled = config.reelsEnabled;
+  if (reelsEnabled) {
+    sl.registerLazySingleton<ReelVideoPicker>(DeviceReelVideoPicker.new);
+    registerReelsFeature(sl);
+  }
 
   // EXPERIMENT — chat inside video calls (DASHURI_IN_CALL_CHAT_ENABLED,
   // default off). Same conversation as the inbox; see docs/chat.

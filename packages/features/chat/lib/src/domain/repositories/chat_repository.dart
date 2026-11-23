@@ -16,10 +16,12 @@ abstract interface class ChatRepository {
     required IdempotencyKey idempotencyKey,
   });
 
-  /// Newest first.
+  /// Newest first. With [callId]: only that call's session chat; without:
+  /// normal Chat (live calls' session messages are not included yet).
   Future<Result<Page<ChatMessage>>> listMessages({
     required String conversationId,
     required PageRequest page,
+    String? callId,
   });
 
   /// [callId]: sent from the in-call panel of that call (same conversation).

@@ -44,7 +44,11 @@ class _Receipt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final (bg, fg) = WalletFormat.iconColors(entry, theme.colorScheme);
+    final (bg, fg) = WalletFormat.iconColors(
+      entry,
+      theme.colorScheme,
+      DashuriColors.of(context),
+    );
     final beans = WalletFormat.isBeans(entry);
     final rows = <(String, String)>[
       ('Date', WalletFormat.dateTime(entry.createdAt)),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dashuri_core/dashuri_core.dart';
 import 'package:dashuri_network/dashuri_network.dart';
@@ -23,7 +24,42 @@ class _Realtime implements RealtimeGateway {
   }
 }
 
+final class _Token implements AccessTokenProvider {
+  @override
+  Future<String?> accessToken() async => 't';
+}
+
 void main() {
+  test('session chat reads send call_id; normal Chat reads do not', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    final seen = <Uri>[];
+    server.listen((req) async {
+      seen.add(req.uri);
+      req.response.headers.contentType = ContentType.json;
+      req.response.write('{"items":[]}');
+      await req.response.close();
+    });
+    final remote = ChatRemoteDataSource(
+      ApiClient(
+        baseUrl: Uri.parse('http://127.0.0.1:${server.port}'),
+        tokens: _Token(),
+      ),
+    );
+    await remote.listMessages(
+      conversationId: 'c1',
+      page: const PageRequest(limit: 30),
+      callId: 'call-9',
+    );
+    await remote.listMessages(
+      conversationId: 'c1',
+      page: const PageRequest(limit: 30),
+    );
+    expect(seen[0].path, '/v1/conversations/c1/messages');
+    expect(seen[0].queryParameters, {'limit': '30', 'call_id': 'call-9'});
+    expect(seen[1].queryParameters, {'limit': '30'});
+  });
+
   test('maps the MVP conversation shape', () {
     final c = conversationFromJson({
       'id': 'c1',

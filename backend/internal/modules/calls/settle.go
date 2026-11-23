@@ -54,6 +54,9 @@ func (s *Service) terminate(ctx context.Context, id string, to Phase, reason str
 			}
 		}
 		s.publishCall(ctx, out)
+		if s.deps.OnTerminated != nil {
+			s.deps.OnTerminated(ctx, out.ID)
+		}
 		if reason == "moderation" {
 			s.publish(ctx, "call:"+out.ID, "call.moderation_ended", map[string]any{"call_id": out.ID})
 		}

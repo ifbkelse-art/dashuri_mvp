@@ -545,12 +545,16 @@ class HostNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg) = switch (tone) {
-      StatusTone.warning => (DashuriTokens.warning100, DashuriTokens.warning),
-      StatusTone.error => (DashuriTokens.error100, DashuriTokens.error),
-      StatusTone.success => (DashuriTokens.success100, DashuriTokens.success),
-      _ => (DashuriTokens.info100, DashuriTokens.info),
+    final c = DashuriColors.of(context);
+    final t = switch (tone) {
+      StatusTone.warning => c.warning,
+      StatusTone.error => c.error,
+      StatusTone.success => c.success,
+      _ => c.info,
     };
+    // Text uses onContainer: the base warning/success colours were 3.0:1
+    // and 3.7:1 on their tints (below AA) even in light mode.
+    final (bg, fg) = (t.container, t.onContainer);
     return Container(
       padding: const EdgeInsets.all(DashuriTokens.space4),
       decoration: BoxDecoration(
@@ -560,7 +564,7 @@ class HostNotice extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: fg, size: 20),
+          Icon(icon, color: t.icon, size: 20),
           const SizedBox(width: DashuriTokens.space3),
           Expanded(
             child: Text(
@@ -578,29 +582,34 @@ class HostNotice extends StatelessWidget {
 
 /// Large round icon used at the top of status screens (H07, H08, H18, H21).
 class HostHeroIcon extends StatelessWidget {
-  const HostHeroIcon({
-    required this.icon,
-    super.key,
-    this.color,
-    this.background,
-  });
+  const HostHeroIcon({required this.icon, super.key, this.tone});
 
   final IconData icon;
-  final Color? color;
-  final Color? background;
+
+  /// A status tone (success, warning…); default: the brand gold
+  /// (secondary container).
+  final DashuriTone Function(DashuriColors)? tone;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      width: 112,
-      height: 112,
-      decoration: BoxDecoration(
-        color: background ?? DashuriTokens.gold100,
-        shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final t = tone?.call(DashuriColors.of(context));
+    return Center(
+      child: Container(
+        width: 112,
+        height: 112,
+        decoration: BoxDecoration(
+          color: t?.container ?? scheme.secondaryContainer,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 44,
+          color: t?.icon ?? scheme.onSecondaryContainer,
+        ),
       ),
-      child: Icon(icon, size: 44, color: color ?? DashuriTokens.goldDark),
-    ),
-  );
+    );
+  }
 }
 
 /// Step progress bar for the application flow ("3/6").

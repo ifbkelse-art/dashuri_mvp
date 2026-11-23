@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/dashuri_colors.dart';
 import '../tokens/dashuri_tokens.dart';
 
 /// Brand monogram ("D" with a gold spark), A01/A02.
@@ -292,37 +293,16 @@ class InfoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // (background, text, icon colour, default icon). Text colours meet WCAG
-    // AA (4.5:1) on their tint; see test/chip_contrast_test.dart.
-    final (bg, fg, iconColor, defaultIcon) = switch (tone) {
-      // The token info blue (as HostNotice uses): burgundy-on-pink was
-      // nearly indistinguishable from the error tone, so guidance looked
-      // like a failure.
-      InfoBannerTone.info => (
-        DashuriTokens.info100,
-        DashuriTokens.info,
-        DashuriTokens.info,
-        Icons.info_outline,
-      ),
-      InfoBannerTone.warning => (
-        DashuriTokens.warning100,
-        DashuriTokens.warningText,
-        DashuriTokens.warning,
-        Icons.warning_amber_rounded,
-      ),
-      InfoBannerTone.error => (
-        DashuriTokens.error100,
-        DashuriTokens.error,
-        DashuriTokens.error,
-        Icons.error_outline,
-      ),
-      InfoBannerTone.success => (
-        DashuriTokens.success100,
-        DashuriTokens.successText,
-        DashuriTokens.success,
-        Icons.check_circle_outline,
-      ),
+    // Semantic tones (light/dark): text meets WCAG AA (4.5:1) on its tint;
+    // see test/theme_contrast_test.dart.
+    final c = DashuriColors.of(context);
+    final (t, defaultIcon) = switch (tone) {
+      InfoBannerTone.info => (c.info, Icons.info_outline),
+      InfoBannerTone.warning => (c.warning, Icons.warning_amber_rounded),
+      InfoBannerTone.error => (c.error, Icons.error_outline),
+      InfoBannerTone.success => (c.success, Icons.check_circle_outline),
     };
+    final (bg, fg, iconColor) = (t.container, t.onContainer, t.icon);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(DashuriTokens.space4),

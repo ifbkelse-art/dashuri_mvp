@@ -44,6 +44,19 @@ const customerTabs = [
   ),
 ];
 
+/// EXPERIMENT — the Reels tab, inserted after Discover when Reels is on.
+const reelsTab = ShellTab(
+  path: RoutePaths.reels,
+  label: 'Reels',
+  icon: Icons.play_circle_outline,
+  selectedIcon: Icons.play_circle,
+);
+
+/// Customer tabs, with the Reels tab only when [reels] is true.
+List<ShellTab> customerTabsFor({required bool reels}) => reels
+    ? [customerTabs.first, reelsTab, ...customerTabs.skip(1)]
+    : customerTabs;
+
 const hostTabs = [
   ShellTab(
     path: RoutePaths.hostDashboard,
@@ -102,8 +115,12 @@ final class ComposedRoutes {
 /// places each in the branch whose tab path is its longest prefix. Tab
 /// routes that fit no tab become full-screen routes. A tab nobody provides
 /// gets an [ErrorStateView] page.
-ComposedRoutes composeRoutes(List<FeatureRoutes> features) {
-  const allTabs = [...customerTabs, ...hostTabs];
+ComposedRoutes composeRoutes(
+  List<FeatureRoutes> features, {
+  bool reelsTab = false,
+}) {
+  final customer = customerTabsFor(reels: reelsTab);
+  final allTabs = [...customer, ...hostTabs];
   final branchRoutes = {for (final t in allTabs) t.path: <RouteBase>[]};
   final fullScreen = <RouteBase>[];
 
@@ -150,9 +167,8 @@ ComposedRoutes composeRoutes(List<FeatureRoutes> features) {
   }
 
   final customerShell = StatefulShellRoute.indexedStack(
-    builder: (context, state, shell) =>
-        RoleShell(tabs: customerTabs, shell: shell),
-    branches: [for (final t in customerTabs) branch(t)],
+    builder: (context, state, shell) => RoleShell(tabs: customer, shell: shell),
+    branches: [for (final t in customer) branch(t)],
   );
   final hostShell = StatefulShellRoute.indexedStack(
     builder: (context, state, shell) => RoleShell(tabs: hostTabs, shell: shell),

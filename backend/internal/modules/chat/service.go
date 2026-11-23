@@ -183,9 +183,23 @@ func (s *Service) StartConversation(ctx context.Context, p auth.Principal, in St
 }
 
 // ListMessages: GET /v1/conversations/{id}/messages — newest first.
+//
+// Without page.CallID this is normal Chat: the canonical history, minus the
+// session messages of calls that are still live. With page.CallID it is the
+// in-call session chat of that call only: no earlier chat history and no
+// other call's messages. Only the call's two participants may read it.
 func (s *Service) ListMessages(ctx context.Context, p auth.Principal, conversationId string, page PageRequest) (Page[ChatMessage], error) {
 	if !isUUID(conversationId) {
 		return Page[ChatMessage]{}, apperr.NotFound("conversation")
+	}
+	if page.CallID != nil {
+		if !isUUID(*page.CallID) {
+			return Page[ChatMessage]{}, validationError(map[string]string{"call_id": "invalid_uuid"})
+		}
+		if !s.deps.MessageContext {
+			// Without the metadata columns a session cannot be told apart.
+			return Page[ChatMessage]{}, apperr.Unavailable("in_call_chat_disabled", "in-call chat is not enabled")
+		}
 	}
 	after, err := DecodeCursor(page.Cursor)
 	if err != nil {
@@ -195,12 +209,21 @@ func (s *Service) ListMessages(ctx context.Context, p auth.Principal, conversati
 	if err != nil {
 		return Page[ChatMessage]{}, err
 	}
-	if _, err := repo.ConversationPeer(ctx, conversationId, p.UserID); errors.Is(err, ErrNotFound) {
+	peerID, err := repo.ConversationPeer(ctx, conversationId, p.UserID)
+	if errors.Is(err, ErrNotFound) {
 		return Page[ChatMessage]{}, apperr.NotFound("conversation")
 	} else if err != nil {
 		return Page[ChatMessage]{}, internal(err)
 	}
-	msgs, err := repo.ListMessages(ctx, conversationId, p.UserID, after, page.Limit+1)
+	if page.CallID != nil {
+		// The session belongs to exactly this pair's call.
+		if err := repo.CallBetween(ctx, *page.CallID, p.UserID, peerID); errors.Is(err, ErrNotFound) {
+			return Page[ChatMessage]{}, apperr.NotFound("call")
+		} else if err != nil {
+			return Page[ChatMessage]{}, internal(err)
+		}
+	}
+	msgs, err := repo.ListMessages(ctx, conversationId, p.UserID, page.CallID, after, page.Limit+1)
 	if err != nil {
 		return Page[ChatMessage]{}, internal(err)
 	}
@@ -281,6 +304,30 @@ func (s *Service) SendMessage(ctx context.Context, p auth.Principal, conversatio
 		s.deps.Push(ctx, peerID, conversationId)
 	}
 	return msg, nil
+}
+
+// CallEnded is called after a call reaches a terminal phase. Its session
+// messages are already in the canonical conversation and become part of
+// normal Chat because the call is no longer live, so there is nothing to
+// move, copy or retry. This only tells both participants' open Chat
+// screens to re-fetch. Safe to call any number of times.
+func (s *Service) CallEnded(ctx context.Context, callID string) {
+	if !s.deps.MessageContext || s.deps.Repo == nil || s.deps.Realtime == nil || !isUUID(callID) {
+		return
+	}
+	convID, users, err := s.deps.Repo.CallSession(ctx, callID)
+	if errors.Is(err, ErrNotFound) {
+		return // nobody chatted during this call
+	}
+	if err != nil {
+		slog.WarnContext(ctx, "chat call session lookup failed", "call_id", callID, "err", err)
+		return
+	}
+	for _, u := range users {
+		if err := s.deps.Realtime.Publish(ctx, "user:"+u, EventChatMessage, map[string]string{"conversation_id": convID}); err != nil {
+			slog.WarnContext(ctx, "chat realtime publish failed", "err", err)
+		}
+	}
 }
 
 // MarkRead: POST /v1/conversations/{id}/read — read up to now.

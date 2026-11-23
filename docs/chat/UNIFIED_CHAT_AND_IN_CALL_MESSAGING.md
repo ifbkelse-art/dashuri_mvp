@@ -6,6 +6,58 @@ has been activated. Flags default to **off**. The in-call panel is
 see-through (no background, no blur; each message has its own dark backing)
 and the call screen has no flip-camera control (selfie camera only).
 
+> **Update 23 Nov 2026 — video-call SESSION chat.** The in-call panel no
+> longer shows the conversation history. Each call has its own session
+> chat; it joins normal Chat when the call ends. See §0 below. Where §1–§11
+> say the panel shows earlier history, §0 replaces that.
+
+## 0. Session chat (23 Nov 2026)
+
+**Model: link, don't copy.** One canonical conversation per pair (unchanged).
+The session identifier is the **call id**. In-call messages are stored once,
+in the canonical conversation, with `context = call` and `call_id`
+(migration 20261123000200, already live on the dev database). Nothing is
+ever moved or copied, so there is no migration step that can fail, run twice
+or lose messages.
+
+| View | Query (`GET /v1/conversations/{id}/messages`) | Shows |
+|---|---|---|
+| In-call panel | `?call_id=<call>` | only that call's messages (no earlier chat, no other call) |
+| Normal Chat | no `call_id` | everything **except** messages of a call that is still live |
+
+- **Isolation while live** is backend-authoritative: a session message is
+  hidden from normal Chat (messages, inbox preview, unread count) while its
+  `calls.calls.phase` is non-terminal (`requested … ending`).
+- **"Append" at call end** = the call reaching a terminal phase (`ended`,
+  `declined`, `missed`, `failed`). The messages then appear in normal Chat
+  at their original `sent_at`, with original senders, in chronological
+  order, after the earlier history. Repeated call-end events change nothing.
+- **App killed / network lost / nobody calls `/end`:** the existing
+  `settle-stale-calls` job ends the call (~90 s without media); the session
+  appears without any client action. **Safety net:** a session message is
+  shown in normal Chat at the latest 6 h after it was sent even if the call
+  row is stuck live (`postgres.SessionRevealAfter`), e.g. if the job is not
+  scheduled.
+- **Refresh:** `calls.Deps.OnTerminated` → `chat.Service.CallEnded` sends a
+  `chat.message` hint to both participants once per terminal transition, so
+  an open Chat screen re-fetches. It is a hint only; correctness never
+  depends on it.
+- **Authorization:** `call_id` must be a call between the viewer and the
+  conversation's other participant, else 404. Outsiders get 404 as before.
+  With `CHAT_MESSAGE_CONTEXT_ENABLED` off the session view returns 503
+  `in_call_chat_disabled` rather than the whole history.
+- **Duplicates:** unchanged three layers (client key reused on retry,
+  `Idempotency-Key` replay, unique `client_message_id`). Reconnection: the
+  panel re-fetches the session (hint + 20 s poll).
+- **Billing:** messaging never touches calls, ledger or reservations
+  (Postgres byte-identical snapshot test).
+
+Tests: `backend/internal/modules/chat/session_chat_test.go` (unit),
+`session_chat_integration_test.go` (real Postgres: all 13 acceptance cases),
+`calls_integration_test.go` (hook fires exactly once under 10 concurrent
+`/end` + 10 sweeps), Flutter `test/application/in_call_chat_test.dart` and
+`test/data/chat_data_test.dart` (wire format).
+
 Contents: 1 Product requirements · 2 Provider assessment · 3 Architecture ·
 4 Database · 5 API · 6 Flutter · 7 Safety, privacy, billing · 8 Tests ·
 9 Flags, rollout, rollback · 10 Local demo · 11 Limitations

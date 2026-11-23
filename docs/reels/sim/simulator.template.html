@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dashuri Reels Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f3f4f7; --surface:#fff; --surface-2:#eceef3; --line:#d8dbe3; --ink:#14161c; --ink-2:#4a4f5c; --ink-3:#6f7584;
+  --accent:#7a1f47; --accent-ink:#fff; --accent-soft:#f3e3ea;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+  --good:#0a7d0a; --warn:#9a6400; --bad:#c22f2f; --good-bg:#e2f3e2; --warn-bg:#fbf0d8; --bad-bg:#fbe3e1; --grid:#e3e5eb; --axis:#9ba1ae;
+  --f-display:"Sora","Inter",system-ui,sans-serif; --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#101217; --surface:#181b22; --surface-2:#20242d; --line:#323744; --ink:#eef0f4; --ink-2:#b8bdc9; --ink-3:#8b91a0;
+  --accent:#e48bb0; --accent-ink:#2a0716; --accent-soft:#3a1a29;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --good:#5cc77d; --warn:#e3a53c; --bad:#f07a6e; --good-bg:#16301f; --warn-bg:#36290f; --bad-bg:#3a1a17; --grid:#272b35; --axis:#5d6372; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#101217; --surface:#181b22; --surface-2:#20242d; --line:#323744; --ink:#eef0f4; --ink-2:#b8bdc9; --ink-3:#8b91a0;
+  --accent:#e48bb0; --accent-ink:#2a0716; --accent-soft:#3a1a29;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --good:#5cc77d; --warn:#e3a53c; --bad:#f07a6e; --good-bg:#16301f; --warn-bg:#36290f; --bad-bg:#3a1a17; --grid:#272b35; --axis:#5d6372; color-scheme:dark }
+*{box-sizing:border-box} [hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14.5px;line-height:1.55}
+h1,h2,h3{font-family:var(--f-display);margin:0;letter-spacing:-.015em;text-wrap:balance}
+h1{font-size:clamp(22px,3.4vw,34px);line-height:1.15} h2{font-size:20px} h3{font-size:15.5px}
+p{margin:0;max-width:76ch}
+.wrap{max-width:1200px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+header.top .wrap{display:grid;gap:8px;padding-block:10px}
+.row1{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.brand{font-family:var(--f-display);font-weight:700;font-size:17px;display:flex;gap:10px;align-items:center}
+.brand small{display:block;font-family:var(--f-body);font-weight:500;font-size:11px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 11px;background:transparent;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+nav.tabs{display:flex;gap:2px;flex-wrap:wrap}
+nav.tabs a{padding:5px 10px;border-radius:999px;text-decoration:none;color:var(--ink-2);font-weight:500;font-size:13px}
+nav.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+button,input[type=number],textarea{font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+button{cursor:pointer} button:hover{background:var(--surface-2)} button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-block:22px 72px} section.view{display:grid;gap:20px} section.view>*{min-width:0}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.muted{color:var(--ink-2)} .tiny{font-size:12px;color:var(--ink-3)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:10px;align-content:start;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.split{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:16px;align-items:start} .split>*{min-width:0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:3px}
+.tile .v{font-family:var(--f-mono);font-size:21px;font-weight:500;font-variant-numeric:tabular-nums}
+.tile .l{font-size:12.5px;color:var(--ink-2)} .tile .s{font-size:11.5px;color:var(--ink-3)}
+.verdict{border-left:4px solid var(--bad);padding:4px 0 4px 14px;display:grid;gap:6px} .verdict.ok{border-color:var(--good)} .verdict.mid{border-color:var(--warn)}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px}
+.st-verified{background:var(--good-bg);color:var(--good)} .st-implemented{background:var(--accent-soft);color:var(--accent)} .st-assumption{background:var(--warn-bg);color:var(--warn)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-weight:600;color:var(--ink-2);font-size:11.5px;letter-spacing:.03em;text-transform:uppercase;background:var(--surface-2)}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.sub td{font-weight:600;background:var(--surface-2)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.neg{color:var(--bad)} .pos{color:var(--good)}
+.ctl{display:grid;gap:2px;padding:6px 0;border-bottom:1px solid var(--line)} .ctl:last-child{border-bottom:0}
+.ctl label{font-size:12.5px;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ctl output{font-family:var(--f-mono);color:var(--ink);font-size:12.5px;white-space:nowrap}
+.ctl .hint{font-size:11.5px;color:var(--ink-3)}
+.ctl.changed label{color:var(--warn)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px} .legend i.ln{height:3px;width:14px;vertical-align:3px}
+.tip{position:fixed;pointer-events:none;z-index:30;background:var(--ink);color:var(--bg);font-size:12px;padding:7px 10px;border-radius:6px;max-width:280px;line-height:1.45}
+.tip b{font-family:var(--f-mono);font-weight:500}
+textarea{width:100%;min-height:160px;font-family:var(--f-mono);font-size:12px}
+details summary{cursor:pointer;font-weight:600}
+.method p{margin-bottom:8px} .method code{font-family:var(--f-mono);font-size:12px;background:var(--surface-2);padding:1px 4px;border-radius:4px}
+@media (max-width:920px){ .grid2,.split{grid-template-columns:minmax(0,1fr)} }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="row1">
+    <div class="brand"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="3" style="fill:var(--accent)"/><path d="M10 8.5v7l6-3.5z" style="fill:var(--accent-ink)"/></svg>
+      <span>Dashuri Reels · financial comparison<small>Experiment · six months · INR</small></span></div>
+    <div class="toolbar">
+      <span class="tiny">Business baseline</span>
+      <div class="seg" id="seg-fin" role="group" aria-label="Business baseline scenario"><button data-v="conservative">Conservative</button><button data-v="base" aria-pressed="true">Base</button><button data-v="optimistic">Optimistic</button></div>
+      <span class="tiny">Reels</span>
+      <div class="seg" id="seg-reels" role="group" aria-label="Reels scenario"><button data-v="conservative">Conservative</button><button data-v="base" aria-pressed="true">Base</button><button data-v="optimistic">Optimistic</button></div>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+  <nav class="tabs" aria-label="Sections"><a href="#overview">Overview</a><a href="#monthly">A vs B monthly</a><a href="#costs">Reels costs</a><a href="#assumptions">Assumptions</a><a href="#method">Method &amp; export</a></nav>
+</div></header>
+
+<main class="wrap">
+<section class="view" id="v-overview">
+  <div style="display:grid;gap:8px"><span class="eyebrow">Scenario A: Dashuri today · Scenario B: Dashuri with Reels</span><h1 id="headline"></h1><p class="muted" id="lede"></p></div>
+  <div class="verdict" id="verdict"></div>
+  <div class="tiles" id="tiles"></div>
+  <div class="grid2">
+    <div class="panel"><h3>Monthly operating profit</h3><p class="tiny">Scenario B includes every Reels cost</p><div class="legend" id="lg-op"></div><div class="chart" id="c-op"></div></div>
+    <div class="panel"><h3>Incremental operating profit from Reels</h3><p class="tiny">B − A each month (incremental contribution minus all Reels costs)</p><div class="legend" id="lg-inc"></div><div class="chart" id="c-inc"></div></div>
+  </div>
+  <div class="panel"><h3>What has to be true for Reels to pay for itself</h3><div id="needs"></div></div>
+</section>
+
+<section class="view" id="v-monthly" hidden>
+  <div><h2>Scenario A vs Scenario B, month by month</h2><p class="muted">Engine outputs for both scenarios; Reels costs are charged to B only.</p></div>
+  <div class="tbl"><table id="t-monthly"></table></div>
+  <div class="panel"><h3>Reels funnel (diagnostic)</h3><p class="tiny">CTA clicks and implied attributed calls do not drive revenue in this model; they are what to measure against the attribution analytics (GET /v1/admin/reels/analytics).</p><div class="tbl"><table id="t-funnel"></table></div></div>
+</section>
+
+<section class="view" id="v-costs" hidden>
+  <div><h2>Reels operating costs</h2><p class="muted" id="costs-lede"></p></div>
+  <div class="tiles" id="cost-tiles"></div>
+  <div class="panel"><h3>Monthly Reels costs by type</h3><div class="legend" id="lg-cost"></div><div class="chart" id="c-cost"></div></div>
+  <div class="tbl"><table id="t-costs"></table></div>
+</section>
+
+<section class="view" id="v-assumptions" hidden>
+  <div><h2>Assumptions</h2><p class="muted">Every input is editable; results update immediately. <span class="pill st-verified">verified</span> official price checked 22 Nov 2026 · <span class="pill st-implemented">implemented</span> a rule in the experiment code · <span class="pill st-assumption">assumption</span> no data yet.</p></div>
+  <div class="split">
+    <div class="panel"><h3>Reels inputs</h3><div id="controls"></div></div>
+    <div class="panel"><h3>How Reels changes the business model inputs (B)</h3><p class="tiny">Scenario B = the finance engine with exactly these changes. Everything else is identical to A.</p><div class="tbl"><table id="t-over"></table></div>
+      <h3 style="margin-top:8px">Verified facts used</h3><div class="tbl"><table id="t-facts"></table></div></div>
+  </div>
+</section>
+
+<section class="view method" id="v-method" hidden>
+  <div class="panel">
+    <h2>Method</h2>
+    <p><b>Scenario A</b> is the existing Dashuri six-month model (<code>docs/finance/engine/dashuri-model.js</code>, unchanged). <b>Scenario B</b> runs the same engine with five Reels levers applied to its inputs: payer churn, non-payer retention, later conversion, organic sign-ups and (as a risk) calls per payer. Incremental results are B − A, so the calls existing customers would have made anyway are never credited to Reels.</p>
+    <p><b>Reels costs</b> are added to B only: Mux storage (all uploaded minutes, including rejected media kept 90 days as evidence), Mux delivery beyond 100,000 free minutes, basic encoding (free), the $20 pay-as-you-go credit, Sightengine operations on top of the call-moderation operations already on the same plan (frames every N seconds × models), human review, extra API/DB load, appeals/copyright support and a one-time legal review.</p>
+    <p><b>Definitions.</b> Incremental contribution = Δ engine contribution − Reels variable costs. Incremental operating = Δ engine operating profit − all Reels costs. Cost per 1,000 views uses variable costs. Break-even views = fixed Reels costs ÷ (incremental value per view − variable cost per view). Extra cash = the deepest point of cumulative (B − A) net cash flow.</p>
+    <p><b>Limits.</b> There is no Reels usage data. Every impact input is an assumption, so treat the outputs as "what would need to be true". Host liabilities rise with extra paid minutes (Beans owed, payouts are off).</p>
+  </div>
+  <div class="panel"><h3>Export</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="primary" id="x-csv">Download CSV</button><button id="x-json">Download JSON</button><button id="x-md">Download summary (.md)</button></div><textarea id="x-out" readonly aria-label="Export preview"></textarea></div>
+</section>
+</main>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+/*__FINANCE_ENGINE__*/
+</script>
+<script>
+/*__REELS_MODEL__*/
+</script>
+<script>
+(function(){
+'use strict';
+const F = window.DashuriModel, R = window.ReelsModel;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const inr = v => (v < 0 ? '−₹' : '₹') + Math.round(Math.abs(v)).toLocaleString('en-IN');
+const kfmt = v => { const a = Math.abs(v), s = v < 0 ? '−' : ''; return a >= 1e7 ? s+'₹'+(a/1e7).toFixed(2)+' Cr' : a >= 1e5 ? s+'₹'+(a/1e5).toFixed(2)+' L' : s+'₹'+Math.round(a).toLocaleString('en-IN'); };
+const num = v => Math.round(v).toLocaleString('en-IN');
+const pct = v => (v*100).toFixed(v*100 < 10 ? 1 : 0) + '%';
+const cls = v => v < 0 ? 'neg' : v > 0 ? 'pos' : '';
+const store = { get(k){ try { return JSON.parse(localStorage.getItem('reels-sim:'+k)); } catch(e){ return null; } }, set(k,v){ try { localStorage.setItem('reels-sim:'+k, JSON.stringify(v)); } catch(e){} } };
+
+const S = { fin: store.get('fin') || 'base', reels: store.get('reels') || 'base', edits: store.get('edits') || {} };
+const params = () => Object.assign(R.defaults(S.reels), S.edits);
+let res;
+
+function seg(id, key){
+  const el = $(id);
+  el.querySelectorAll('button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === S[key])); b.onclick = () => { S[key] = b.dataset.v; if (key === 'reels') S.edits = {}; store.set(key, S[key]); store.set('edits', S.edits); seg(id, key); renderControls(); update(); }; });
+}
+
+// ---------------------------------------------------------------- charts (inline SVG)
+const tip = $('#tip');
+function showTip(e, html){ tip.innerHTML = html; tip.hidden = false; const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8); tip.style.left = x+'px'; tip.style.top = (e.clientY + 14)+'px'; }
+function hideTip(){ tip.hidden = true; }
+function scale(min, max){ if (min === max){ min -= 1; max += 1; } const span = max - min; const step = Math.pow(10, Math.floor(Math.log10(span/4))); const m = [1,2,2.5,5,10].find(m => span/(step*m) <= 5) * step; return { lo: Math.floor(min/m)*m, hi: Math.ceil(max/m)*m, step: m }; }
+function frame(el, series, kind, opts){
+  const W = 560, H = 240, L = 64, Rr = 12, T = 10, B = 26;
+  const months = res.rows.map(r => 'M'+r.month);
+  const all = series.flatMap(s => s.values);
+  const stacked = kind === 'stack';
+  const tops = stacked ? months.map((_, i) => series.reduce((s, x) => s + x.values[i], 0)) : all;
+  const sc = scale(Math.min(0, ...tops), Math.max(0, ...tops));
+  const y = v => T + (H - T - B) * (1 - (v - sc.lo)/(sc.hi - sc.lo));
+  const bw = (W - L - Rr) / months.length;
+  const x = i => L + bw * (i + 0.5);
+  let g = '';
+  for (let v = sc.lo; v <= sc.hi + 1e-9; v += sc.step){ g += `<line x1="${L}" x2="${W-Rr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-3)">${kfmt(v)}</text>`; }
+  g += `<line x1="${L}" x2="${W-Rr}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)"/>`;
+  months.forEach((m, i) => { g += `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${m}</text>`; });
+  let marks = '';
+  if (kind === 'line'){
+    series.forEach(s => { const pts = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' '); marks += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`; s.values.forEach((v, i) => { marks += `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`; }); });
+  } else if (kind === 'bar'){
+    const s = series[0]; s.values.forEach((v, i) => { const y0 = y(Math.max(0, v)), h = Math.max(1, Math.abs(y(v) - y(0))); marks += `<rect x="${x(i)-bw*0.3}" y="${y0}" width="${bw*0.6}" height="${h}" rx="3" fill="${v < 0 ? opts.neg : opts.pos}"/>`; });
+  } else {
+    months.forEach((_, i) => { let acc = 0; series.forEach(s => { const v = s.values[i]; if (v <= 0) return; const y1 = y(acc + v), y0 = y(acc); marks += `<rect x="${x(i)-bw*0.3}" y="${y1}" width="${bw*0.6}" height="${Math.max(0, y0 - y1 - 2)}" fill="${s.color}"/>`; acc += v; }); });
+  }
+  let hits = '';
+  months.forEach((m, i) => { hits += `<rect data-i="${i}" x="${L + bw*i}" y="${T}" width="${bw}" height="${H-T-B}" fill="transparent"/>`; });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label)}">${g}${marks}${hits}</svg>`;
+  el.querySelectorAll('rect[data-i]').forEach(r => { r.onmousemove = e => { const i = +r.dataset.i; showTip(e, `<div>${months[i]}</div>` + series.map(s => `<div>${esc(s.name)}: <b>${inr(s.values[i])}</b></div>`).join('') + (stacked ? `<div>Total: <b>${inr(series.reduce((t, s) => t + s.values[i], 0))}</b></div>` : '')); }; r.onmouseleave = hideTip; });
+}
+function legend(el, items){ el.innerHTML = items.map(([n, c, ln]) => `<span><i class="${ln?'ln':''}" style="background:${c}"></i>${esc(n)}</span>`).join(''); }
+
+// ---------------------------------------------------------------- controls
+function renderControls(){
+  const p = params(); const groups = {};
+  R.ASSUMPTIONS.forEach(a => (groups[a.group] = groups[a.group] || []).push(a));
+  $('#controls').innerHTML = Object.entries(groups).map(([g, list]) => `<details open><summary>${esc(g)}</summary>` + list.map(a => {
+    const v = p[a.key]; const changed = a.key in S.edits;
+    return `<div class="ctl${changed?' changed':''}"><label for="i-${a.key}"><span>${esc(a.label)} <span class="pill st-${a.status}">${a.status}</span></span><output id="o-${a.key}">${fmtVal(a, v)}</output></label><input type="range" id="i-${a.key}" data-k="${a.key}" min="${a.min}" max="${a.max}" step="${a.step}" value="${v}"><span class="hint">${esc(a.source)}</span></div>`;
+  }).join('') + `</details>`).join('');
+  $('#controls').querySelectorAll('input[type=range]').forEach(inp => { inp.oninput = () => { const a = R.ASSUMPTIONS.find(x => x.key === inp.dataset.k); S.edits[a.key] = +inp.value; store.set('edits', S.edits); $('#o-'+a.key).textContent = fmtVal(a, +inp.value); inp.closest('.ctl').classList.add('changed'); update(); }; });
+}
+function fmtVal(a, v){ if (a.pct) return pct(v); if (a.unit === '$') return '$' + (+v).toFixed(v < 1 ? 4 : 0); if (a.unit === '₹') return '₹' + (+v).toLocaleString('en-IN'); return (+v).toLocaleString('en-IN') + (a.unit && a.unit !== 'views' && a.unit !== 'reels' && a.unit !== 'models' ? ' ' + a.unit : a.unit ? ' ' + a.unit : ''); }
+
+// ---------------------------------------------------------------- render
+function update(){
+  const fp = F.defaults(S.fin);
+  res = R.run(F, fp, params());
+  const s = res.summary;
+  const be = R.breakEvenChurnReduction(F, fp, params());
+  $('#headline').textContent = s.improves
+    ? `With these assumptions, Reels adds ${kfmt(s.sixMonthDOperating)} to six-month operating profit.`
+    : `With these assumptions, Reels costs ${kfmt(-s.sixMonthDOperating)} more than it earns over six months.`;
+  $('#lede').textContent = `Scenario A (today, ${S.fin} business case): ${kfmt(s.operatingA)} operating result. Scenario B (with Reels, ${S.reels} Reels case): ${kfmt(s.operatingB)}. Reels costs ${kfmt(s.sixMonthReelsCost)} over six months for about ${num(s.views)} views.`;
+  const v = $('#verdict'); v.className = 'verdict ' + (s.improves ? 'ok' : s.verdict === 'neutral' ? 'mid' : '');
+  v.innerHTML = `<strong>${s.improves ? 'Improves the six-month outlook' : s.verdict === 'neutral' ? 'Roughly neutral' : 'Worsens the six-month outlook'}</strong><span class="muted">${s.improves ? 'Only if the retention and conversion effects are real. None is measured yet.' : 'Running costs are small; the result depends on whether Reels changes retention or conversion.'} Extra cash needed for Reels: <b>${kfmt(s.extraCash)}</b>.</span>`;
+  const tiles = [
+    ['Incremental revenue', kfmt(s.sixMonthDRevenue), 'six months, recognised (Diamonds spent)'],
+    ['Incremental contribution', kfmt(s.sixMonthDContribution), 'after Reels variable costs'],
+    ['Reels operating cost', kfmt(s.sixMonthReelsCost), 'six months, all-in'],
+    ['Cost per 1,000 views', s.costPer1000Views == null ? '—' : inr(s.costPer1000Views), 'variable costs only'],
+    ['Cost per published reel', s.costPerPublished == null ? '—' : inr(s.costPerPublished), 'all Reels costs ÷ published'],
+    ['Incremental revenue per viewer', inr(s.dRevenuePerViewer), 'per viewer-month'],
+    ['Break-even views', s.breakEvenViewsPerMonth == null ? 'not reached' : num(s.breakEvenViewsPerMonth) + '/mo', 'to cover fixed Reels costs'],
+    ['Extra host liability (M6)', kfmt(s.dHostLiabilityM6), 'Beans owed, payouts off'],
+  ];
+  $('#tiles').innerHTML = tiles.map(([l, val, sub]) => `<div class="tile"><span class="l">${l}</span><span class="v">${val}</span><span class="s">${sub}</span></div>`).join('');
+  legend($('#lg-op'), [['A: without Reels', 'var(--s1)', 1], ['B: with Reels', 'var(--s2)', 1]]);
+  frame($('#c-op'), [{ name: 'A: without Reels', color: 'var(--s1)', values: res.rows.map(r => r.operatingA) }, { name: 'B: with Reels', color: 'var(--s2)', values: res.rows.map(r => r.operatingB) }], 'line', { label: 'Monthly operating profit, A and B' });
+  legend($('#lg-inc'), [['Reels adds', 'var(--s3)'], ['Reels costs more', 'var(--s2)']]);
+  frame($('#c-inc'), [{ name: 'B − A', values: res.rows.map(r => r.dOperating) }], 'bar', { pos: 'var(--s3)', neg: 'var(--s2)', label: 'Incremental operating profit' });
+  $('#needs').innerHTML = `<p>${be == null ? 'Even a 60% relative cut in payer churn would not cover Reels costs with these inputs.' : `Holding the other inputs, Reels breaks even over six months if it cuts paying-customer churn by <b>${pct(be)}</b> (relative). The current assumption is <b>${pct(params().churnReduction)}</b>.`}</p>
+    <p class="muted" style="margin-top:6px">With zero business impact, Reels is a pure cost of about ${kfmt(R.run(F, fp, Object.assign(params(), { churnReduction:0, nonPayerRetentionUplift:0, laterConversionUplift:0, signupUplift:0, cannibalization:0 })).summary.sixMonthReelsCost)} over six months. Measure retention in a cohort before scaling it.</p>`;
+
+  // Colour only results (incremental and profit lines), never cost lines.
+  const tone = new Set(['dRevenue', 'dContribution', 'dOperating', 'operatingA', 'operatingB']);
+  const row = (label, key, f = inr, sub) => { const tot = res.rows.reduce((t, r) => t + r[key], 0); const c = v => tone.has(key) ? cls(v) : ''; return `<tr${sub?' class="sub"':''}><td>${label}</td>${res.rows.map(r => `<td class="n ${c(r[key])}">${f(r[key])}</td>`).join('')}<td class="n ${c(tot)}">${f(tot)}</td></tr>`; };
+  const head = `<tr><th>Line</th>${res.rows.map(r => `<th class="n">M${r.month}</th>`).join('')}<th class="n">6 months</th></tr>`;
+  const avg = k => `<tr><td>${k[0]}</td>${res.rows.map(r => `<td class="n">${num(r[k[1]])}</td>`).join('')}<td class="n">${num(res.rows[5][k[1]])} (M6)</td></tr>`;
+  $('#t-monthly').innerHTML = head + avg(['MAU — A', 'mauA']) + avg(['MAU — B', 'mauB']) + avg(['Paying customers — A', 'payersA']) + avg(['Paying customers — B', 'payersB']) +
+    row('Revenue — A', 'revenueA') + row('Revenue — B', 'revenueB') + row('Incremental revenue', 'dRevenue', inr, 1) +
+    row('Reels costs', 'reelsCost') + row('Incremental contribution', 'dContribution') + row('Operating profit — A', 'operatingA') + row('Operating profit — B', 'operatingB') +
+    row('Incremental operating profit', 'dOperating', inr, 1) + row('Extra host earnings (Beans)', 'dHostEarnings') + row('Extra host liability (closing)', 'dHostLiability');
+  $('#t-funnel').innerHTML = head + ['viewers|Viewers', 'views|Views', 'watchMin|Watch minutes', 'uploads|Reels uploaded', 'published|Reels published', 'hostViews|Host-reel views', 'profileVisits|Creator profile visits (est.)', 'ctaClicks|Call CTA clicks', 'impliedAttributedCalls|Implied attributed calls'].map(x => { const [k, l] = x.split('|'); return row(l, k, num); }).join('');
+
+  $('#costs-lede').textContent = `At these volumes the biggest Reels costs are ${['video','moderationApi','humanReview','compute','support'].map(k => [k, res.rows.reduce((t, r) => t + r[k], 0)]).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => ({ video: 'video hosting', moderationApi: 'automated moderation', humanReview: 'human review', compute: 'backend load', support: 'appeals/copyright support' })[k]).join(' and ')}. Delivery stays inside Mux's free 100,000 minutes until watch time grows.`;
+  const tot = k => res.rows.reduce((t, r) => t + r[k], 0);
+  $('#cost-tiles').innerHTML = [['Video (Mux)', tot('video')], ['Automated moderation', tot('moderationApi')], ['Human review', tot('humanReview')], ['Backend load', tot('compute')], ['Support + one-time', tot('support') + tot('oneTime')]].map(([l, v]) => `<div class="tile"><span class="l">${l}</span><span class="v">${kfmt(v)}</span><span class="s">six months</span></div>`).join('');
+  const cs = [['Video (Mux)', 'video', 'var(--s1)'], ['Automated moderation', 'moderationApi', 'var(--s2)'], ['Human review', 'humanReview', 'var(--s3)'], ['Backend load', 'compute', 'var(--s4)'], ['Support + one-time', null, 'var(--s5)']];
+  legend($('#lg-cost'), cs.map(([n, , c]) => [n, c]));
+  frame($('#c-cost'), cs.map(([n, k, c]) => ({ name: n, color: c, values: res.rows.map(r => k ? r[k] : r.support + r.oneTime) })), 'stack', { label: 'Monthly Reels costs by type' });
+  $('#t-costs').innerHTML = head + row('Video hosting (Mux)', 'video') + row('Sightengine (incremental)', 'moderationApi') + row('Human review', 'humanReview') + row('Backend load', 'compute') + row('Support', 'support') + row('One-time', 'oneTime') + row('Total Reels cost', 'reelsCost', inr, 1) + row('Sightengine operations', 'reelOps', num) + row('Stored minutes', 'storedMin', num);
+
+  const fpB = Object.assign({}, fp, res.overrides);
+  $('#t-over').innerHTML = `<tr><th>Engine input</th><th class="n">A</th><th class="n">B</th></tr>` + [['payerChurn', 'Paying-customer churn / month', pct], ['nonPayerRetention', 'Non-payer retention / month', pct], ['convLater', 'Later conversion / month', pct], ['organicNewM1', 'Organic sign-ups, Month 1', num], ['callsPerPayer', 'Calls per payer / month', v => (+v).toFixed(2)]].map(([k, l, f]) => `<tr><td>${l}</td><td class="n">${f(fp[k])}</td><td class="n">${f(fpB[k])}</td></tr>`).join('');
+  $('#t-facts').innerHTML = `<tr><th>Fact</th><th>Status</th></tr>` + R.ASSUMPTIONS.filter(a => a.status !== 'assumption').map(a => `<tr><td>${esc(a.label)}: ${esc(fmtVal(a, params()[a.key]))}<div class="tiny">${esc(a.source)}</div></td><td><span class="pill st-${a.status}">${a.status}</span></td></tr>`).join('') +
+    `<tr><td>Diamond → Bean rule, packages, Play fee, GST, host Bean liability: from the existing finance engine (rule set 2026-11-17-founder)<div class="tiny">docs/finance/DASHURI_FINANCIAL_MODEL_METHODOLOGY.md</div></td><td><span class="pill st-implemented">implemented</span></td></tr>`;
+}
+
+// ---------------------------------------------------------------- export
+function download(name, type, text){ $('#x-out').value = text; try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); } catch(e){} }
+$('#x-csv').onclick = () => download('dashuri_reels_comparison.csv', 'text/csv', R.toCSV(res));
+$('#x-json').onclick = () => download('dashuri_reels_comparison.json', 'application/json', JSON.stringify({ businessScenario: S.fin, reelsScenario: S.reels, reelsInputs: params(), engineOverrides: res.overrides, summary: Object.assign({}, res.summary, { m6: undefined }), months: res.rows }, null, 2));
+$('#x-md').onclick = () => { const s = res.summary; download('dashuri_reels_summary.md', 'text/markdown', `# Dashuri Reels — six-month comparison\n\n- Business case: ${S.fin}; Reels case: ${S.reels}\n- Operating result A (no Reels): ${inr(s.operatingA)}\n- Operating result B (with Reels): ${inr(s.operatingB)}\n- Incremental revenue: ${inr(s.sixMonthDRevenue)}\n- Incremental contribution: ${inr(s.sixMonthDContribution)}\n- Reels costs: ${inr(s.sixMonthReelsCost)}\n- Views: ${num(s.views)}; cost per 1,000 views: ${s.costPer1000Views == null ? '—' : inr(s.costPer1000Views)}\n- Extra cash needed: ${inr(s.extraCash)}\n- Extra host liability at Month 6: ${inr(s.dHostLiabilityM6)}\n\nAll impact inputs are assumptions (no Reels data yet).\n`); };
+$('#reset').onclick = () => { S.edits = {}; store.set('edits', {}); renderControls(); update(); };
+
+// ---------------------------------------------------------------- routing
+const views = ['overview', 'monthly', 'costs', 'assumptions', 'method'];
+function route(){ const h = (location.hash || '#overview').slice(1); const v = views.includes(h) ? h : 'overview'; views.forEach(x => { $('#v-'+x).hidden = x !== v; }); document.querySelectorAll('nav.tabs a').forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#'+v ? 'page' : 'false')); }
+addEventListener('hashchange', route);
+seg('#seg-fin', 'fin'); seg('#seg-reels', 'reels'); renderControls(); update(); route();
+})();
+</script>
+</body>
+</html>

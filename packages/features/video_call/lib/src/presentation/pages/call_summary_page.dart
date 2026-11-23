@@ -340,22 +340,22 @@ class _Notice extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.all(DashuriTokens.space3),
       decoration: BoxDecoration(
-        color: DashuriTokens.warning100,
+        color: DashuriColors.of(context).warning.container,
         borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.hourglass_bottom_rounded,
-            color: DashuriTokens.warning,
+            color: DashuriColors.of(context).warning.icon,
           ),
           const SizedBox(width: DashuriTokens.space3),
           Expanded(
             child: Text(
               text,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: DashuriTokens.neutral800),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: DashuriColors.of(context).warning.onContainer,
+              ),
             ),
           ),
         ],

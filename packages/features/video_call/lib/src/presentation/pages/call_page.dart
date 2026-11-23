@@ -846,8 +846,11 @@ class _TopBar extends StatelessWidget {
                         peerName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        // Over live video: shadows keep it readable on
+                        // bright frames (there is no panel behind it).
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: Colors.white,
+                          shadows: _videoTextShadows,
                         ),
                       ),
                       Text(
@@ -855,7 +858,8 @@ class _TopBar extends StatelessWidget {
                             ? 'Customer'
                             : (session.isFreeCall ? 'Free call' : 'Video call'),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white70,
+                          color: const Color(0xE6FFFFFF),
+                          shadows: _videoTextShadows,
                         ),
                       ),
                     ],
@@ -891,7 +895,8 @@ class _TopBar extends StatelessWidget {
                 children: [
                   if (freeLeft != null)
                     GlassPill(
-                      color: DashuriTokens.gold.withValues(alpha: .85),
+                      // White on the brand gold is 3.1:1; on goldDark 4.9:1.
+                      color: DashuriTokens.goldDark,
                       child: Text(
                         'FREE MINUTE · ${DashuriFormat.duration(freeLeft)}',
                         style: white,
@@ -964,7 +969,8 @@ class _LowBalanceBanner extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(DashuriTokens.space3),
         decoration: BoxDecoration(
-          color: DashuriTokens.warning,
+          // White on the base warning orange is 3.0:1; warningText is AA.
+          color: DashuriTokens.warningText,
           borderRadius: BorderRadius.circular(DashuriTokens.radiusLarge),
         ),
         child: Row(
@@ -974,7 +980,7 @@ class _LowBalanceBanner extends StatelessWidget {
               child: Text(
                 '$seconds',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: DashuriTokens.warning,
+                  color: DashuriTokens.warningText,
                 ),
               ),
             ),
@@ -1144,3 +1150,9 @@ void _withHaptic(VoidCallback action) {
   unawaited(HapticFeedback.mediumImpact());
   action();
 }
+
+/// Shadows for text drawn straight on video.
+const _videoTextShadows = [
+  Shadow(blurRadius: 3, color: Color(0xE6000000)),
+  Shadow(blurRadius: 8, color: Color(0x99000000)),
+];

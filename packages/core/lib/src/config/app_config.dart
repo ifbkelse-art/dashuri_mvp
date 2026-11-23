@@ -15,6 +15,7 @@ final class AppConfig extends Equatable {
     required this.supabasePublishableKey,
     this.supportEmail = '',
     this.cashfreeEnabled = false,
+    this.reelsEnabled = false,
     this.inCallChatEnabled = false,
   });
 
@@ -33,6 +34,7 @@ final class AppConfig extends Equatable {
     ),
     supportEmail: const String.fromEnvironment('DASHURI_SUPPORT_EMAIL'),
     cashfreeEnabled: const bool.fromEnvironment('DASHURI_CASHFREE_ENABLED'),
+    reelsEnabled: const bool.fromEnvironment('DASHURI_REELS_ENABLED'),
     inCallChatEnabled: const bool.fromEnvironment(
       'DASHURI_IN_CALL_CHAT_ENABLED',
     ),
@@ -55,6 +57,10 @@ final class AppConfig extends Equatable {
   /// Off by default; Play Billing stays the default rail.
   final bool cashfreeEnabled;
 
+  /// EXPERIMENT — shows the Reels tab (docs/reels). Off by default; when
+  /// off, no Reels route or tab is registered at all.
+  final bool reelsEnabled;
+
   /// EXPERIMENT — chat panel inside video calls (docs/chat). Off by default:
   /// the call screen then has no chat control.
   final bool inCallChatEnabled;
@@ -74,6 +80,7 @@ final class AppConfig extends Equatable {
     supabasePublishableKey,
     supportEmail,
     cashfreeEnabled,
+    reelsEnabled,
     inCallChatEnabled,
   ];
 }

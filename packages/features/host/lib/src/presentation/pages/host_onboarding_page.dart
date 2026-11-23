@@ -144,7 +144,9 @@ class _Intro extends StatelessWidget {
         Text(
           'HOST ON DASHURI',
           style: theme.textTheme.labelMedium?.copyWith(
-            color: DashuriTokens.goldDark,
+            // goldDark is 3.9:1 on the dark surface; secondary is the
+            // theme's gold (≥ 4.7:1 in both modes).
+            color: theme.colorScheme.secondary,
             letterSpacing: 1.6,
           ),
         ),

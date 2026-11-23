@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/dashuri_colors.dart';
 import '../tokens/dashuri_tokens.dart';
 import 'currency_icons.dart';
 import 'formatting.dart';
@@ -130,31 +131,15 @@ class StatusTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg) = switch (tone) {
-      StatusTone.online => (
-        DashuriTokens.success100,
-        DashuriTokens.successText,
-      ),
-      StatusTone.busy => (DashuriTokens.warning100, DashuriTokens.warningText),
-      StatusTone.offline => (
-        DashuriTokens.neutral100,
-        DashuriTokens.neutral600,
-      ),
-      StatusTone.success => (
-        DashuriTokens.success100,
-        DashuriTokens.successText,
-      ),
-      StatusTone.warning => (
-        DashuriTokens.warning100,
-        DashuriTokens.warningText,
-      ),
-      StatusTone.error => (DashuriTokens.error100, DashuriTokens.error),
-      StatusTone.info => (DashuriTokens.info100, DashuriTokens.info),
-      StatusTone.neutral => (
-        DashuriTokens.neutral100,
-        DashuriTokens.neutral700,
-      ),
+    final c = DashuriColors.of(context);
+    final t = switch (tone) {
+      StatusTone.online || StatusTone.success => c.success,
+      StatusTone.busy || StatusTone.warning => c.warning,
+      StatusTone.offline || StatusTone.neutral => c.neutral,
+      StatusTone.error => c.error,
+      StatusTone.info => c.info,
     };
+    final (bg, fg) = (t.container, t.onContainer);
     final text = Text(
       label,
       style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
@@ -178,9 +163,7 @@ class StatusTag extends StatelessWidget {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: tone == StatusTone.online
-                          ? DashuriTokens.online
-                          : fg,
+                      color: tone == StatusTone.online ? t.icon : fg,
                       shape: BoxShape.circle,
                     ),
                   ),

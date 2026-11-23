@@ -163,13 +163,15 @@ class _SubmittedView extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 40,
-                    backgroundColor: DashuriTokens.success100,
+                    backgroundColor: DashuriColors.of(
+                      context,
+                    ).success.container,
                     child: Icon(
                       Icons.verified_user_outlined,
                       size: 40,
-                      color: DashuriTokens.success,
+                      color: DashuriColors.of(context).success.icon,
                     ),
                   ),
                   const SizedBox(height: DashuriTokens.space5),

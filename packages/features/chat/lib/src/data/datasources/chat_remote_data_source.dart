@@ -35,13 +35,15 @@ class ChatRemoteDataSource {
     idempotencyKey: idempotencyKey,
   );
 
+  /// [callId] selects one call's in-call session chat.
   Future<Result<Page<ChatMessage>>> listMessages({
     required String conversationId,
     required PageRequest page,
+    String? callId,
   }) => _api.get(
     '/v1/conversations/$conversationId/messages',
     decode: pageDecoder(chatMessageFromJson),
-    query: page.toQuery(),
+    query: {...page.toQuery(), 'call_id': ?callId},
   );
 
   /// With [callId] the message is sent from the in-call panel: it carries

@@ -64,7 +64,12 @@ final class ChatRepositoryImpl implements ChatRepository {
   Future<Result<Page<ChatMessage>>> listMessages({
     required String conversationId,
     required PageRequest page,
-  }) => _remote.listMessages(conversationId: conversationId, page: page);
+    String? callId,
+  }) => _remote.listMessages(
+    conversationId: conversationId,
+    page: page,
+    callId: callId,
+  );
 
   @override
   Future<Result<ChatMessage>> sendMessage({

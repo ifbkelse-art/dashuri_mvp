@@ -70,15 +70,21 @@ final class ApiClient {
 
   /// PUTs raw [bytes] to a pre-signed storage URL (e.g. a photo upload
   /// ticket). No bearer token is sent: the URL itself carries the grant.
+  /// [onProgress] receives the sent fraction (0–1) for large uploads.
   Future<Result<void>> uploadToSignedUrl(
     Uri url,
     List<int> bytes, {
     required String contentType,
+    void Function(double fraction)? onProgress,
   }) async {
     try {
       final response = await _dio.requestUri<Object?>(
         url,
         data: Stream<List<int>>.value(bytes),
+        onSendProgress: onProgress == null
+            ? null
+            : (sent, total) =>
+                  onProgress(total <= 0 ? 0 : (sent / total).clamp(0, 1)),
         options: Options(
           method: 'PUT',
           contentType: contentType,

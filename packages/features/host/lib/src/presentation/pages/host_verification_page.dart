@@ -365,8 +365,7 @@ class _Attention extends StatelessWidget {
         const SizedBox(height: DashuriTokens.space4),
         const HostHeroIcon(
           icon: Icons.report_gmailerrorred_rounded,
-          color: DashuriTokens.warning,
-          background: DashuriTokens.warning100,
+          tone: _warning,
         ),
         const SizedBox(height: DashuriTokens.space5),
         Text(
@@ -418,3 +417,5 @@ class _Attention extends StatelessWidget {
     );
   }
 }
+
+DashuriTone _warning(DashuriColors c) => c.warning;

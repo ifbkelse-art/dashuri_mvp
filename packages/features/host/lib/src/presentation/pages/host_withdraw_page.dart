@@ -386,11 +386,7 @@ class _Requested extends StatelessWidget {
     return HostFormBody(
       children: [
         const SizedBox(height: DashuriTokens.space4),
-        const HostHeroIcon(
-          icon: Icons.check_rounded,
-          color: DashuriTokens.success,
-          background: DashuriTokens.success100,
-        ),
+        const HostHeroIcon(icon: Icons.check_rounded, tone: _success),
         const SizedBox(height: DashuriTokens.space5),
         Text(
           'Withdrawal requested',
@@ -481,3 +477,5 @@ class _Unavailable extends StatelessWidget {
     );
   }
 }
+
+DashuriTone _success(DashuriColors c) => c.success;

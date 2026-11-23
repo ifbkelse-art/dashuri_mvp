@@ -50,7 +50,14 @@ type Repository interface {
 	// ErrNotFound otherwise.
 	CallBetween(ctx context.Context, callID, a, b string) error
 	// ListMessages is newest first; ReadByPeer is computed for viewerID.
-	ListMessages(ctx context.Context, conversationID, viewerID string, after *Cursor, limit int) ([]ChatMessage, error)
+	// With callID nil it is the normal Chat view: messages of a call
+	// session whose call is still live are left out (they appear, in place,
+	// once the call ends). With callID set it is that call's session only.
+	ListMessages(ctx context.Context, conversationID, viewerID string, callID *string, after *Cursor, limit int) ([]ChatMessage, error)
+	// CallSession returns the conversation holding callID's session
+	// messages and the two participants; ErrNotFound when the call has no
+	// session messages.
+	CallSession(ctx context.Context, callID string) (conversationID string, participants [2]string, err error)
 	// InsertMessage stores the message, bumps the conversation and marks it
 	// read for the sender, in one transaction. With a ClientMessageID that
 	// was already stored for this sender and conversation it returns the

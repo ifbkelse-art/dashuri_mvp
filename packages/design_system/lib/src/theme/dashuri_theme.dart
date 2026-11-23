@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/dashuri_tokens.dart';
+import 'dashuri_colors.dart';
 import 'dashuri_text.dart';
 
 /// Material 3 themes built from the design tokens (light is the designed
 /// mode; dark is derived for system dark mode and the in-call screens).
+///
+/// Every foreground role meets WCAG 2.2 AA on its background in both
+/// modes (test/theme_contrast_test.dart). Status colours live in the
+/// [DashuriColors] extension.
 abstract final class DashuriTheme {
   static ThemeData light() => _build(Brightness.light);
 
@@ -22,16 +27,20 @@ abstract final class DashuriTheme {
       onPrimaryContainer: light
           ? DashuriTokens.burgundy800
           : DashuriTokens.burgundy50,
-      secondary: light ? DashuriTokens.goldDark : DashuriTokens.gold,
-      onSecondary: DashuriTokens.neutral0,
+      // Gold as text: ≥ 4.5:1 on every surface level in both modes.
+      secondary: light ? const Color(0xFF86632A) : const Color(0xFFD0A456),
+      // White on the dark-mode gold is 3.1:1; near-black is 6.2:1.
+      onSecondary: light ? DashuriTokens.neutral0 : DashuriTokens.neutral950,
       secondaryContainer: light
           ? DashuriTokens.gold100
           : const Color(0xFF3A2C14),
+      // goldDark on gold100 is 4.2:1; this deeper gold is 5.8:1.
       onSecondaryContainer: light
-          ? DashuriTokens.goldDark
+          ? const Color(0xFF765421)
           : DashuriTokens.gold100,
-      tertiary: DashuriTokens.info,
-      onTertiary: DashuriTokens.neutral0,
+      // The token info blue is 3.1:1 on the dark surface.
+      tertiary: light ? DashuriTokens.info : const Color(0xFF9CC3E4),
+      onTertiary: light ? DashuriTokens.neutral0 : const Color(0xFF0B2539),
       error: light ? DashuriTokens.error : const Color(0xFFF2B8B5),
       onError: light ? DashuriTokens.neutral0 : const Color(0xFF601410),
       errorContainer: light ? DashuriTokens.error100 : const Color(0xFF8C1D18),
@@ -53,10 +62,15 @@ abstract final class DashuriTheme {
       surfaceContainerHigh: light
           ? DashuriTokens.neutral100
           : DashuriTokens.neutral800,
+      // neutral-200 / neutral-700 left error, info and border colours
+      // below AA on it.
       surfaceContainerHighest: light
-          ? DashuriTokens.neutral200
-          : DashuriTokens.neutral700,
-      outline: light ? DashuriTokens.neutral300 : DashuriTokens.neutral600,
+          ? const Color(0xFFEBE4DC)
+          : const Color(0xFF363030),
+      // Meaningful borders (inputs, outlined buttons) need 3:1 (WCAG
+      // 1.4.11): neutral-300 was 1.6:1 (light), neutral-600 2.9:1 (dark).
+      // Decorative lines use outlineVariant.
+      outline: DashuriTokens.neutral500,
       outlineVariant: light
           ? DashuriTokens.neutral200
           : DashuriTokens.neutral800,
@@ -79,6 +93,7 @@ abstract final class DashuriTheme {
     const minSize = Size(64, DashuriTokens.buttonHeight);
     return ThemeData(
       useMaterial3: true,
+      extensions: [light ? DashuriColors.light : DashuriColors.dark],
       colorScheme: scheme,
       textTheme: text,
       scaffoldBackgroundColor: scheme.surface,
@@ -126,10 +141,25 @@ abstract final class DashuriTheme {
           borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
+        // The field fill is almost the page colour, so the border is what
+        // shows where to type: it uses outline (≥ 3:1), not outlineVariant.
         enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
+          borderSide: BorderSide(color: scheme.outline),
+        ),
+        disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
+          borderSide: BorderSide(color: scheme.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
+          borderSide: BorderSide(color: scheme.error, width: 1.5),
+        ),
+        hintStyle: text.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
           borderSide: BorderSide(color: scheme.primary, width: 1.5),

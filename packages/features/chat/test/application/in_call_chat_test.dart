@@ -1,4 +1,6 @@
-// EXPERIMENT — unified chat + in-call messaging, client side. Two users,
+// EXPERIMENT — video-call session chat, client side. Each call has its own
+// session in the pair's one conversation; normal Chat gets it when the call
+// ends. Two users,
 // real cubits, one fake server with the Go API's rules (see
 // helpers/fake_chat_server.dart). Server rules are separately verified on
 // Postgres in backend/internal/modules/chat/chat_integration_test.go.
@@ -49,8 +51,8 @@ void main() {
     return (c, h);
   }
 
-  test('1+2: a message sent during the call reaches the peer immediately '
-      'and is in their normal chat', () async {
+  test('1+2: a message sent during the call reaches the peer immediately; '
+      'normal Chat gets it when the call ends', () async {
     final (c, h) = await bothInCall();
     await c.send('Can you hear me?');
     await settle();
@@ -59,7 +61,7 @@ void main() {
     expect(h.state.bubbles.single.context, MessageContext.call);
     expect(c.state.bubbles.single.context, MessageContext.call);
 
-    // The host's inbox opens the same conversation and sees it.
+    // The host's normal Chat: same conversation, session not in it yet.
     final conv = server.conversationOf(customer, host);
     final inbox = cubitFor(
       server,
@@ -70,11 +72,16 @@ void main() {
     addTearDown(inbox.close);
     await inbox.start();
     expect(inbox.state.conversationId, conv);
+    expect(bodies(inbox), isEmpty);
+
+    // The call ends server-side: the open Chat refreshes from the hint.
+    server.endCall(callId);
+    await settle();
     expect(bodies(inbox), ['Can you hear me?']);
   });
 
-  test('3+4: a normal-chat message sent while the call is active appears in '
-      "the peer's in-call panel", () async {
+  test('3+4: the session is isolated: normal-chat messages, even ones sent '
+      'during the call, stay out of the in-call panel', () async {
     final (c, _) = await bothInCall();
     final conv = server.conversationOf(customer, host);
     final hostInbox = cubitFor(
@@ -88,32 +95,40 @@ void main() {
 
     await hostInbox.send('Sent from the inbox');
     await settle();
-    expect(bodies(c), ['Sent from the inbox']);
-    expect(c.state.bubbles.single.context, MessageContext.chat);
+    expect(bodies(c), isEmpty);
+    expect(bodies(hostInbox), ['Sent from the inbox']);
   });
 
-  test('history from before the call is in the in-call panel; one '
-      'conversation per pair', () async {
+  test('a new call does not load earlier chat history; one conversation '
+      'per pair', () async {
     final before = cubitFor(server, customer, peerUserId: host);
     await before.start();
     await before.send('Hi before the call');
     await before.close();
 
     final (c, h) = await bothInCall();
-    expect(bodies(c), ['Hi before the call']);
-    expect(bodies(h), ['Hi before the call']);
+    expect(bodies(c), isEmpty);
+    expect(bodies(h), isEmpty);
     expect(c.state.conversationId, h.state.conversationId);
     expect(c.state.conversationId, server.conversationOf(customer, host));
   });
 
-  test('5: history survives the end of the call; chatting continues', () async {
+  test('5: after the call the session is appended to normal Chat; earlier '
+      'history intact; chatting continues', () async {
+    final before = cubitFor(server, customer, peerUserId: host);
+    await before.start();
+    await before.send('before the call');
+    await before.close();
+
     final (c, h) = await bothInCall();
     await c.send('during the call');
     await h.send('reply during the call');
     await settle();
-    // The call ends: the call screen closes its chat.
+    // The call ends: the call screen closes its chat; the server ends it.
     await c.close();
     await h.close();
+    server.endCall(callId);
+    server.endCall(callId); // repeated call-end event: no effect
 
     final conv = server.conversationOf(customer, host);
     for (final user in [customer, host]) {
@@ -125,7 +140,11 @@ void main() {
       );
       addTearDown(inbox.close);
       await inbox.start();
-      expect(bodies(inbox), ['during the call', 'reply during the call']);
+      expect(bodies(inbox), [
+        'before the call',
+        'during the call',
+        'reply during the call',
+      ]);
     }
     final after = cubitFor(
       server,
@@ -137,10 +156,49 @@ void main() {
     await after.start();
     await after.send('thanks for the call');
     expect(server.stored(conv).map((m) => m.body), [
+      'before the call',
       'during the call',
       'reply during the call',
       'thanks for the call',
     ]);
+  });
+
+  test('multiple calls: each session is independent and all join the same '
+      'conversation in order', () async {
+    Future<ConversationCubit> panel(String user, String call) async {
+      final p = cubitFor(
+        server,
+        user,
+        peerUserId: user == host ? customer : host,
+        callId: call,
+      );
+      addTearDown(p.close);
+      await p.start();
+      return p;
+    }
+
+    final c1 = await panel(customer, 'call-1');
+    await c1.send('first call');
+    server.endCall('call-1');
+
+    final c2 = await panel(customer, 'call-2');
+    final h2 = await panel(host, 'call-2');
+    expect(bodies(c2), isEmpty);
+    await h2.send('second call');
+    await settle();
+    expect(bodies(c2), ['second call']);
+    server.endCall('call-2');
+
+    final conv = server.conversationOf(customer, host);
+    final inbox = cubitFor(
+      server,
+      host,
+      peerUserId: customer,
+      conversationId: conv,
+    );
+    addTearDown(inbox.close);
+    await inbox.start();
+    expect(bodies(inbox), ['first call', 'second call']);
   });
 
   test('6: a lost response is retried with the same key: one message, one '
@@ -223,6 +281,7 @@ void main() {
       customer,
       peerUserId: host,
       conversationId: c.state.conversationId,
+      callId: callId, // a reconnecting panel pages the session
     );
     addTearDown(fresh.close);
     await fresh.start();

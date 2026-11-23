@@ -20,7 +20,11 @@ class TransactionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final (bg, fg) = WalletFormat.iconColors(entry, theme.colorScheme);
+    final (bg, fg) = WalletFormat.iconColors(
+      entry,
+      theme.colorScheme,
+      DashuriColors.of(context),
+    );
     final positive = entry.amount > 0;
     final subtitle = [
       if (showDay) WalletFormat.day(entry.createdAt),
@@ -81,8 +85,10 @@ class TransactionRow extends StatelessWidget {
                       WalletFormat.signedAmount(entry),
                       textAlign: TextAlign.end,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        // AA-safe green for text (base green is 4.0:1 here).
-                        color: positive ? DashuriTokens.successText : null,
+                        // AA-safe green for text in both themes.
+                        color: positive
+                            ? DashuriColors.of(context).positiveText
+                            : null,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),

@@ -238,6 +238,7 @@ void main() {
       await inCall.send('sent in the call');
       await inCall.close();
     });
+    server.endCall('call'); // the session joins normal Chat
     final cubit = cubitFor(
       server,
       me,

@@ -10,6 +10,7 @@ import 'package:feature_location/feature_location.dart';
 import 'package:feature_notifications/feature_notifications.dart';
 import 'package:feature_profile/feature_profile.dart';
 import 'package:feature_purchases/feature_purchases.dart';
+import 'package:feature_reels/feature_reels.dart';
 import 'package:feature_safety/feature_safety.dart';
 import 'package:feature_settings/feature_settings.dart';
 import 'package:feature_video_call/feature_video_call.dart';
@@ -20,7 +21,11 @@ import 'role_shells.dart';
 import 'session_route_guard.dart';
 
 /// Every feature's routes. Tab routes go into the role shells.
-List<FeatureRoutes> appFeatures({bool backendConfigured = true}) => [
+/// [reelsEnabled] adds the EXPERIMENTAL Reels routes (DASHURI_REELS_ENABLED).
+List<FeatureRoutes> appFeatures({
+  bool backendConfigured = true,
+  bool reelsEnabled = false,
+}) => [
   AuthRoutes(backendConfigured: backendConfigured),
   const DiscoveryRoutes(),
   const FreeCallRoutes(),
@@ -34,6 +39,7 @@ List<FeatureRoutes> appFeatures({bool backendConfigured = true}) => [
   const NotificationsRoutes(),
   const SettingsRoutes(),
   const LocationRoutes(),
+  if (reelsEnabled) const ReelsRoutes(),
 ];
 
 /// Composes every feature's routes into one GoRouter with the onboarding
@@ -43,10 +49,16 @@ GoRouter buildRouter({
   required ExperienceController experience,
   List<FeatureRoutes>? features,
   bool backendConfigured = true,
+  bool reelsEnabled = false,
   String initialLocation = RoutePaths.splash,
 }) {
   final composed = composeRoutes(
-    features ?? appFeatures(backendConfigured: backendConfigured),
+    features ??
+        appFeatures(
+          backendConfigured: backendConfigured,
+          reelsEnabled: reelsEnabled,
+        ),
+    reelsTab: reelsEnabled,
   );
   final guard = SessionRouteGuard(
     session,

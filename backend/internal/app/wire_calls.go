@@ -4,6 +4,7 @@ import (
 	"dashuri/backend/internal/adapters/postgres"
 	"dashuri/backend/internal/adapters/stream"
 	"dashuri/backend/internal/modules/calls"
+	"dashuri/backend/internal/modules/chat"
 	"dashuri/backend/internal/wiring"
 )
 
@@ -28,6 +29,14 @@ func BuildCalls(env wiring.Env) *calls.Service {
 		d.Repo = postgres.CallsRepo{Pool: env.Pool, Tx: env.Tx}
 		// BE-identity: peer.photo_url from the first approved profile photo.
 		d.Photos = postgres.ProfilePhotoURLs{Pool: env.Pool, Signer: profilePhotoStorage(env)}
+		// In-call session chat joins normal Chat when the call ends (by
+		// phase, server-side); this only nudges open Chat screens.
+		sessions := chat.NewService(chat.Deps{
+			Repo:           postgres.ChatRepo{Pool: env.Pool, MessageContext: env.Config.ChatMessageContextEnabled},
+			Realtime:       env.Realtime,
+			MessageContext: env.Config.ChatMessageContextEnabled,
+		})
+		d.OnTerminated = sessions.CallEnded
 	}
 	return calls.NewService(d)
 }

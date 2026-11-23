@@ -24,6 +24,8 @@ type Deps struct {
 type PageRequest struct {
 	Cursor string
 	Limit  int
+	// CallID selects one call's session chat (messages only).
+	CallID *string
 }
 
 // Page is the list envelope {items, next_cursor}.
@@ -34,6 +36,9 @@ type Page[T any] struct {
 
 func parsePage(r *http.Request) (PageRequest, error) {
 	p := PageRequest{Cursor: r.URL.Query().Get("cursor"), Limit: 20}
+	if v := r.URL.Query().Get("call_id"); v != "" {
+		p.CallID = &v
+	}
 	if v := r.URL.Query().Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 || n > 100 {

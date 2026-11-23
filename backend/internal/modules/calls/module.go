@@ -1,6 +1,7 @@
 package calls
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -26,6 +27,10 @@ type Deps struct {
 	APIKey string
 	// Photos fills peer.photo_url (optional; nil leaves it null).
 	Photos PeerPhotos
+	// OnTerminated (optional) runs after a call reached a terminal phase
+	// and committed, once per transition. Chat uses it to refresh both
+	// participants' Chat screens so the call's session chat shows there.
+	OnTerminated func(ctx context.Context, callID string)
 }
 
 // Timing rules of the call lifecycle (video-call-architecture.md).

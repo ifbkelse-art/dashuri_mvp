@@ -242,7 +242,9 @@ class _GalleryState extends State<_Gallery> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               stops: [0, .25],
-              colors: [Color(0x66000000), Colors.transparent],
+              // 55 % black: the white app-bar icons stay ≥ 4.5:1 even
+              // over a white photo (40 % gave 2.9:1).
+              colors: [Color(0x8C000000), Colors.transparent],
             ),
           ),
         ),

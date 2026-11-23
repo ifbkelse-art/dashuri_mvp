@@ -163,7 +163,11 @@ class _ConversationPageState extends State<ConversationPage> {
                                   child: Text(
                                     ChatFormat.failure(state.sendFailure!),
                                     style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(color: DashuriTokens.error),
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.error,
+                                        ),
                                   ),
                                 ),
                             ],

@@ -221,7 +221,7 @@ class _CallRow extends StatelessWidget {
             CurrencyAmount.beans(
               beans,
               style: theme.textTheme.titleSmall?.copyWith(
-                color: DashuriTokens.successText, // AA-safe green for text
+                color: DashuriColors.of(context).positiveText,
               ),
             )
           else

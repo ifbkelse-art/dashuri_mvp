@@ -23,7 +23,7 @@ class _Hints extends Mock implements WatchChatHints {}
 class _Me extends Mock implements GetCurrentUserId {}
 
 typedef SendInput = SendMessageInput;
-typedef ListInput = ({String conversationId, PageRequest page});
+typedef ListInput = ({String conversationId, PageRequest page, String? callId});
 
 void main() {
   late _ListConv listConv;
@@ -38,7 +38,11 @@ void main() {
   setUpAll(() {
     registerFallbackValue(const PageRequest());
     registerFallbackValue(const NoInput());
-    registerFallbackValue((conversationId: 'c', page: const PageRequest()));
+    registerFallbackValue((
+      conversationId: 'c',
+      page: const PageRequest(),
+      callId: null,
+    ));
     registerFallbackValue((
       conversationId: 'c',
       body: 'b',

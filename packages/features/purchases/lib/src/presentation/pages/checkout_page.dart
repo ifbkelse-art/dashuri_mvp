@@ -243,7 +243,7 @@ class _Summary extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: DashuriTokens.burgundy50,
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(
                     DashuriTokens.radiusMedium,
                   ),
@@ -316,9 +316,10 @@ class _Banner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (bg, fg) = error
-        ? (DashuriTokens.error100, DashuriTokens.error)
-        : (DashuriTokens.info100, DashuriTokens.info);
+    final tone = error
+        ? DashuriColors.of(context).error
+        : DashuriColors.of(context).info;
+    final (bg, fg) = (tone.container, tone.icon);
     return Container(
       padding: const EdgeInsets.all(DashuriTokens.space3),
       decoration: BoxDecoration(
@@ -336,7 +337,9 @@ class _Banner extends StatelessWidget {
               Expanded(
                 child: Text(
                   text,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: tone.onContainer),
                 ),
               ),
             ],

@@ -53,7 +53,7 @@ Future<GoRouter> pumpPage(
         textScaler: TextScaler.linear(uiuxScale(textScale)),
       ),
       child: MaterialApp.router(
-        theme: DashuriTheme.light(),
+        theme: uiuxTheme(DashuriTheme.light()),
         routerConfig: router,
       ),
     ),

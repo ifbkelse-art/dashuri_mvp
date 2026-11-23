@@ -9,6 +9,7 @@ export 'src/components/state_views.dart';
 export 'src/components/widgets.dart';
 export 'src/responsive/adaptive_shell.dart';
 export 'src/responsive/breakpoints.dart';
+export 'src/theme/dashuri_colors.dart';
 export 'src/theme/dashuri_text.dart';
 export 'src/theme/dashuri_theme.dart';
 export 'src/tokens/dashuri_tokens.dart';

@@ -27,6 +27,7 @@ class _DashuriAppState extends State<DashuriApp> {
     session: _session,
     experience: _experience,
     backendConfigured: backendConfigured,
+    reelsEnabled: reelsEnabled,
   );
 
   /// Re-reads the account when the app returns to the foreground, so changes

@@ -63,6 +63,17 @@ type Config struct {
 	// makes photo uploads return 503 storage_not_configured.
 	StorageServiceKey string // secret
 
+	// EXPERIMENT — Dashuri Reels (docs/reels). Off by default: every Reels
+	// endpoint answers 503 reels_disabled and nothing else changes.
+	ReelsEnabled             bool
+	MuxTokenID               string // secret
+	MuxTokenSecret           string // secret
+	MuxSigningKeyID          string
+	MuxSigningKeyBase64      string // secret (base64 PEM RSA key for signed playback)
+	MuxWebhookSecret         string // secret
+	ReelsModerationModels    string // Sightengine models per frame
+	ReelsModerationFrameSecs int    // seconds between moderation frames
+
 	// EXPERIMENT — unified chat + in-call messaging (docs/chat). Stores the
 	// in-call metadata columns (context, call_id, client_message_id). Needs
 	// migration 20261123000200 applied FIRST. Off: in-call messages are
@@ -103,6 +114,15 @@ func Load() (Config, error) {
 		SightengineSecret:      os.Getenv("SIGHTENGINE_API_SECRET"),
 		FCMProjectID:           os.Getenv("FCM_PROJECT_ID"),
 		StorageServiceKey:      os.Getenv("SUPABASE_STORAGE_SERVICE_KEY"),
+
+		ReelsEnabled:             getBool("REELS_ENABLED", false),
+		MuxTokenID:               os.Getenv("MUX_TOKEN_ID"),
+		MuxTokenSecret:           os.Getenv("MUX_TOKEN_SECRET"),
+		MuxSigningKeyID:          os.Getenv("MUX_SIGNING_KEY_ID"),
+		MuxSigningKeyBase64:      os.Getenv("MUX_SIGNING_KEY_PRIVATE"),
+		MuxWebhookSecret:         os.Getenv("MUX_WEBHOOK_SECRET"),
+		ReelsModerationModels:    os.Getenv("REELS_MODERATION_MODELS"),
+		ReelsModerationFrameSecs: getInt("REELS_MODERATION_FRAME_SECONDS", 2),
 
 		ChatMessageContextEnabled: getBool("CHAT_MESSAGE_CONTEXT_ENABLED", false),
 	}
@@ -152,6 +172,13 @@ func (c Config) Validate() error {
 func get(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func getInt(k string, def int) int {
+	if n, err := strconv.Atoi(os.Getenv(k)); err == nil && n > 0 {
+		return n
 	}
 	return def
 }

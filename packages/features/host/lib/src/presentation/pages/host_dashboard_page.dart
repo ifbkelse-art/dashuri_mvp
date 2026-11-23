@@ -107,10 +107,13 @@ class _Header extends StatelessWidget {
                   height: 12,
                   decoration: BoxDecoration(
                     color: online
-                        ? DashuriTokens.online
-                        : DashuriTokens.neutral400,
+                        ? DashuriColors.of(context).onlineDot
+                        : Theme.of(context).colorScheme.outline,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.surface,
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
@@ -211,9 +214,13 @@ class _AvailabilityCard extends StatelessWidget {
     final cubit = context.read<HostDashboardCubit>();
     final host = state.data;
     final online = host.isAvailable;
+    final ok = DashuriColors.of(context).success;
+    final light = theme.brightness == Brightness.light;
     return HostCard(
-      color: online ? DashuriTokens.success100 : null,
-      borderColor: online ? DashuriTokens.success.withValues(alpha: .3) : null,
+      // Theme-aware tint: text and chips inside use the theme's on-colours,
+      // which were unreadable on the fixed light green in dark mode.
+      color: online ? ok.container : null,
+      borderColor: online ? ok.icon.withValues(alpha: .4) : null,
       padding: const EdgeInsets.all(DashuriTokens.space5),
       child: Column(
         children: [
@@ -222,24 +229,22 @@ class _AvailabilityCard extends StatelessWidget {
             height: 88,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: online ? Colors.white : theme.colorScheme.surfaceContainer,
-              border: online
-                  ? Border.all(color: DashuriTokens.success, width: 2)
-                  : null,
+              color: online
+                  ? theme.colorScheme.surface
+                  : theme.colorScheme.surfaceContainer,
+              border: online ? Border.all(color: ok.icon, width: 2) : null,
             ),
             child: Icon(
               online ? Icons.videocam_rounded : Icons.bedtime_outlined,
               size: 36,
-              color: online
-                  ? DashuriTokens.success
-                  : theme.colorScheme.onSurfaceVariant,
+              color: online ? ok.icon : theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: DashuriTokens.space4),
           Text(
             online ? "You're online" : "You're offline",
             style: theme.textTheme.headlineSmall?.copyWith(
-              color: online ? DashuriTokens.success : null,
+              color: online ? ok.onContainer : null,
             ),
           ),
           const SizedBox(height: DashuriTokens.space1),
@@ -248,7 +253,9 @@ class _AvailabilityCard extends StatelessWidget {
                 ? 'Waiting for calls · visible in Discover'
                 : "Customers can't see or call you.",
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: online ? ok.onContainer : null,
+            ),
           ),
           if (online) ...[
             const SizedBox(height: DashuriTokens.space3),
@@ -284,7 +291,7 @@ class _AvailabilityCard extends StatelessWidget {
                           : () => cubit.setAvailable(available: false),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(56),
-                        backgroundColor: Colors.white,
+                        backgroundColor: theme.colorScheme.surface,
                       ),
                       child: Text(state.updating ? 'Updating…' : 'Go offline'),
                     )
@@ -294,8 +301,14 @@ class _AvailabilityCard extends StatelessWidget {
                           : () => cubit.setAvailable(available: true),
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(56),
-                        backgroundColor: DashuriTokens.success,
-                        foregroundColor: Colors.white,
+                        // White on the base green is 4.0:1; these are
+                        // ≥ 6:1 (light) and ≥ 9:1 (dark).
+                        backgroundColor: light
+                            ? DashuriTokens.successText
+                            : ok.icon,
+                        foregroundColor: light
+                            ? Colors.white
+                            : DashuriTokens.neutral950,
                       ),
                       icon: state.updating
                           ? const SizedBox.square(

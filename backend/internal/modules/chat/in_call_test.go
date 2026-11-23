@@ -21,6 +21,8 @@ const (
 	convID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 	callID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 	other  = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+	// callID2 is a second call between userA and userB.
+	callID2 = "dddddddd-dddd-4ddd-8ddd-ddddddddddd2"
 )
 
 type fakeRepo struct {
@@ -31,11 +33,13 @@ type fakeRepo struct {
 	clientID map[string]string // client id -> message id
 	readAt   map[string]time.Time
 	clock    time.Time
+	msgCall  map[string]string // message id -> call id (session messages)
+	liveCall map[string]bool   // call id -> still live
 }
 
 func newFake() *fakeRepo {
 	return &fakeRepo{privacy: "everyone", clientID: map[string]string{}, readAt: map[string]time.Time{},
-		clock: time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)}
+		clock: time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC), msgCall: map[string]string{}, liveCall: map[string]bool{}}
 }
 
 func (f *fakeRepo) tick() time.Time { f.clock = f.clock.Add(time.Second); return f.clock }
@@ -49,7 +53,7 @@ func (f *fakeRepo) BlockedEither(context.Context, string, string) (bool, error) 
 func (f *fakeRepo) HadBilledCall(context.Context, string, string) (bool, error) { return false, nil }
 func (f *fakeRepo) InLiveCall(context.Context, string, string) (bool, error)    { return f.live, nil }
 func (f *fakeRepo) CallBetween(_ context.Context, id, _, _ string) error {
-	if id != callID {
+	if id != callID && id != callID2 {
 		return ErrNotFound
 	}
 	return nil
@@ -74,9 +78,16 @@ func (f *fakeRepo) Conversation(context.Context, string, string) (ConversationRo
 func (f *fakeRepo) ListConversations(context.Context, string, *Cursor, int) ([]ConversationRow, error) {
 	return nil, nil
 }
-func (f *fakeRepo) ListMessages(_ context.Context, _, viewer string, _ *Cursor, limit int) ([]ChatMessage, error) {
+func (f *fakeRepo) ListMessages(_ context.Context, _, viewer string, call *string, _ *Cursor, limit int) ([]ChatMessage, error) {
 	out := []ChatMessage{}
 	for _, m := range f.msgs {
+		mc, inSession := f.msgCall[m.Id]
+		if call != nil && mc != *call {
+			continue // session view: this call only
+		}
+		if call == nil && inSession && f.liveCall[mc] {
+			continue // normal Chat: hidden while the call is live
+		}
 		if m.SenderId == viewer {
 			for u, at := range f.readAt {
 				m.ReadByPeer = m.ReadByPeer || (u != viewer && !at.Before(m.SentAt))
@@ -103,6 +114,9 @@ func (f *fakeRepo) InsertMessage(_ context.Context, nm NewMessage) (ChatMessage,
 	m := ChatMessage{Id: time.Now().Format("150405.000000000") + nm.Body, ConversationId: nm.ConversationID,
 		SenderId: nm.SenderID, Body: nm.Body, SentAt: f.tick(), Context: nm.Context}
 	f.msgs = append(f.msgs, m)
+	if nm.CallID != nil {
+		f.msgCall[m.Id] = *nm.CallID
+	}
 	f.readAt[nm.SenderID] = m.SentAt
 	if nm.ClientMessageID != nil {
 		f.clientID[nm.SenderID+*nm.ClientMessageID] = m.Id
@@ -118,6 +132,14 @@ func (f *fakeRepo) MarkRead(_ context.Context, _, u string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+func (f *fakeRepo) CallSession(_ context.Context, call string) (string, [2]string, error) {
+	for _, c := range f.msgCall {
+		if c == call {
+			return convID, [2]string{userA, userB}, nil
+		}
+	}
+	return "", [2]string{}, ErrNotFound
 }
 func (f *fakeRepo) WhoCanMessage(context.Context, string) (string, error)  { return f.privacy, nil }
 func (f *fakeRepo) SetWhoCanMessage(context.Context, string, string) error { return nil }

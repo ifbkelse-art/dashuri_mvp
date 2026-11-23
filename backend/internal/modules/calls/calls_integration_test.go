@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -71,14 +72,29 @@ type env struct {
 	video      *fakeVideo
 	clock      *testClock
 	ledger     postgres.LedgerStore
+	terminated *terminations
+}
+
+// terminations records OnTerminated (the in-call session chat hook).
+type terminations struct {
+	mu  sync.Mutex
+	ids []string
+}
+
+func (r *terminations) record(_ context.Context, id string) {
+	r.mu.Lock()
+	r.ids = append(r.ids, id)
+	r.mu.Unlock()
 }
 
 func setup(t *testing.T) env {
 	api, admin := pgtest.Pools(t)
-	e := env{api: api, admin: admin, video: &fakeVideo{}, clock: &testClock{t: time.Now().UTC()}, ledger: postgres.LedgerStore{Pool: api}}
+	e := env{api: api, admin: admin, video: &fakeVideo{}, clock: &testClock{t: time.Now().UTC()}, ledger: postgres.LedgerStore{Pool: api},
+		terminated: &terminations{}}
 	e.svc = calls.NewService(calls.Deps{
 		Rules: economy.Founder(), Video: e.video, Clock: e.clock, ProviderName: "stream", APIKey: "pk",
-		Repo: postgres.CallsRepo{Pool: api, Tx: db.TxManager{Pool: api}},
+		Repo:         postgres.CallsRepo{Pool: api, Tx: db.TxManager{Pool: api}},
+		OnTerminated: e.terminated.record,
 	})
 	return e
 }
@@ -320,6 +336,11 @@ func TestParallelEndAndStaleSweepSettleOnce(t *testing.T) {
 	_ = e.api.QueryRow(ctx, `select count(*) from calls.settlements where call_id = $1`, s.CallId).Scan(&settlements)
 	if entries != 1 || settlements != 1 {
 		t.Fatalf("entries=%d settlements=%d", entries, settlements)
+	}
+	// Session-chat hook: once, for 10 concurrent /end + 10 sweeps.
+	// (The sweep may also end other tests' calls in the shared database.)
+	if n := slices.Index(e.terminated.ids, s.CallId); n < 0 || slices.Contains(e.terminated.ids[n+1:], s.CallId) {
+		t.Fatalf("OnTerminated must run exactly once for %s: %v", s.CallId, e.terminated.ids)
 	}
 	if got := e.balance(t, cust, ledger.UserDiamondPurchased, ledger.Diamond); got != 10000-4333 {
 		t.Fatalf("customer diamonds %d (want 65 s billed once)", got)
