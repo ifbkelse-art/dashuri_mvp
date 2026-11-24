@@ -243,6 +243,26 @@ func (c *Client) Consume(ctx context.Context, pkg, productID, token string) erro
 	return nil
 }
 
+// errorSnippet returns the message Google put in an error response (or a
+// short prefix of the body), so a failed call is diagnosable from the log.
+// Error bodies hold no credentials or purchase data.
+func errorSnippet(body []byte) string {
+	var e struct {
+		Error struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &e) == nil && e.Error.Message != "" {
+		return strings.TrimSpace(e.Error.Status + " " + e.Error.Message)
+	}
+	s := strings.TrimSpace(string(body))
+	if len(s) > 200 {
+		s = s[:200]
+	}
+	return s
+}
+
 // VoidedPurchases implements purchases.voidedpurchases.list (one-time
 // products, type=0), following pagination. Google keeps 30 days of history.
 func (c *Client) VoidedPurchases(ctx context.Context, pkg string, since time.Time) ([]purchases.VoidedPurchase, error) {
@@ -259,7 +279,7 @@ func (c *Client) VoidedPurchases(ctx context.Context, pkg string, since time.Tim
 			return nil, err
 		}
 		if status != http.StatusOK {
-			return nil, fmt.Errorf("googleplay: voidedpurchases.list returned %d", status)
+			return nil, fmt.Errorf("googleplay: voidedpurchases.list returned %d: %s", status, errorSnippet(body))
 		}
 		var r struct {
 			VoidedPurchases []struct {

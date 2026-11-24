@@ -94,6 +94,38 @@ func TestClientMintsTokenAndCallsAPI(t *testing.T) {
 	}
 }
 
+func TestVoidedPurchasesErrorKeepsGoogleMessage(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"access_token":"at-1","expires_in":3600}`))
+	})
+	mux.HandleFunc("GET /androidpublisher/v3/applications/app.dashuri/purchases/voidedpurchases", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(400)
+		_, _ = w.Write([]byte(`{"error":{"code":400,"message":"startTime is too old","status":"INVALID_ARGUMENT"}}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c, err := New(fakeCredentials(t, srv.URL+"/token"), srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.BaseURL = srv.URL
+	_, err = c.VoidedPurchases(context.Background(), "app.dashuri", time.Now().Add(-time.Hour))
+	if err == nil || !strings.Contains(err.Error(), "returned 400") || !strings.Contains(err.Error(), "startTime is too old") {
+		t.Fatalf("error should carry the status and Google's message, got %v", err)
+	}
+}
+
+func TestErrorSnippetFallsBackToTrimmedBody(t *testing.T) {
+	long := strings.Repeat("x", 500)
+	if got := errorSnippet([]byte(long)); len(got) != 200 {
+		t.Fatalf("want 200 chars, got %d", len(got))
+	}
+	if got := errorSnippet([]byte(" not json ")); got != "not json" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestPushVerifier(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	other, _ := rsa.GenerateKey(rand.Reader, 2048)

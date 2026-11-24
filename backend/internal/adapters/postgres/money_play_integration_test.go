@@ -186,6 +186,64 @@ func TestVoidedPurchaseReversesOnlyUnspent(t *testing.T) {
 	}
 }
 
+// A refund whose purchase token does not match (for example a token in
+// another format) is matched by the Play order id stored at credit time.
+func TestVoidedPurchaseMatchedByOrderIDWhenTokenDiffers(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	m := newMoneyEnv(t, api, admin)
+	ctx := context.Background()
+	user := pgtest.NewUser(t, admin, true)
+	token := "tok" + pgtest.UUID()[:8]
+	m.play.set(token, 0, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(user)})
+	res, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), purchases.VerifyGooglePlayRequest{ProductId: "diamonds_4000", PurchaseToken: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.rtdn(t, pgtest.UUID(), map[string]any{"voidedPurchaseNotification": map[string]any{
+		"purchaseToken": "other-format-" + token, "orderId": "GPA." + token, "productType": 2, "refundType": 1}}); err != nil {
+		t.Fatal(err)
+	}
+	var state string
+	var removed int64
+	if err := admin.QueryRow(ctx, `select state, reversed_diamonds from commerce.purchases where id = $1`, res.PurchaseId).Scan(&state, &removed); err != nil {
+		t.Fatal(err)
+	}
+	if state != "reversed" || removed != 4000 {
+		t.Fatalf("state=%s removed=%d, want reversed/4000", state, removed)
+	}
+	if b := balance(t, api, user, ledger.UserDiamondPurchased); b != 0 {
+		t.Fatalf("balance after reversal %d, want 0", b)
+	}
+}
+
+// A refund that matches neither a token nor an order id changes nothing.
+func TestVoidedPurchaseMatchingNothingChangesNothing(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	m := newMoneyEnv(t, api, admin)
+	ctx := context.Background()
+	user := pgtest.NewUser(t, admin, true)
+	token := "tok" + pgtest.UUID()[:8]
+	m.play.set(token, 0, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(user)})
+	res, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), purchases.VerifyGooglePlayRequest{ProductId: "diamonds_4000", PurchaseToken: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.rtdn(t, pgtest.UUID(), map[string]any{"voidedPurchaseNotification": map[string]any{
+		"purchaseToken": "unknown-" + token, "orderId": "GPA.unknown-" + token, "productType": 2, "refundType": 1}}); err != nil {
+		t.Fatal(err)
+	}
+	var state string
+	if err := admin.QueryRow(ctx, `select state from commerce.purchases where id = $1`, res.PurchaseId).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state != "credited" {
+		t.Fatalf("state=%s, want credited", state)
+	}
+	if b := balance(t, api, user, ledger.UserDiamondPurchased); b != 4000 {
+		t.Fatalf("balance %d, want 4000", b)
+	}
+}
+
 func TestPollVoidedPurchasesReversesCreditedPurchase(t *testing.T) {
 	api, admin := pgtest.Pools(t)
 	m := newMoneyEnv(t, api, admin)

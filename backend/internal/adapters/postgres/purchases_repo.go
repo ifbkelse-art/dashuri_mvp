@@ -68,6 +68,17 @@ func (r PurchasesRepo) PurchaseByTokenHash(ctx context.Context, hash string) (pu
 	return p, err == nil, err
 }
 
+func (r PurchasesRepo) PurchaseByOrderID(ctx context.Context, orderID string) (purchases.PurchaseRecord, bool, error) {
+	if orderID == "" {
+		return purchases.PurchaseRecord{}, false, nil
+	}
+	p, err := scanPurchase(r.Pool.QueryRow(ctx, `select `+purchaseCols+` from commerce.purchases where order_id = $1`, orderID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return p, false, nil
+	}
+	return p, err == nil, err
+}
+
 func nullIfEmpty(s string) *string {
 	if s == "" {
 		return nil

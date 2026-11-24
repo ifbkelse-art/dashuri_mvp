@@ -343,7 +343,7 @@ func (s *Service) GooglePlayNotification(ctx context.Context, raw []byte, header
 		kind = "test"
 	case n.VoidedPurchaseNotification != nil:
 		kind = "voided"
-		if _, err := s.reversePlay(ctx, n.VoidedPurchaseNotification.PurchaseToken, "rtdn_voided", s.deps.Clock.Now(), "provider:google_play_rtdn"); err != nil {
+		if _, err := s.reversePlay(ctx, n.VoidedPurchaseNotification.PurchaseToken, n.VoidedPurchaseNotification.OrderID, "rtdn_voided", s.deps.Clock.Now(), "provider:google_play_rtdn"); err != nil {
 			return err
 		}
 	case n.OneTimeProductNotification != nil:
@@ -402,11 +402,39 @@ func ReversalAmount(p PurchaseRecord, purchased, promotional, reserved int64) in
 	return max(min(p.Diamonds, purchased-committed), 0)
 }
 
-func (s *Service) reversePlay(ctx context.Context, token, reason string, at time.Time, actor string) (ReversalResult, error) {
-	if token == "" {
+// reversePlay reverses a refunded or charged-back Play purchase. Google sends
+// both the purchase token and the order id. The token is tried first; if it
+// matches no purchase (for example a token in another format), the order id
+// stored at credit time is used. A refund that matches nothing is logged,
+// never silently dropped.
+func (s *Service) reversePlay(ctx context.Context, token, orderID, reason string, at time.Time, actor string) (ReversalResult, error) {
+	if token == "" && orderID == "" {
 		return ReversalResult{}, nil
 	}
-	res, err := s.deps.Repo.ReversePurchase(ctx, SHA256Hex(token), reason, at, ReversalAmount, s.deps.Rules.XPDiamondWeight)
+	hash := ""
+	if token != "" {
+		hash = SHA256Hex(token)
+		if _, found, err := s.deps.Repo.PurchaseByTokenHash(ctx, hash); err != nil {
+			return ReversalResult{}, apperr.Internal(err)
+		} else if !found {
+			hash = ""
+		}
+	}
+	if hash == "" && orderID != "" {
+		rec, found, err := s.deps.Repo.PurchaseByOrderID(ctx, orderID)
+		if err != nil {
+			return ReversalResult{}, apperr.Internal(err)
+		}
+		if found {
+			hash = rec.TokenHash
+			slog.InfoContext(ctx, "play reversal matched by order id", "order_id", orderID, "purchase_id", rec.ID)
+		}
+	}
+	if hash == "" {
+		slog.WarnContext(ctx, "play reversal matched no purchase", "order_id", orderID, "reason", reason)
+		return ReversalResult{}, nil
+	}
+	res, err := s.deps.Repo.ReversePurchase(ctx, hash, reason, at, ReversalAmount, s.deps.Rules.XPDiamondWeight)
 	if err != nil {
 		return res, apperr.Internal(err)
 	}
@@ -428,11 +456,17 @@ func (s *Service) reversePlay(ctx context.Context, token, reason string, at time
 
 // PollVoidedPurchases is the `poll-voided-purchases` job: the Voided
 // Purchases API (last 30 days) through the same reversal path as RTDN.
+// VoidedLookback is how far back the voided-purchases poll asks Google to look.
+// Google rejects (400) a startTime older than 30 days, and a request that is
+// built at exactly now-30d arrives a few milliseconds past that limit, so the
+// window stays a day inside it.
+const VoidedLookback = 29 * 24 * time.Hour
+
 func (s *Service) PollVoidedPurchases(ctx context.Context) (processed int, err error) {
 	if err := s.playReady(); err != nil {
 		return 0, err
 	}
-	since := s.deps.Clock.Now().Add(-30 * 24 * time.Hour)
+	since := s.deps.Clock.Now().Add(-VoidedLookback)
 	voided, err := s.deps.Play.VoidedPurchases(ctx, s.deps.PackageName, since)
 	if err != nil {
 		return 0, err
@@ -442,7 +476,7 @@ func (s *Service) PollVoidedPurchases(ctx context.Context) (processed int, err e
 		if at.IsZero() {
 			at = s.deps.Clock.Now()
 		}
-		res, err := s.reversePlay(ctx, v.PurchaseToken, "voided_purchases_api", at, "system:poll-voided-purchases")
+		res, err := s.reversePlay(ctx, v.PurchaseToken, v.OrderID, "voided_purchases_api", at, "system:poll-voided-purchases")
 		if err != nil {
 			return processed, err
 		}

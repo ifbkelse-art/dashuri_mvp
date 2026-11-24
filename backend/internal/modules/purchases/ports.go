@@ -180,6 +180,9 @@ type Repository interface {
 	Package(ctx context.Context, productID string) (Package, bool, error)
 
 	PurchaseByTokenHash(ctx context.Context, tokenHash string) (PurchaseRecord, bool, error)
+	// PurchaseByOrderID finds a purchase by its store order id (Google Play
+	// "GPA.…"). Used when a refund's purchase token does not match.
+	PurchaseByOrderID(ctx context.Context, orderID string) (PurchaseRecord, bool, error)
 	// SavePlayPurchaseState records a non-credited (pending or rejected) Play
 	// purchase for the user, never downgrading a credited or reversed row.
 	SavePlayPurchaseState(ctx context.Context, rec PurchaseRecord) (PurchaseRecord, error)
