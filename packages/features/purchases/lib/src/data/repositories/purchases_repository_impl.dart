@@ -76,6 +76,31 @@ final class PurchasesRepositoryImpl implements PurchasesRepository {
   Future<Result<PurchaseVerification>> verify(
     PurchaseNeedsVerification purchase,
     IdempotencyKey key,
+  ) {
+    // Several screens each create a purchase handler and every one listens to
+    // the store, so the same purchase token can arrive more than once at the
+    // same moment. Share one in-flight request per token. The server also
+    // deduplicates on the token, so this only avoids a pointless second call.
+    final token = purchase.purchaseToken;
+    final running = _verifying[token];
+    if (running != null) return running;
+    // A block body: `remove` returns this very future, and whenComplete waits
+    // for a returned future, so an expression body would wait on itself.
+    final future = _verifyOnce(purchase, key).whenComplete(() {
+      _verifying.remove(token);
+    });
+    _verifying[token] = future;
+    return future;
+  }
+
+  // Static because this class has a const constructor; tokens are unique, and
+  // each entry is removed as soon as its request finishes.
+  static final Map<String, Future<Result<PurchaseVerification>>> _verifying =
+      {};
+
+  Future<Result<PurchaseVerification>> _verifyOnce(
+    PurchaseNeedsVerification purchase,
+    IdempotencyKey key,
   ) async {
     final result = await _remote.verifyGooglePlay(purchase, key);
     if (result case Success(

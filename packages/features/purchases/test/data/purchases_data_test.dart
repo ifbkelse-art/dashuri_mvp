@@ -161,6 +161,38 @@ void main() {
       verifyNever(() => store.complete(any()));
     });
 
+    test('two verifies of the same token at once make one request', () async {
+      final gate = Completer<Result<PurchaseVerification>>();
+      when(
+        () => remote.verifyGooglePlay(any(), any()),
+      ).thenAnswer((_) => gate.future);
+      final a = repo.verify(purchase, IdempotencyKey.generate());
+      final b = repo.verify(purchase, IdempotencyKey.generate());
+      gate.complete(
+        const Success(
+          PurchaseVerification(
+            purchaseId: 'p',
+            status: 'credited',
+            diamondsCredited: 4000,
+          ),
+        ),
+      );
+      final results = await Future.wait([a, b]);
+      verify(() => remote.verifyGooglePlay(any(), any())).called(1);
+      verify(() => store.complete('tok')).called(1);
+      expect(results[0], isA<Success<PurchaseVerification>>());
+      expect(results[1], isA<Success<PurchaseVerification>>());
+    });
+
+    test('a later verify of the same token is sent again', () async {
+      when(() => remote.verifyGooglePlay(any(), any())).thenAnswer(
+        (_) async => const Err(NetworkFailure()),
+      );
+      await repo.verify(purchase, IdempotencyKey.generate());
+      await repo.verify(purchase, IdempotencyKey.generate());
+      verify(() => remote.verifyGooglePlay(any(), any())).called(2);
+    });
+
     test('loadPackages merges Play prices and the balance', () async {
       when(() => remote.catalogue()).thenAnswer(
         (_) async => const Success(

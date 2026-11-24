@@ -1,8 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Upload-key signing for Play. android/key.properties is git-ignored and holds
+// storeFile, storePassword, keyAlias, keyPassword (never commit it or the keystore).
+// Without it, release builds keep the debug key and work locally only.
+val keyProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val hasUploadKey = keyProperties.getProperty("storeFile") != null
 
 android {
     namespace = "com.bkenterprises.dashuri_mobile"
@@ -29,11 +40,22 @@ android {
             (project.findProperty("DASHURI_PLAY_CLOUD_PROJECT_NUMBER") ?: System.getenv("DASHURI_PLAY_CLOUD_PROJECT_NUMBER") ?: "0").toString()
     }
 
+    signingConfigs {
+        if (hasUploadKey) {
+            create("upload") {
+                storeFile = rootProject.file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO(release): replace with the upload key; Play App Signing holds the app key.
-            // Debug signing keeps `flutter build apk --release` working locally only.
-            signingConfig = signingConfigs.getByName("debug")
+            // Upload key when android/key.properties exists (Play App Signing holds the app key);
+            // otherwise the debug key, which keeps `flutter build apk --release` working locally only.
+            signingConfig = if (hasUploadKey) signingConfigs.getByName("upload") else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
