@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { site } from './src/site.mjs';
 import { legalPages } from './src/legal.mjs';
 import { pages } from './src/pages.mjs';
+import { headersFile } from './src/headers.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const out = join(root, 'dist');
@@ -140,5 +141,6 @@ for (const p of legalPages) {
 writeFileSync(join(out, 'styles.css'), readFileSync(join(root, 'src/styles.css')));
 writeFileSync(join(out, 'favicon.svg'), logo.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
 writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nAllow: /\n');
+writeFileSync(join(out, '_headers'), headersFile);
 
 console.log(`Built ${legalPages.length + pages(site).length + 1} pages into dist/`);

@@ -44,7 +44,7 @@ Do not mention unreleased features, such as Verified Host, Reels, the Free Call 
 2. Optionally add a custom domain, then set `origin` in `src/site.mjs` so the pages carry canonical links.
 3. Put the resulting URLs in Play Console: App content › Privacy policy, Data safety › Account deletion URL, and Child Safety Standards.
 
-`netlify.toml` also sets a strict Content-Security-Policy: no scripts, with fonts from Google Fonts only. Pages must not use inline `style=""` attributes or `<script>` tags; `check.mjs` enforces this.
+The build writes `dist/_headers` from `src/headers.mjs`, which Netlify applies for every deploy method, including drag-and-drop. It sets a strict Content-Security-Policy: no scripts, with fonts from Google Fonts only. Pages must not use inline `style=""` attributes or `<script>` tags; `check.mjs` enforces this.
 
 ## Legal status (25 Nov 2026)
 

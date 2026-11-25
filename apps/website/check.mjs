@@ -16,6 +16,8 @@ const files = [];
 })(dist);
 const html = files.filter((f) => f.endsWith('.html'));
 
+if (!existsSync(join(dist, '_headers'))) problems.push('missing _headers (security headers)');
+
 // Pages Google Play asks for must exist.
 for (const slug of ['privacy', 'terms', 'child-safety', 'delete-account']) {
   if (!existsSync(join(dist, slug, 'index.html'))) problems.push(`missing required page /${slug}/`);
