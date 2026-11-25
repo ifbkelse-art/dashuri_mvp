@@ -37,7 +37,7 @@ export const site = {
   // download buttons then say "Coming soon" instead of linking.
   playStoreUrl: '',
   // Absolute origin once a domain is chosen (used for canonical links).
-  origin: '',
+  origin: 'https://dashuri.netlify.app',
 
   // Policy version shown on every policy page. Bump both on any change and
   // tell users in the app (Terms §17).
