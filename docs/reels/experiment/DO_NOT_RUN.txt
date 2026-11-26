@@ -1,0 +1,1 @@
+OBSOLETE since Reels was committed (23 Nov 2026). Roll back with git revert; restore.sh would fight the committed state.

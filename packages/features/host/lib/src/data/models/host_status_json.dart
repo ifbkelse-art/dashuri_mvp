@@ -15,4 +15,15 @@ HostStatus hostStatusFromJson(JsonMap json) => HostStatus(
   todayEarnedBeans: json['today_earned_beans'] as int?,
   todayCalls: json['today_calls'] as int?,
   kycRejectionReason: json['kyc_rejection_reason'] as String?,
+  level: json['level'] as int?,
+  verificationStatus: json['verification_status'] as String? ?? 'not_applied',
+  verificationNote: json['verification_note'] as String?,
+  levelMaxRatePerMinute: json['level_max_rate_per_minute'] as int?,
+  nextLevelMaxRatePerMinute: json['next_level_max_rate_per_minute'] as int?,
+  verifiedRateThreshold: json['verified_rate_threshold'] as int? ?? 3000,
+  onlineSessionId: (json['online_session'] as JsonMap?)?['id'] as String?,
+  onlineSince: switch ((json['online_session'] as JsonMap?)?['started_at']) {
+    final String at => DateTime.parse(at).toUtc(),
+    _ => null,
+  },
 );

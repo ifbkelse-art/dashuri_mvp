@@ -98,6 +98,12 @@ func AccountID(ctx context.Context, q Querier, a ledger.AccountRef, c ledger.Cur
 		union all
 		select id from ledger.accounts where owner_user_id = $1 and kind = $2
 		limit 1`, a.UserID, string(a.Kind), string(c)).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// A concurrent transaction created the account after this
+		// statement's snapshot (ON CONFLICT waited for it); a new statement
+		// sees the committed row.
+		err = q.QueryRow(ctx, `select id from ledger.accounts where owner_user_id = $1 and kind = $2`, a.UserID, string(a.Kind)).Scan(&id)
+	}
 	return id, err
 }
 

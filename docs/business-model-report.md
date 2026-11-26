@@ -39,6 +39,7 @@
 |---|---|---|---|
 | S1 | **Ambition:** a profitable business; the founder takes whatever profit Dashuri generates. No fixed $1M revenue, valuation or wealth target. Analysis optimises for sustainable profit, cash generation and long-term viability. | F4 / B8 item 1 | [FOUNDER] |
 | S2 | **Host pricing:** hosts set their own rate, limited by their Dashuri level. Platform minimum **500 D/min**, maximum **10,000 D/min**. Level thresholds and rate ladder are **not decided**; the simulation models three proposed ladders (A, B, C). | P3 (2,000–8,000; 4,000 new-host cap), X2 | [FOUNDER] range; ladder [UNRESOLVED] |
+| S2a | **Verified Host + price ladder (2026-11-23):** minimum **500 D/min** for every host; maximum **level × 1,000** (levels 1–10); prices **above 3,000** need an **active Verified Host** status (staff-reviewed face video + ID). Integer prices only. Revocation or a level drop caps the price before new calls; live calls are never re-priced. Spec: `docs/mvp/VERIFIED_HOST_AND_PRICING.md`, ADR-014. | S2 ladder [UNRESOLVED], P3 | [FOUNDER] |
 | S3 | **Conversion:** **16,670 Diamonds spent = 10,000 Beans earned**. 1 Bean = ₹0.005, so 10,000 Beans = ₹50 and ≈ ₹0.003 host payout per eligible Diamond. Use the exact formula. | P2 (1 D = 1 Bean); completes R3-9 | [FOUNDER] |
 | S4 | **Free Call Card approved:** one-minute free random video call for eligible new customers. ₹10 host compensation per eligible free-call minute. Hosts opt in. Max 20 free calls per host per day. One card per phone and device. Disabled on iOS. Android only, subject to policy. Free-to-paid conversion is unknown and is modelled as an assumption. | P13 (now approved), F1 mechanics | [FOUNDER] |
 | S5 | **Wallet rules:** purchased Diamonds never expire; promotional Diamonds expire after 30 days; Diamonds cannot be transferred; Beans never expire; refunds, chargebacks and fraud trigger reversals; unspent purchased Diamonds are a customer liability; eligible earned Beans are a host liability. | P7, P8, P9 (now approved) | [FOUNDER] |
@@ -197,7 +198,8 @@ There is no public data on any of these. They must be measured in the closed bet
    - Consent to data processing.
 
    [PRO-REVIEW]
-3. **Set up a profile and choose a rate** within Dashuri's limits [FOUNDER C13; limits in CLAUDE P3].
+3. **Set up a profile and choose a rate** within Dashuri's limits [FOUNDER C13]: 500 to level × 1,000 D/min, at most 3,000 until she becomes a **Verified Host** [FOUNDER S2a].
+3a. **Optional: become a Verified Host.** Submit a short face video and an ID image; staff review it. The badge shows on her profile and cards, and she may charge above 3,000 D/min up to her level limit [FOUNDER S2a].
 4. **Go online whenever she likes.** Accept or decline calls, end calls any time, opt in or out of Free Call Card calls. No quotas, no penalties [FOUNDER C14, C15].
 5. **Earn Beans per second** of eligible time [FOUNDER].
 6. **Withdraw.** Beans become withdrawable 7 days after they are earned. Withdrawals are weekly, minimum ₹500, to a bank account or UPI ID in her own name [FOUNDER C19]. **Withdrawals are only enabled after incorporation and onboarding [FOUNDER R3-7].**
@@ -390,8 +392,9 @@ There is no spending or earning distribution data yet (R16), so these thresholds
 | Rule | Proposal | Label |
 |---|---|---|
 | Who sets the rate | The host, within limits | [FOUNDER C13] |
-| Range | 2,000–8,000 D/min, about ₹44–₹178 per minute to the customer | [CLAUDE P3] |
-| New-host cap | 4,000 D/min until 5 billable hours are completed | [CLAUDE P3]. A fraud control, not a performance target. |
+| Range | 2,000–8,000 D/min, about ₹44–₹178 per minute to the customer | [CLAUDE P3], **superseded by S2a** |
+| New-host cap | 4,000 D/min until 5 billable hours are completed | [CLAUDE P3], **superseded by S2a** |
+| Ladder (decided) | Minimum 500; maximum level × 1,000; above 3,000 only for an active Verified Host | [FOUNDER S2a] |
 | Changes | Take effect on the next call. Never during a call. | [CLAUDE] |
 | Shown to customer | Rate shown before the call, plus a "₹ per minute ≈" hint | [CLAUDE] |
 

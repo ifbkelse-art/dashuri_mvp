@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Manrope:wght@500&display=block">
+<style>
+html,body{margin:0}
+.s{width:1080px;height:1920px;position:relative;overflow:hidden;
+background:radial-gradient(100% 70% at 30% 8%,#8A2546 0%,#5E1630 55%,#2B0A17 100%)}
+h1{position:absolute;left:0;right:0;top:96px;margin:0;text-align:center;font:400 84px/1.05 'Instrument Serif',serif;color:#fff;letter-spacing:-.5px}
+p{position:absolute;left:0;right:0;top:196px;margin:0;text-align:center;font:500 34px/1.3 'Manrope',sans-serif;color:#EBC3CF}
+.card{position:absolute;left:130px;top:290px;width:820px;height:1597px;border-radius:44px;overflow:hidden;background:#FCFAF7;
+box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.card img{position:absolute;left:0;top:-132px;width:820px;height:auto}
+</style>
+<div class="s"><h1 id="t"></h1><p id="u"></p><div class="card"><img id="i"></div></div>
+<script>
+const q=new URLSearchParams(location.search);
+t.textContent=q.get('t');u.textContent=q.get('u');i.src=q.get('img');
+</script>

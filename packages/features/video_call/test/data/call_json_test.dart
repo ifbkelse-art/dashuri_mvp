@@ -38,6 +38,19 @@ void main() {
     expect(s.beansEarned, 1200);
   });
 
+  test('peer Verified Host flag (2026-11-23), absent means false', () {
+    final verified = callSessionFromJson({
+      ...base,
+      'peer': {'user_id': 'h1', 'display_name': 'A', 'is_verified': true},
+    });
+    expect(verified.peer!.isVerified, isTrue);
+    final plain = callSessionFromJson({
+      ...base,
+      'peer': {'user_id': 'h1', 'display_name': 'A'},
+    });
+    expect(plain.peer!.isVerified, isFalse);
+  });
+
   test('credentials with optional api key', () {
     final c = callCredentialsFromJson({
       'provider': 'stream',

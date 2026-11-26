@@ -110,7 +110,9 @@ func TestDiscoveryFiltersBlocksAndPagination(t *testing.T) {
 	for _, c := range page.Items {
 		switch c.UserId {
 		case a:
-			if c.Availability != "available" || c.Level != 2 || c.Age == nil || *c.Age < 27 || !c.IsVerified {
+			// is_verified means an ACTIVE Verified Host (2026-11-23), not
+			// "hosting KYC approved": A is KYC-approved but not verified.
+			if c.Availability != "available" || c.Level != 2 || c.Age == nil || *c.Age < 27 || c.IsVerified {
 				t.Fatalf("A card: %+v", c)
 			}
 		case busy:
@@ -118,6 +120,13 @@ func TestDiscoveryFiltersBlocksAndPagination(t *testing.T) {
 				t.Fatalf("busy card: %+v", c)
 			}
 		}
+	}
+
+	if _, err := admin.Exec(ctx, `update hosting.hosts set verification_status = 'verified', verified_at = now() where user_id = $1`, a); err != nil {
+		t.Fatal(err)
+	}
+	if card, err := s.GetHost(ctx, p, a); err != nil || !card.IsVerified {
+		t.Fatalf("verified A card: %+v %v", card, err)
 	}
 
 	d, err := s.GetHost(ctx, p, off)

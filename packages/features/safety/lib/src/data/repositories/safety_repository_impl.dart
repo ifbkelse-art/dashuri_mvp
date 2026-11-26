@@ -23,12 +23,14 @@ final class SafetyRepositoryImpl implements SafetyRepository {
     required String? callId,
     required String? details,
     required IdempotencyKey idempotencyKey,
+    String? arrivalPhotoId,
   }) => _remote.reportUser(
     targetUserId: targetUserId,
     category: category,
     callId: callId,
     details: details,
     idempotencyKey: idempotencyKey,
+    arrivalPhotoId: arrivalPhotoId,
   );
 
   @override

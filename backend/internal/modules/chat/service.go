@@ -99,7 +99,7 @@ func (s *Service) canMessage(ctx context.Context, repo Repository, p auth.Princi
 func (s *Service) toConversation(row ConversationRow, photos map[string]string) Conversation {
 	c := Conversation{
 		Id: row.ID, PeerUserId: row.PeerID, PeerDisplayName: row.PeerName,
-		Peer:        Peer{UserId: row.PeerID, DisplayName: row.PeerName},
+		Peer:        Peer{UserId: row.PeerID, DisplayName: row.PeerName, IsVerified: row.PeerVerified},
 		LastMessage: row.LastMessage, UnreadCount: row.Unread, UpdatedAt: row.UpdatedAt,
 	}
 	if row.LastMessage != nil {
@@ -294,7 +294,14 @@ func (s *Service) SendMessage(ctx context.Context, p auth.Principal, conversatio
 	}
 	// After commit: hints only; failures never undo the message.
 	if s.deps.Realtime != nil {
-		if err := s.deps.Realtime.Publish(ctx, "user:"+peerID, EventChatMessage, map[string]string{"conversation_id": conversationId}); err != nil {
+		// The message rides along so the recipient can show it at once,
+		// without a second request (the in-call chat felt slow). The channel
+		// is the recipient's private user channel; clients still re-fetch
+		// to stay consistent. read_by_peer is the recipient's view: false.
+		forPeer := msg
+		forPeer.ReadByPeer = false
+		hint := ChatMessageHint{ConversationId: conversationId, Message: &forPeer, CallId: nm.CallID}
+		if err := s.deps.Realtime.Publish(ctx, "user:"+peerID, EventChatMessage, hint); err != nil {
 			slog.WarnContext(ctx, "chat realtime publish failed", "err", err)
 		}
 	}

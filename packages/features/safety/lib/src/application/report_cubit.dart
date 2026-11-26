@@ -14,14 +14,19 @@ class ReportCubit extends Cubit<ReportState> {
     this._block, {
     required String targetUserId,
     String? callId,
+    String? arrivalPhotoId,
   }) : _target = targetUserId,
        _callId = callId,
+       _arrivalPhotoId = arrivalPhotoId,
        super(const ReportState());
 
   final ReportUser _report;
   final BlockUser _block;
   final String _target;
   final String? _callId;
+
+  /// The host's arrival photo this report is about (2026-11-26).
+  final String? _arrivalPhotoId;
   final IdempotencyKey _reportKey = IdempotencyKey.generate();
   final IdempotencyKey _blockKey = IdempotencyKey.generate();
   bool _reported = false;
@@ -46,6 +51,7 @@ class ReportCubit extends Cubit<ReportState> {
         callId: _callId,
         details: details.isEmpty ? null : details,
         idempotencyKey: _reportKey,
+        arrivalPhotoId: _arrivalPhotoId,
       ));
       if (result case Err(:final failure)) {
         emit(state.copyWith(submitting: false, failure: failure));

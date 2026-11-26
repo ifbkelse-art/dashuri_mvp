@@ -400,6 +400,8 @@ void main() {
           () => repo.createUpload(
             caption: 'Hello',
             durationMs: 22000,
+            sizeBytes: video.bytes.length,
+            contentType: 'video/mp4',
             idempotencyKey: any(named: 'idempotencyKey'),
           ),
         ).thenAnswer(
@@ -407,6 +409,7 @@ void main() {
             ReelUploadTicket(
               reel: reel('n', mine: true, status: ReelStatus.awaitingUpload),
               uploadUrl: 'https://up',
+              uploadHeaders: const {'Content-Type': 'video/mp4'},
             ),
           ),
         );
@@ -415,12 +418,18 @@ void main() {
             uploadUrl: 'https://up',
             bytes: video.bytes,
             contentType: 'video/mp4',
+            headers: const {'Content-Type': 'video/mp4'},
             onProgress: any(named: 'onProgress'),
           ),
         ).thenAnswer((inv) async {
           (inv.namedArguments[#onProgress] as void Function(double))(0.5);
           return const Success(null);
         });
+        // The server says the file arrived (R2 upload-complete).
+        when(() => repo.completeUpload('n')).thenAnswer(
+          (_) async =>
+              Success(reel('n', mine: true, status: ReelStatus.processing)),
+        );
         final statuses = [
           ReelStatus.processing,
           ReelStatus.inReview,
@@ -462,6 +471,8 @@ void main() {
           () => repo.createUpload(
             caption: '',
             durationMs: 22000,
+            sizeBytes: video.bytes.length,
+            contentType: 'video/mp4',
             idempotencyKey: any(named: 'idempotencyKey'),
           ),
         ).thenAnswer((inv) async {

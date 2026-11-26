@@ -22,7 +22,11 @@ type CreatorSummary struct {
 	Host         *HostInfo `json:"host"` // null unless an approved host (paid calls)
 }
 
+// PlaybackInfo: Url + Format are canonical ("mp4" from R2, "hls" from Mux).
+// HlsUrl is kept for app builds from before R2 and is "" for MP4 reels.
 type PlaybackInfo struct {
+	Url          string    `json:"url"`
+	Format       string    `json:"format"`
 	HlsUrl       string    `json:"hls_url"`
 	ThumbnailUrl string    `json:"thumbnail_url"`
 	ExpiresAt    time.Time `json:"expires_at"`
@@ -61,9 +65,12 @@ type CreatorProfile struct {
 }
 
 type UploadTicket struct {
-	Reel      Reel      `json:"reel"`
-	UploadUrl string    `json:"upload_url"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Reel      Reel   `json:"reel"`
+	UploadUrl string `json:"upload_url"`
+	// UploadHeaders must be sent unchanged with the PUT (they are part of
+	// the R2 signature). Empty for Mux.
+	UploadHeaders map[string]string `json:"upload_headers"`
+	ExpiresAt     time.Time         `json:"expires_at"`
 }
 
 type LikeState struct {
@@ -88,6 +95,10 @@ type ReelsConfig struct {
 	MaxCaption       int   `json:"max_caption_length"`
 	DailyUploadLimit int   `json:"daily_upload_limit"`
 	MaxUploadBytes   int64 `json:"max_upload_bytes"`
+	// VideoProvider receives new uploads: "r2" (target) or "mux" (transition).
+	VideoProvider string `json:"video_provider"`
+	// UploadContentTypes are the accepted upload file types.
+	UploadContentTypes []string `json:"upload_content_types"`
 }
 
 // MaxUploadBytes bounds the client-side file (a 60 s 1080p phone clip is
@@ -138,6 +149,23 @@ type CreateUploadRequest struct {
 	Caption            *string `json:"caption"`
 	Language           *string `json:"language"`
 	DeclaredDurationMs *int    `json:"duration_ms"`
+	// SizeBytes and ContentType describe the file; R2 signs them into the
+	// upload URL (required there). Optional for Mux.
+	SizeBytes   *int64  `json:"size_bytes"`
+	ContentType *string `json:"content_type"`
+}
+
+// UploadContentTypes are the file types the app may upload (phone camera
+// and gallery formats ffmpeg demuxes safely).
+var UploadContentTypes = []string{"video/mp4", "video/quicktime", "video/webm", "video/3gpp"}
+
+func allowedContentType(ct string) bool {
+	for _, c := range UploadContentTypes {
+		if c == ct {
+			return true
+		}
+	}
+	return false
 }
 
 func (r CreateUploadRequest) validate() map[string]string {
@@ -153,6 +181,12 @@ func (r CreateUploadRequest) validate() map[string]string {
 		errs["duration_ms"] = "required"
 	case *r.DeclaredDurationMs < MinDurationMs || *r.DeclaredDurationMs > MaxDurationMs:
 		errs["duration_ms"] = "out_of_range"
+	}
+	if r.SizeBytes != nil && (*r.SizeBytes <= 0 || *r.SizeBytes > MaxUploadBytes) {
+		errs["size_bytes"] = "out_of_range"
+	}
+	if r.ContentType != nil && !allowedContentType(*r.ContentType) {
+		errs["content_type"] = "unsupported"
 	}
 	return errs
 }

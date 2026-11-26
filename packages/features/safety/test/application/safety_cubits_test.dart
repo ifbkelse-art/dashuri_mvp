@@ -12,6 +12,7 @@ typedef _ReportInput = ({
   String? callId,
   String? details,
   IdempotencyKey idempotencyKey,
+  String? arrivalPhotoId,
 });
 
 void main() {
@@ -37,6 +38,7 @@ void main() {
             callId: null,
             details: null,
             idempotencyKey: IdempotencyKey.generate(),
+            arrivalPhotoId: null,
           )
           as _ReportInput,
     );
@@ -350,5 +352,26 @@ void main() {
         ),
       ],
     );
+  });
+
+  test('a report about an arrival photo carries its id', () async {
+    final report = MockReportUser();
+    when(() => report(any())).thenAnswer(
+      (_) async => const Success(ReportReceipt(reportId: 'r1', status: 'open')),
+    );
+    final c =
+        ReportCubit(
+            report,
+            MockBlockUser(),
+            targetUserId: 'h1',
+            arrivalPhotoId: 'p1',
+          )
+          ..selectCategory(ReportCategory.values.first)
+          ..setAlsoBlock(false);
+    await c.submit();
+    final input =
+        verify(() => report(captureAny())).captured.single as _ReportInput;
+    expect(input.arrivalPhotoId, 'p1');
+    await c.close();
   });
 }

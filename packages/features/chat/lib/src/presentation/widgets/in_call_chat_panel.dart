@@ -32,6 +32,12 @@ class _InCallChatPanelState extends State<InCallChatPanel> {
   final _text = TextEditingController();
   final _focus = FocusNode();
 
+  /// The composer moves between the full layout and the composer-only one
+  /// when the keyboard changes the panel's height. A GlobalKey moves it
+  /// instead of rebuilding it, so the field keeps focus and the keyboard
+  /// stays open.
+  final _composerKey = GlobalKey(debugLabel: 'in-call-composer');
+
   @override
   void dispose() {
     _text.dispose();
@@ -80,6 +86,7 @@ class _InCallChatPanelState extends State<InCallChatPanel> {
         // close the panel too).
         final close = _CloseButton(onClose: widget.onClose);
         final composer = Row(
+          key: _composerKey,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Padding(

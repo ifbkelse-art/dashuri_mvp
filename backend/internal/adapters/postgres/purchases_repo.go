@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"dashuri/backend/internal/modules/economy"
 	"errors"
 	"time"
 
@@ -17,6 +18,16 @@ import (
 type PurchasesRepo struct {
 	Pool *pgxpool.Pool
 	Tx   db.TxManager
+	// Rules caps a host's price after a reversal lowers their level. Zero
+	// value: economy.Founder().
+	Rules economy.Rules
+}
+
+func (r PurchasesRepo) rules() economy.Rules {
+	if r.Rules.LevelRateStep == 0 {
+		return economy.Founder()
+	}
+	return r.Rules
 }
 
 var _ purchases.Repository = PurchasesRepo{}
@@ -230,6 +241,12 @@ func (r PurchasesRepo) ReversePurchase(ctx context.Context, hash, reason string,
 			if _, err := tx.Exec(ctx, `
 				insert into ledger.xp_events (user_id, source_type, source_id, xp_delta) values ($1, 'reversal', $2, $3)
 				on conflict (source_type, source_id) do nothing`, p.UserID, p.ID, -xp); err != nil {
+				return err
+			}
+			// A lower level lowers the price ceiling: cap the stored price in
+			// the same transaction, before any new call (live calls keep
+			// their snapshotted rate). No-op for non-hosts.
+			if _, err := capHostRateToEligibility(ctx, tx, r.rules(), p.UserID, "system:purchase_reversal", "level_decreased"); err != nil {
 				return err
 			}
 		}

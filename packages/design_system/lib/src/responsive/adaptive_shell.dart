@@ -26,6 +26,7 @@ class AdaptiveShell extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.body,
+    this.overlayBar = false,
     super.key,
   });
 
@@ -34,6 +35,12 @@ class AdaptiveShell extends StatelessWidget {
   final ValueChanged<int> onSelected;
   final Widget body;
 
+  /// Compact windows only: the bottom bar goes transparent (light icons over
+  /// a soft dark scrim) and the body is drawn behind it, edge to edge. Used
+  /// by full-screen video such as Reels, which keeps its own controls clear
+  /// of the bar through the inset the Scaffold reports.
+  final bool overlayBar;
+
   Widget _icon(IconData icon, int badge) =>
       badge > 0 ? Badge.count(count: badge, child: Icon(icon)) : Icon(icon);
 
@@ -41,19 +48,57 @@ class AdaptiveShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = context.windowSize;
     if (size.isCompact) {
+      final bar = NavigationBar(
+        selectedIndex: selectedIndex,
+        onDestinationSelected: onSelected,
+        destinations: [
+          for (final d in destinations)
+            NavigationDestination(
+              icon: _icon(d.icon, d.badgeCount),
+              selectedIcon: _icon(d.selectedIcon, d.badgeCount),
+              label: d.label,
+            ),
+        ],
+      );
+      if (!overlayBar) {
+        return Scaffold(body: body, bottomNavigationBar: bar);
+      }
+      const onVideo = Colors.white;
+      final theme = Theme.of(context);
       return Scaffold(
+        extendBody: true,
+        backgroundColor: Colors.black,
         body: body,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: onSelected,
-          destinations: [
-            for (final d in destinations)
-              NavigationDestination(
-                icon: _icon(d.icon, d.badgeCount),
-                selectedIcon: _icon(d.selectedIcon, d.badgeCount),
-                label: d.label,
+        bottomNavigationBar: DecoratedBox(
+          key: const Key('overlay-nav-bar'),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x00000000), Color(0x99000000)],
+            ),
+          ),
+          child: Theme(
+            data: theme.copyWith(
+              navigationBarTheme: theme.navigationBarTheme.copyWith(
+                backgroundColor: Colors.transparent,
+                surfaceTintColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                elevation: 0,
+                indicatorColor: Colors.white24,
+                iconTheme: WidgetStateProperty.all(
+                  const IconThemeData(color: onVideo),
+                ),
+                labelTextStyle: WidgetStateProperty.all(
+                  (theme.textTheme.labelMedium ?? const TextStyle()).copyWith(
+                    color: onVideo,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-          ],
+            ),
+            child: bar,
+          ),
         ),
       );
     }

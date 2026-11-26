@@ -77,4 +77,23 @@ void main() {
     expect(appeal.isSuccess, isTrue);
     expect(api.last.uri.path, '/v1/appeals');
   });
+
+  test('POST /v1/reports carries arrival_photo_id when given', () async {
+    api
+      ..status = 201
+      ..response = {'report_id': 'r2', 'status': 'open'};
+    await SafetyRemoteDataSource(api.client).reportUser(
+      targetUserId: 'h1',
+      category: 'fake_profile',
+      callId: null,
+      details: null,
+      idempotencyKey: IdempotencyKey.generate(),
+      arrivalPhotoId: 'p1',
+    );
+    expect(api.last.body, {
+      'target_user_id': 'h1',
+      'category': 'fake_profile',
+      'arrival_photo_id': 'p1',
+    });
+  });
 }

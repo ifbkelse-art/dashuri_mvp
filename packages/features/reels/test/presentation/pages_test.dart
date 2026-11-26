@@ -26,8 +26,7 @@ class _FakePlayer implements ReelPlayerFactory {
     required bool muted,
     required bool paused,
     required ReelPlayerCallbacks callbacks,
-  }) =>
-      ColoredBox(color: Colors.black, child: Text('player ${playback.hlsUrl}'));
+  }) => ColoredBox(color: Colors.black, child: Text('player ${playback.url}'));
 }
 
 Widget feed(
@@ -104,7 +103,7 @@ void main() {
     });
 
     testWidgets(
-      'regular creators get no call CTA; offline hosts link to their profile',
+      'regular creators get no call CTA; offline hosts show status only',
       (t) async {
         final offline = reel(
           'o',
@@ -127,7 +126,9 @@ void main() {
           ReelsFeedLoaded(FeedTab.forYou, items: [offline], nextCursor: null),
         );
         await pumpPage(t, feed(c));
-        expect(find.text('View host profile'), findsOneWidget);
+        // No separate profile button: the creator's name opens the profile.
+        expect(find.text('View host profile'), findsNothing);
+        expect(find.byType(FilledButton), findsNothing);
         expect(find.text('Offline'), findsOneWidget);
       },
     );
@@ -137,7 +138,10 @@ void main() {
     ) async {
       when(() => c.state).thenReturn(loaded);
       await pumpPage(t, feed(c, player: _FakePlayer()));
-      expect(find.text('player https://play.example/a.m3u8'), findsOneWidget);
+      expect(
+        find.text('player https://play.example/a/playback.mp4'),
+        findsOneWidget,
+      );
       await t.tap(find.byTooltip('Unmute'));
       verify(c.toggleMute).called(1);
     });

@@ -109,6 +109,8 @@ final class ReelsRemoteDataSource implements ReelsRepository {
   Future<Result<ReelUploadTicket>> createUpload({
     required String caption,
     required int durationMs,
+    required int sizeBytes,
+    required String contentType,
     String? language,
     required IdempotencyKey idempotencyKey,
   }) => _api.post(
@@ -117,11 +119,18 @@ final class ReelsRemoteDataSource implements ReelsRepository {
       (j) => ReelUploadTicket(
         reel: reelFromJson(j['reel']! as JsonMap),
         uploadUrl: j['upload_url']! as String,
+        uploadHeaders: {
+          for (final e
+              in ((j['upload_headers'] as JsonMap?) ?? const {}).entries)
+            e.key: e.value! as String,
+        },
       ),
     ),
     body: {
       'caption': caption,
       'duration_ms': durationMs,
+      'size_bytes': sizeBytes,
+      'content_type': contentType,
       'language': ?language,
     },
     idempotencyKey: idempotencyKey,
@@ -132,12 +141,20 @@ final class ReelsRemoteDataSource implements ReelsRepository {
     required String uploadUrl,
     required List<int> bytes,
     required String contentType,
+    Map<String, String> headers = const {},
     void Function(double fraction)? onProgress,
   }) => _api.uploadToSignedUrl(
     Uri.parse(uploadUrl),
     bytes,
     contentType: contentType,
+    headers: headers,
     onProgress: onProgress,
+  );
+
+  @override
+  Future<Result<Reel>> completeUpload(String id) => _api.post(
+    '/v1/reels/${_e(id)}/upload-complete',
+    decode: objectDecoder(reelFromJson),
   );
 
   @override

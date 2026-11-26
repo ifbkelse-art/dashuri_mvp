@@ -23,7 +23,11 @@ void main() {
     expect(DashuriFormat.duration(3723), '1:02:03');
   });
 
-  Future<void> pumpShell(WidgetTester tester, Size size) async {
+  Future<void> pumpShell(
+    WidgetTester tester,
+    Size size, {
+    bool overlayBar = false,
+  }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -31,6 +35,7 @@ void main() {
       MaterialApp(
         home: AdaptiveShell(
           selectedIndex: 0,
+          overlayBar: overlayBar,
           onSelected: (_) {},
           destinations: const [
             ShellDestination(
@@ -61,5 +66,28 @@ void main() {
     await pumpShell(tester, const Size(1024, 768));
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('overlay bar is transparent and the body runs behind it', (
+    tester,
+  ) async {
+    await pumpShell(tester, const Size(390, 844), overlayBar: true);
+    expect(find.byKey(const Key('overlay-nav-bar')), findsOneWidget);
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.extendBody, isTrue);
+    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    // The bar takes its colour from the overlay theme: transparent.
+    final theme = Theme.of(tester.element(find.byType(NavigationBar)));
+    expect(theme.navigationBarTheme.backgroundColor, Colors.transparent);
+    expect(bar.destinations, hasLength(2));
+  });
+
+  testWidgets('default bar is unchanged (opaque, body above it)', (
+    tester,
+  ) async {
+    await pumpShell(tester, const Size(390, 844));
+    expect(find.byKey(const Key('overlay-nav-bar')), findsNothing);
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.extendBody, isFalse);
   });
 }

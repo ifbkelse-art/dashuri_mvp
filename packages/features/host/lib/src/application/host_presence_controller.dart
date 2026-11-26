@@ -33,12 +33,36 @@ class HostPresenceController {
   final Duration interval;
 
   final _rejected = StreamController<Failure>.broadcast();
+  final _incoming = StreamController<String>.broadcast();
+  final _network = StreamController<bool>.broadcast();
+  int _networkFailures = 0;
   AppLifecycleListener? _lifecycle;
   Timer? _timer;
   bool _online = false;
   bool _foreground = true;
 
   Stream<Failure> get heartbeatRejected => _rejected.stream;
+
+  /// Ringing calls for this host, reported by the app's incoming-call
+  /// watcher BEFORE it opens the call screen, so Host Home shows the ring
+  /// at once (2026-11-26).
+  Stream<String> get incomingCalls => _incoming.stream;
+
+  /// Heartbeat reachability while online: false after a heartbeat failed for
+  /// network reasons, true again after the next success.
+  Stream<bool> get networkHealthy => _network.stream;
+
+  /// Consecutive heartbeat network failures (0 when healthy).
+  int get networkFailures => _networkFailures;
+
+  /// Sends one heartbeat now (e.g. "Retry" after a network problem).
+  Future<void> beatNow() => _beat();
+
+  /// Called by the app when a call rings for this host.
+  void notifyIncomingCall(String callId) {
+    if (!_incoming.isClosed) _incoming.add(callId);
+  }
+
   bool get isOnline => _online;
   bool get isInForeground => _foreground;
   bool get isBeating => _timer != null;
@@ -85,7 +109,15 @@ class HostPresenceController {
 
   Future<void> _beat() async {
     final result = await _sendHeartbeat(const NoInput());
+    if (result is Success) {
+      if (_networkFailures > 0 && !_network.isClosed) _network.add(true);
+      _networkFailures = 0;
+    }
     if (result case Err(:final failure)) {
+      if (failure is NetworkFailure) {
+        _networkFailures++;
+        if (!_network.isClosed) _network.add(false);
+      }
       final refused =
           failure is ForbiddenFailure ||
           failure is BusinessRuleFailure ||
@@ -105,5 +137,7 @@ class HostPresenceController {
     _lifecycle?.dispose();
     _lifecycle = null;
     await _rejected.close();
+    await _incoming.close();
+    await _network.close();
   }
 }

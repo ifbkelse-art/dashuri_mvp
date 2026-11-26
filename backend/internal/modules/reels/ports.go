@@ -10,18 +10,19 @@ import (
 
 // ---------------------------------------------------------------- video provider
 
-// VideoProvider hides the hosting vendor (Mux by default; see
-// docs/reels/DASHURI_VIDEO_PROVIDER_COMPARISON.md). Secrets stay in the
-// adapter; the app only ever receives a one-time upload URL and short-lived
-// signed playback URLs.
+// VideoProvider hides the hosting vendor. The target is Cloudflare R2 plus
+// our own ffmpeg processing (adapters/r2, adapters/ffmpeg; see
+// docs/reels/DASHURI_REELS_R2_MIGRATION.md); Mux (adapters/mux) stays only
+// for the transition. Secrets stay in the adapter; the app only ever
+// receives a one-time upload URL and short-lived signed playback URLs.
 type VideoProvider interface {
 	Name() string
 	// Configured is false without credentials; uploads then return 503
 	// video_provider_not_configured (never a fake success).
 	Configured() bool
-	// CreateUpload opens a direct upload for one video. passthrough is our
-	// video id, echoed back in webhooks.
-	CreateUpload(ctx context.Context, passthrough string) (UploadSession, error)
+	// CreateUpload opens a direct upload for one video. Passthrough is our
+	// video id (echoed back in Mux webhooks; the object key for R2).
+	CreateUpload(ctx context.Context, req UploadRequest) (UploadSession, error)
 	UploadStatus(ctx context.Context, uploadID string) (UploadState, error)
 	Asset(ctx context.Context, assetID string) (AssetInfo, error)
 	// Playback signs HLS and poster URLs valid for ttl.
@@ -39,12 +40,28 @@ var ErrProviderNotConfigured = errors.New("video provider not configured")
 // ErrWebhookSignature means the webhook signature is missing, wrong or stale.
 var ErrWebhookSignature = errors.New("webhook signature invalid")
 
+// ErrProcessorUnavailable means this process cannot transcode (no ffmpeg:
+// the API image). Reels wait for the media worker; they are never failed
+// for it.
+var ErrProcessorUnavailable = errors.New("media processor unavailable")
+
 // ErrAssetNotFound means the provider has no such asset (already deleted).
 var ErrAssetNotFound = errors.New("asset not found")
 
+// UploadRequest describes the file the app is about to send. SizeBytes and
+// ContentType are signed into the R2 upload URL, so the storage rejects a
+// different (e.g. much larger) file; Mux ignores them.
+type UploadRequest struct {
+	Passthrough string
+	SizeBytes   int64  // 0 = not declared
+	ContentType string // "" = not declared
+}
+
 type UploadSession struct {
-	UploadID  string
-	URL       string // PUT the file here (no auth header; the URL is the grant)
+	UploadID string
+	URL      string // PUT the file here (no auth header; the URL is the grant)
+	// Headers the client must send unchanged with the PUT (signed for R2).
+	Headers   map[string]string
 	ExpiresAt time.Time
 }
 
@@ -60,13 +77,53 @@ type AssetInfo struct {
 	AspectRatio string
 	PlaybackID  string
 	Passthrough string
+	// Media facts recorded in reels.videos (filled by self-processing
+	// providers; zero/empty for Mux).
+	Width        int
+	Height       int
+	SizeBytes    int64 // playback file
+	VideoKey     string
+	ThumbnailKey string
 }
 
+// Playback formats.
+const (
+	FormatHLS = "hls"
+	FormatMP4 = "mp4"
+)
+
 type Playback struct {
-	HLSURL       string
+	URL          string // what the player opens
+	Format       string // FormatHLS | FormatMP4
 	ThumbnailURL string
 	ExpiresAt    time.Time
 }
+
+// SelfProcessing is implemented by providers that only store files (R2):
+// our own worker validates and transcodes the upload and extracts the
+// thumbnail and moderation frames (job reels-process-media). Vendors that
+// process themselves (Mux) don't implement it.
+type SelfProcessing interface {
+	// Process is idempotent: a finished asset returns its stored result.
+	// Invalid media returns *MediaError (permanent); other errors are
+	// transient and retried.
+	Process(ctx context.Context, assetID string, limits MediaLimits) (AssetInfo, error)
+}
+
+// MediaLimits are the server-side rules Process enforces.
+type MediaLimits struct {
+	MaxBytes      int64
+	MinDurationMs int
+	MaxDurationMs int
+	FrameInterval time.Duration
+}
+
+// MediaError is a permanent rejection of an uploaded file. Code becomes the
+// reel's rejection_code (file_too_large, invalid_media, no_video_stream,
+// duration_out_of_range, unsupported_format, upload_missing).
+type MediaError struct{ Code string }
+
+func (e *MediaError) Error() string { return "media rejected: " + e.Code }
 
 // WebhookEvent is the provider-neutral subset of a webhook.
 type WebhookEvent struct {

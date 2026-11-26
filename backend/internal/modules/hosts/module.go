@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 
 	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/platform/apperr"
@@ -17,6 +18,16 @@ type Deps struct {
 	KYC   KYCProvider
 	Repo  Repository // nil without a database → 503
 	Clock clock.Clock
+	// Evidence is the private verification-evidence bucket; nil or
+	// unconfigured: evidence uploads and admin access return 503.
+	Evidence EvidenceStore
+	// EvidenceRetention is how long private evidence is kept after a final
+	// decision (approved, rejected, revoked). Default 90 days.
+	EvidenceRetention time.Duration
+	// OrphanEvidenceRetention removes uploads never submitted. Default 48 h.
+	OrphanEvidenceRetention time.Duration
+	// Arrival configures arrival photos (ARRIVAL_PHOTOS_ENABLED; off by default).
+	Arrival ArrivalConfig
 }
 
 // PageRequest is a parsed cursor page request.

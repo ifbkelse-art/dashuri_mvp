@@ -43,7 +43,22 @@ void main() {
     final r = reelFromJson(_reel);
     expect(r.creator.host!.availability, 'busy');
     expect(r.creator.followedByMe, isTrue);
-    expect(r.playback!.hlsUrl, 'https://stream/x.m3u8');
+    // Legacy (pre-R2) server: only hls_url → HLS.
+    expect(r.playback!.url, 'https://stream/x.m3u8');
+    expect(r.playback!.format, ReelMediaFormat.hls);
+    final r2 = reelFromJson({
+      ..._reel,
+      'playback': {
+        'url':
+            'https://acct.r2.cloudflarestorage.com/media/reels/x/playback.mp4?X-Amz-Signature=s',
+        'format': 'mp4',
+        'hls_url': '',
+        'thumbnail_url': 'https://img/x.jpg',
+        'expires_at': '2026-11-22T18:00:00Z',
+      },
+    });
+    expect(r2.playback!.format, ReelMediaFormat.mp4);
+    expect(r2.playback!.url, endsWith('X-Amz-Signature=s'));
     expect(r.status, ReelStatus.published);
     final regular = reelFromJson({
       ..._reel,
@@ -101,17 +116,33 @@ void main() {
         ..response = {
           'reel': {..._reel, 'status': 'awaiting_upload'},
           'upload_url': 'https://up/x',
+          'upload_headers': {
+            'Content-Type': 'video/mp4',
+            'Content-Length': '5',
+          },
           'expires_at': '2026-11-22T12:00:00Z',
         };
       final key = IdempotencyKey.generate();
       final t = await ds.createUpload(
         caption: 'c',
         durationMs: 20000,
+        sizeBytes: 5,
+        contentType: 'video/mp4',
         idempotencyKey: key,
       );
       expect(api.last.headers.value('idempotency-key'), key.value);
-      expect(api.last.body, {'caption': 'c', 'duration_ms': 20000});
-      expect((t as Success<ReelUploadTicket>).value.uploadUrl, 'https://up/x');
+      expect(api.last.body, {
+        'caption': 'c',
+        'duration_ms': 20000,
+        'size_bytes': 5,
+        'content_type': 'video/mp4',
+      });
+      final ticket = (t as Success<ReelUploadTicket>).value;
+      expect(ticket.uploadUrl, 'https://up/x');
+      expect(ticket.uploadHeaders, {
+        'Content-Type': 'video/mp4',
+        'Content-Length': '5',
+      });
       api
         ..status = 204
         ..response = null;

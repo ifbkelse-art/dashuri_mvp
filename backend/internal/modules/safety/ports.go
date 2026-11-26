@@ -35,6 +35,8 @@ type NewReport struct {
 	CallID     *string
 	Details    *string
 	Priority   int
+	// ArrivalPhotoID is stored only when it belongs to TargetID.
+	ArrivalPhotoID *string
 }
 
 // Repository is the safety.* persistence port.

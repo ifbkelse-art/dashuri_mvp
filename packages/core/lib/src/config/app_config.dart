@@ -17,6 +17,8 @@ final class AppConfig extends Equatable {
     this.cashfreeEnabled = false,
     this.reelsEnabled = false,
     this.inCallChatEnabled = false,
+    this.giftsEnabled = false,
+    this.arrivalPhotosEnabled = false,
   });
 
   /// Reads `--dart-define` values. Missing values are empty strings;
@@ -37,6 +39,10 @@ final class AppConfig extends Equatable {
     reelsEnabled: const bool.fromEnvironment('DASHURI_REELS_ENABLED'),
     inCallChatEnabled: const bool.fromEnvironment(
       'DASHURI_IN_CALL_CHAT_ENABLED',
+    ),
+    giftsEnabled: const bool.fromEnvironment('DASHURI_GIFTS_ENABLED'),
+    arrivalPhotosEnabled: const bool.fromEnvironment(
+      'DASHURI_ARRIVAL_PHOTOS_ENABLED',
     ),
   );
 
@@ -65,6 +71,14 @@ final class AppConfig extends Equatable {
   /// the call screen then has no chat control.
   final bool inCallChatEnabled;
 
+  /// Virtual gifts during calls (docs/gifts). Off by default: no Gift
+  /// control, no gift history. Needs the backend GIFTS_ENABLED.
+  final bool giftsEnabled;
+
+  /// Optional arrival photo when going online (docs/host). Off by default:
+  /// Host Home skips the photo step. Needs ARRIVAL_PHOTOS_ENABLED.
+  final bool arrivalPhotosEnabled;
+
   /// Names of missing required values; empty when the config is usable.
   List<String> validate() => [
     if (apiBaseUrl.toString().isEmpty) 'DASHURI_API_BASE_URL',
@@ -82,5 +96,7 @@ final class AppConfig extends Equatable {
     cashfreeEnabled,
     reelsEnabled,
     inCallChatEnabled,
+    giftsEnabled,
+    arrivalPhotosEnabled,
   ];
 }

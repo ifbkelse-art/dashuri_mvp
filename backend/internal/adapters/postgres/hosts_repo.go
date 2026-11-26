@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/modules/hosts"
 	"dashuri/backend/internal/modules/ledger"
 	"dashuri/backend/internal/platform/db"
@@ -18,6 +19,8 @@ import (
 type HostsRepo struct {
 	Pool *pgxpool.Pool
 	Tx   db.TxManager
+	// Sessions reads hosting.online_sessions (migration 20261126000100).
+	Sessions bool
 }
 
 var _ hosts.Repository = HostsRepo{}
@@ -40,8 +43,15 @@ func (r HostsRepo) Host(ctx context.Context, userID string) (hosts.HostRow, erro
 	err := r.Pool.QueryRow(ctx, `select h.state, h.kyc_state, h.is_available, h.free_call_opt_in, h.rate_per_minute,
 		  case when h.kyc_state = 'rejected' then
 		    (select k.reason from hosting.kyc_sessions k where k.host_id = h.user_id and k.status = 'rejected'
-		      order by coalesce(k.completed_at, k.created_at) desc limit 1) end
-		from hosting.hosts h where h.user_id = $1`, userID).Scan(&h.State, &h.KycState, &h.IsAvailable, &h.FreeCallOptIn, &h.RatePerMinute, &h.KycRejectionReason)
+		      order by coalesce(k.completed_at, k.created_at) desc limit 1) end,
+		  h.verification_status,
+		  (select case when h.verification_status = 'info_required' then va.info_request
+		               when h.verification_status in ('rejected','suspended','revoked') then va.decision_reason end
+		     from hosting.verification_applications va where va.host_id = h.user_id
+		    order by va.submitted_at desc limit 1),
+		  `+r.openSessionColumns()+`
+		from hosting.hosts h where h.user_id = $1`, userID).Scan(&h.State, &h.KycState, &h.IsAvailable, &h.FreeCallOptIn,
+		&h.RatePerMinute, &h.KycRejectionReason, &h.VerificationStatus, &h.VerificationNote, &h.OnlineSessionID, &h.OnlineSince)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return h, nil
 	}
@@ -64,7 +74,7 @@ func (r HostsRepo) Today(ctx context.Context, userID string, dayStart time.Time)
 		     join ledger.accounts a on a.id = p.account_id
 		     join ledger.journal_entries e on e.id = p.entry_id
 		    where a.owner_user_id = $1 and a.kind = 'bean_held' and p.amount > 0
-		      and e.entry_type in ('call_settlement','free_call_compensation') and e.occurred_at >= $2),
+		      and e.entry_type in ('call_settlement','free_call_compensation','gift_send') and e.occurred_at >= $2),
 		  (select count(*) from calls.calls
 		    where receiver_id = $1 and connected_at is not null and ended_at >= $2)`, userID, dayStart).
 		Scan(&t.EarnedBeans, &t.Calls)
@@ -145,9 +155,64 @@ func (r HostsRepo) Heartbeat(ctx context.Context, userID string, at time.Time) e
 	return err
 }
 
-func (r HostsRepo) SetRate(ctx context.Context, userID string, rate int64) error {
-	_, err := r.Pool.Exec(ctx, `update hosting.hosts set rate_per_minute = $2 where user_id = $1`, userID, rate)
-	return err
+// UpdateRate: see hosts.Repository. The host row lock serialises the write
+// with verification changes and call creation.
+func (r HostsRepo) UpdateRate(ctx context.Context, userID string, decide func(hosts.PricingState) (int64, error)) error {
+	return r.Tx.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
+		ps, err := lockPricing(ctx, tx, userID)
+		if err != nil {
+			return err
+		}
+		rate, err := decide(ps)
+		if err != nil {
+			return err
+		}
+		if rate == ps.RatePerMinute {
+			return nil
+		}
+		if _, err := tx.Exec(ctx, `update hosting.hosts set rate_per_minute = $2 where user_id = $1`, userID, rate); err != nil {
+			return err
+		}
+		return callsAudit(ctx, tx, userID, "host.rate_changed", userID, map[string]any{"from": ps.RatePerMinute, "to": rate})
+	})
+}
+
+// lockPricing locks the host row and reads the pricing state in the same
+// transaction (lifetime XP from ledger.user_xp).
+func lockPricing(ctx context.Context, q Querier, userID string) (hosts.PricingState, error) {
+	var ps hosts.PricingState
+	err := q.QueryRow(ctx, `select h.state, h.rate_per_minute, h.verification_status, `+idLifetimeXP("h.user_id")+`
+		from hosting.hosts h where h.user_id = $1 for update of h`, userID).
+		Scan(&ps.State, &ps.RatePerMinute, &ps.VerificationStatus, &ps.LifetimeXP)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ps, nil
+	}
+	ps.Exists = err == nil
+	return ps, err
+}
+
+// capHostRateToEligibility locks the host row and lowers the stored rate to
+// the host's current eligibility (level max; 3,000 unless an active
+// Verified Host). It never raises a rate. Used after a level drop (purchase
+// reversal). Returns whether the rate changed.
+func capHostRateToEligibility(ctx context.Context, q Querier, rules economy.Rules, hostID, actor, reason string) (bool, error) {
+	ps, err := lockPricing(ctx, q, hostID)
+	if err != nil || !ps.Exists {
+		return false, err
+	}
+	to := rules.CapRate(ps.RatePerMinute, rules.LevelForXP(ps.LifetimeXP), ps.Verified())
+	if to >= ps.RatePerMinute {
+		return false, nil
+	}
+	return true, capHostRate(ctx, q, hostID, ps.RatePerMinute, to, actor, reason)
+}
+
+// capHostRate writes a lowered rate and its audit row (host.rate_capped).
+func capHostRate(ctx context.Context, q Querier, hostID string, from, to int64, actor, reason string) error {
+	if _, err := q.Exec(ctx, `update hosting.hosts set rate_per_minute = $2 where user_id = $1`, hostID, to); err != nil {
+		return err
+	}
+	return callsAudit(ctx, q, actor, "host.rate_capped", hostID, map[string]any{"from": from, "to": to, "reason": reason})
 }
 
 func (r HostsRepo) SetFreeCallOptIn(ctx context.Context, userID string, optIn bool) error {
@@ -193,6 +258,8 @@ func (r HostsRepo) DecideKyc(ctx context.Context, d hosts.KycDecision) error {
 				where user_id = $1`, d.HostID, d.At); err != nil {
 				return err
 			}
+		} else if _, err := tx.Exec(ctx, `select set_config('dashuri.offline_reason', 'host_ineligible', true)`); err != nil {
+			return err
 		} else if _, err := tx.Exec(ctx, `update hosting.hosts set state = case when state = 'suspended' then state else 'applied' end,
 			kyc_state = 'rejected', is_available = false where user_id = $1`, d.HostID); err != nil {
 			return err
@@ -202,13 +269,32 @@ func (r HostsRepo) DecideKyc(ctx context.Context, d hosts.KycDecision) error {
 }
 
 // MarkOffline takes hosts offline whose last heartbeat is older than cutoff
-// (hosts in a live call are left alone).
+// (hosts in a live call are left alone). Their online sessions end with
+// reason heartbeat_timeout (trigger hosting.sync_online_session).
 func (r HostsRepo) MarkOffline(ctx context.Context, cutoff time.Time) (int64, error) {
-	tag, err := r.Pool.Exec(ctx, `update hosting.hosts h set is_available = false
+	var n int64
+	err := r.Tx.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `select set_config('dashuri.offline_reason', 'heartbeat_timeout', true)`); err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `update hosting.hosts h set is_available = false
 		where h.is_available and (h.last_heartbeat_at is null or h.last_heartbeat_at < $1)
 		  and not exists (select 1 from calls.calls c where (c.caller_id = h.user_id or c.receiver_id = h.user_id)
 		                    and c.phase in ('requested','ringing','accepted','connecting','active','paused','ending'))`, cutoff)
-	return tag.RowsAffected(), err
+		n = tag.RowsAffected()
+		return err
+	})
+	return n, err
+}
+
+// openSessionColumns selects the host's open session (id, started_at) as
+// two columns of a query over hosting.hosts h.
+func (r HostsRepo) openSessionColumns() string {
+	if !r.Sessions {
+		return `null::text, null::timestamptz`
+	}
+	return `(select s.id::text from hosting.online_sessions s where s.host_id = h.user_id and s.ended_at is null),
+		  (select s.started_at from hosting.online_sessions s where s.host_id = h.user_id and s.ended_at is null)`
 }
 
 // ReleaseDueBeanHolds posts BeanRelease (key bean_release:<source entry>) for
@@ -221,7 +307,7 @@ func (r HostsRepo) ReleaseDueBeanHolds(ctx context.Context, olderThan, at time.T
 		  from ledger.postings p
 		  join ledger.accounts a on a.id = p.account_id and a.kind = 'bean_held'
 		  join ledger.journal_entries e on e.id = p.entry_id
-		 where p.amount > 0 and e.entry_type in ('call_settlement','free_call_compensation') and e.occurred_at < $1
+		 where p.amount > 0 and e.entry_type in ('call_settlement','free_call_compensation','gift_send') and e.occurred_at < $1
 		   and not exists (select 1 from ledger.journal_entries r where r.idempotency_key = 'bean_release:' || p.entry_id::text)
 		 order by e.occurred_at limit $2`, olderThan, limit)
 	if err != nil {

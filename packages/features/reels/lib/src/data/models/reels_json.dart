@@ -22,8 +22,13 @@ ReelCreator creatorFromJson(JsonMap j) => ReelCreator(
 
 ReelPlayback? _playback(Object? json) {
   if (json is! JsonMap) return null;
+  // `url` + `format` since R2; older servers only send `hls_url`.
+  final url = json['url'] as String?;
   return ReelPlayback(
-    hlsUrl: json['hls_url']! as String,
+    url: (url == null || url.isEmpty) ? json['hls_url']! as String : url,
+    format: url == null || url.isEmpty
+        ? ReelMediaFormat.hls
+        : ReelMediaFormat.parse(json['format'] as String?),
     thumbnailUrl: json['thumbnail_url']! as String,
     expiresAt: DateTime.parse(json['expires_at']! as String),
   );

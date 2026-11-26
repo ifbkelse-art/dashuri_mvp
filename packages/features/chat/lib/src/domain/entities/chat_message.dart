@@ -19,6 +19,7 @@ final class ChatMessage extends Equatable {
     required this.sentAt,
     this.context = MessageContext.chat,
     this.readByPeer = false,
+    this.isGift = false,
   });
 
   final String id;
@@ -31,6 +32,9 @@ final class ChatMessage extends Equatable {
   /// For the signed-in user's own messages: the other person has read it.
   final bool readByPeer;
 
+  /// A server-written gift line ("🌹 Asha sent Rose to Meera."), 2026-11-26.
+  final bool isGift;
+
   @override
   List<Object?> get props => [
     id,
@@ -40,5 +44,18 @@ final class ChatMessage extends Equatable {
     sentAt,
     context,
     readByPeer,
+    isGift,
   ];
+}
+
+/// A message delivered inside a `chat.message` realtime hint, with the call
+/// it was sent during (in-call messages only).
+final class ChatHintMessage extends Equatable {
+  const ChatHintMessage(this.message, {this.callId});
+
+  final ChatMessage message;
+  final String? callId;
+
+  @override
+  List<Object?> get props => [message, callId];
 }

@@ -19,6 +19,7 @@ CallPeer? _peer(Object? v) {
     userId: id,
     displayName: (v['display_name'] as String?) ?? '',
     photoUrl: v['photo_url'] as String?,
+    isVerified: v['is_verified'] == true,
   );
 }
 

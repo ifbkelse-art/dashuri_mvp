@@ -20,10 +20,15 @@ type HostRow struct {
 	City          *City
 	RatePerMinute int64
 	KYCApproved   bool
+	Verified      bool       // ACTIVE Verified Host (hosting.hosts.verification_status = verified)
 	VerifiedDOB   *time.Time // only when age_method = kyc_verified
 	LifetimeXP    int64
 	Online        bool // is_available with a heartbeat in the last 90 s
 	Busy          bool // in a live call
+	// Current approved arrival photo of the open online session (2026-11-26).
+	ArrivalPhotoPath  *string
+	ArrivalCapturedAt *time.Time
+	ArrivalPhotoID    *string
 }
 
 // ListQuery filters and positions a host listing.
@@ -32,8 +37,13 @@ type ListQuery struct {
 	Language string
 	CityID   string
 	Sort     string
-	After    *Cursor
-	Limit    int // the repository returns up to Limit rows
+	// Verification filters: "" (all), "verified", "non_verified".
+	Verification string
+	// VerifiedBoost is added to a verified host's XP for the recommended
+	// sort (ranking signal; never excludes anyone).
+	VerifiedBoost int64
+	After         *Cursor
+	Limit         int // the repository returns up to Limit rows
 }
 
 // Repository reads hosting.hosts with profiles, blocks and calls.

@@ -122,7 +122,7 @@ func (s *Service) ReportUser(ctx context.Context, p auth.Principal, in ReportReq
 	}
 	rec, err := repo.CreateReport(ctx, NewReport{
 		ReporterID: p.UserID, TargetID: in.TargetUserId, Category: in.Category,
-		CallID: callID, Details: details, Priority: PriorityFor(in.Category),
+		CallID: callID, Details: details, Priority: PriorityFor(in.Category), ArrivalPhotoID: in.ArrivalPhotoId,
 	})
 	return rec, internalOrNil(err)
 }

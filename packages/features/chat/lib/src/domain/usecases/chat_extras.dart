@@ -1,5 +1,6 @@
 import 'package:dashuri_core/dashuri_core.dart';
 
+import '../entities/chat_message.dart';
 import '../repositories/chat_repository.dart';
 
 /// POST /v1/conversations/{conversationId}/read
@@ -23,6 +24,17 @@ class WatchChatHints implements StreamUseCase<String, NoInput> {
 
   @override
   Stream<String> call(NoInput input) => _repository.chatHints();
+}
+
+/// Messages carried in `chat.message` hints (shown before the re-fetch).
+// Not final: application tests mock use cases.
+class WatchChatHintMessages implements StreamUseCase<ChatHintMessage, NoInput> {
+  const WatchChatHintMessages(this._repository);
+
+  final ChatRepository _repository;
+
+  @override
+  Stream<ChatHintMessage> call(NoInput input) => _repository.chatHintMessages();
 }
 
 /// `chat.read` realtime hints (conversation ids): the peer read my messages.

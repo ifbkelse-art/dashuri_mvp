@@ -220,6 +220,7 @@ const _stubPaths = [
   RoutePaths.hostAgreement,
   RoutePaths.hostProfileSetup,
   RoutePaths.hostRate,
+  RoutePaths.hostVerifiedHost,
   RoutePaths.hostWithdraw,
   RoutePaths.hostPayoutHistory,
   RoutePaths.hostPayoutMethod,

@@ -1,0 +1,3967 @@
+# Dashuri API contract (OpenAPI 3.1). Source of truth for app ↔ backend.
+# Scaffolded 2026-11-17 from the architecture endpoint registry; edit this file going forward.
+openapi: "3.1.0"
+info:
+  title: Dashuri API
+  version: 1.0.0-draft
+  description: "Contract between the Dashuri mobile app and the Go backend. Draft scaffold: endpoints return 501 until implemented. All money and virtual-currency amounts are integers (Diamonds, Beans, INR paise). Value-moving and create operations require an Idempotency-Key. The client never submits call durations or Diamond amounts for calls."
+servers:
+  - url: "https://api.dashuri.invalid"
+    description: "TODO: real hostnames per environment"
+security:
+  - bearerAuth: []
+tags:
+  - name: accounts
+  - name: admin
+  - name: calls
+  - name: chat
+  - name: discovery
+  - name: free-call
+  - name: host
+  - name: levels
+  - name: notifications
+  - name: ops
+  - name: privacy
+  - name: purchases
+  - name: safety
+  - name: wallet
+  - name: webhooks
+paths:
+  /v1/me:
+    get:
+      operationId: getMe
+      tags:
+        - accounts
+      summary: "Account status (eligibility, host role, restriction)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/profile:
+    get:
+      operationId: getMyProfile
+      tags:
+        - accounts
+      summary: Own profile.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    patch:
+      operationId: updateMyProfile
+      tags:
+        - accounts
+      summary: Update own profile. Text is screened for contact details and banned terms.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: profile_text_rejected"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/profiles/{userId}":
+    get:
+      operationId: getProfile
+      tags:
+        - accounts
+      summary: "Another user's public profile (404 if blocked either way)."
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/photos/upload-tickets:
+    post:
+      operationId: requestPhotoUpload
+      tags:
+        - accounts
+      summary: Signed upload URL for a profile photo (private until moderated).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoUploadTicketRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoUploadTicket"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: photo_limit_reached"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/age:
+    get:
+      operationId: getAgeStatus
+      tags:
+        - safety
+      summary: 18+ eligibility status.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgeStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/age/declaration:
+    post:
+      operationId: submitAgeDeclaration
+      tags:
+        - safety
+      summary: Self-declared date of birth (minimum gate; hosts are verified via KYC).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgeDeclarationRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgeStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: under_18, declaration_locked"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/consents:
+    get:
+      operationId: getConsents
+      tags:
+        - privacy
+      summary: Privacy consents (DPDP).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentState"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      operationId: updateConsents
+      tags:
+        - privacy
+      summary: Update privacy consents.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConsentsRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentState"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/deletion-requests:
+    post:
+      operationId: requestAccountDeletion
+      tags:
+        - privacy
+      summary: Request account deletion (records required by law are anonymised and retained).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionRequest"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: pending_balance_or_payout"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/data-exports:
+    post:
+      operationId: requestDataExport
+      tags:
+        - privacy
+      summary: Request a copy of personal data.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataExportRequest"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/level:
+    get:
+      operationId: getMyLevel
+      tags:
+        - levels
+      summary: Shared account level and XP.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LevelProgress"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/discovery/hosts:
+    get:
+      operationId: listAvailableHosts
+      tags:
+        - discovery
+      summary: "Hosts online and accepting calls, with their rates. Excludes blocked users."
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HostCard"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host:
+    get:
+      operationId: getHostStatus
+      tags:
+        - host
+      summary: "Host state, KYC, availability, rate limits for the shared level."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/application:
+    post:
+      operationId: applyAsHost
+      tags:
+        - host
+      summary: "Apply to become a host (women-first at launch, C17)."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: not_age_eligible, already_applied, host_applications_closed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/kyc/sessions:
+    post:
+      operationId: startKyc
+      tags:
+        - host
+      summary: Start identity verification with the KYC vendor (vendor not chosen).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KycSession"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: kyc_not_required"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/availability:
+    put:
+      operationId: setAvailability
+      tags:
+        - host
+      summary: Go online/offline. Requires approved host; refused while in a call.
+      x-required-roles:
+        - host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetAvailabilityRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: host_not_approved, in_call"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/availability/heartbeat:
+    post:
+      operationId: sendHeartbeat
+      tags:
+        - host
+      summary: Keeps an online host listed; missing heartbeats mark the host offline.
+      x-required-roles:
+        - host
+      responses:
+        "204":
+          description: No content
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/rate:
+    put:
+      operationId: setRate
+      tags:
+        - host
+      summary: "Set Diamonds/min within 500–10,000 and the level cap (S2). Applies to the next call."
+      x-required-roles:
+        - host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetRateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: rate_outside_level_limits"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/free-call-opt-in:
+    put:
+      operationId: setFreeCallOptIn
+      tags:
+        - host
+      summary: Join or leave the Free Call pool (S4).
+      x-required-roles:
+        - host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetFreeCallOptInRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/earnings:
+    get:
+      operationId: getEarnings
+      tags:
+        - host
+      summary: "Beans on hold, available and pending payout."
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostEarnings"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/host/withdrawals:
+    post:
+      operationId: requestWithdrawal
+      tags:
+        - host
+      summary: Request a withdrawal into the next weekly payout cycle.
+      description: "Server behaviour:
+1. Return 503 payouts_not_enabled until PAYOUTS_ENABLED (R3-7: incorporation + provider onboarding).
+2. Check host approved, KYC passed, payout method verified, no restriction or open fraud case.
+3. In one transaction: lock the host's bean_available balance row; check beans ≥ MinWithdrawalBeans (₹500 = 100,000 Beans) and ≤ available.
+4. Insert withdrawal (status requested) and post ledger.WithdrawalRequested (available → payout_pending).
+5. The weekly payout-cycle job picks it up."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      x-required-roles:
+        - host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: payouts_not_enabled, below_minimum_withdrawal, insufficient_available_beans, kyc_required, payout_method_missing, account_restricted"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          description: Payouts disabled until incorporation and payout-provider onboarding (R3-7)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    get:
+      operationId: listWithdrawals
+      tags:
+        - host
+      summary: Withdrawal history.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Withdrawal"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/free-call/card:
+    get:
+      operationId: getFreeCallCard
+      tags:
+        - free-call
+      summary: Free Call Card status for this account/device.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreeCallCard"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/free-call/requests:
+    post:
+      operationId: requestFreeCall
+      tags:
+        - free-call
+      summary: "Use the card: random match with an opted-in available host (Android only)."
+      description: "Server behaviour:
+1. Verify the Play Integrity token server-side; bind the card to phone number AND device (S4: one card per phone and device).
+2. In one transaction: lock the user's free_call_cards row; refuse if used.
+3. Pick a random available host with free_call_opt_in and fewer than 20 free calls today (FreeCallMaxPerHostPerDay); lock that host's daily counter row.
+4. Create a call with is_free_call = true and a 60-second server cap; no Diamonds reserved.
+5. Host compensation (₹10 = 2,000 Beans) is posted only when the server confirms an eligible free-call minute (ledger.FreeCallCompensation)."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreeCallRequestBody"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreeCallRequest"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: free_call_unavailable_on_platform, card_already_used, device_already_used, not_age_eligible, integrity_check_failed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/free-call/requests/{requestId}":
+    get:
+      operationId: getFreeCallRequest
+      tags:
+        - free-call
+      summary: Match status.
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FreeCallRequest"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/calls:
+    post:
+      operationId: requestCall
+      tags:
+        - calls
+      summary: "Customer calls a host at the host's current rate."
+      description: "Server behaviour:
+1. Check caller and host eligibility, host available, no block either way, caller not already in a call (unique partial index on active calls per user).
+2. Snapshot the host's rate on the call (rate cannot change mid-call).
+3. In one transaction: lock the customer's Diamond balance rows (FOR UPDATE); check CanStartCall (60 s at the rate); create a reservation for the first billing window.
+4. Create the call (phase ringing), the provider call, and publish call.updated to user:<host> (incoming call)."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CallRequestBody"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallSession"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: host_unavailable, host_busy, blocked, insufficient_diamonds, caller_in_call, not_age_eligible, account_restricted, self_call"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/calls/{callId}":
+    get:
+      operationId: getCall
+      tags:
+        - calls
+      summary: Call state for a participant.
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallSession"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/calls/{callId}/accept":
+    post:
+      operationId: acceptCall
+      tags:
+        - calls
+      summary: Host accepts a ringing call.
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallSession"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: illegal_call_transition, call_expired"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/calls/{callId}/decline":
+    post:
+      operationId: declineCall
+      tags:
+        - calls
+      summary: Host declines; reservation released.
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallSession"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: illegal_call_transition"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/calls/{callId}/end":
+    post:
+      operationId: endCall
+      tags:
+        - calls
+      summary: Either participant ends the call; the server settles from its own metering.
+      description: "Server behaviour:
+1. Transition to ending with an optimistic phase check.
+2. Compute billable seconds with calls.BillableSeconds from the provider-event timeline (never from the client).
+3. Diamonds = DiamondsForSeconds(rate, billable), capped by the reservation; Beans = BeansForDiamonds(total) once.
+4. Post ledger.CallSettlement (idempotency key call_settlement:<call_id>) and release the unused reservation in the same transaction.
+5. Award XP for Beans earned; publish call.updated; request moderation evidence retention if a report was filed."
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EndCallRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallSession"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/calls/{callId}/credentials":
+    post:
+      operationId: getCallCredentials
+      tags:
+        - calls
+      summary: Short-lived video-provider token for this participant and call.
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallCredentials"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: call_not_joinable"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/webhooks/video/{provider}":
+    post:
+      operationId: videoProviderWebhook
+      tags:
+        - webhooks
+      summary: "Video provider server events (participant joined/left, tracks, call ended). Signature-verified; no user auth."
+      description: "Server behaviour:
+1. Verify the provider signature over the raw body; reject replays by event id (unique table).
+2. Append to call_media_events; recompute phase (active/paused) and push call.updated.
+3. Extend the reservation window while active and the balance allows; send call.low_balance 30 s before exhaustion; end the call at zero.
+4. During the first 3 minutes, route frame-check jobs to the moderation module (S7)."
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      security: []
+      responses:
+        "204":
+          description: No content
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: invalid_signature"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/conversations:
+    get:
+      operationId: listConversations
+      tags:
+        - chat
+      summary: Conversations for the signed-in user.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Conversation"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    post:
+      operationId: startConversation
+      tags:
+        - chat
+      summary: "Open a conversation, if the peer's messaging privacy allows it."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartConversationRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: messaging_not_allowed, blocked"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/conversations/{conversationId}/messages":
+    get:
+      operationId: listMessages
+      tags:
+        - chat
+      summary: "Messages, newest first."
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMessage"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    post:
+      operationId: sendMessage
+      tags:
+        - chat
+      summary: "Send a message (privacy, blocks, rate limits, contact-detail filtering enforced)."
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: messaging_not_allowed, blocked, message_rejected"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/messaging-privacy:
+    get:
+      operationId: getMessagingPrivacy
+      tags:
+        - chat
+      summary: Who can message me (C11).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagingPrivacy"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      operationId: updateMessagingPrivacy
+      tags:
+        - chat
+      summary: Change who can message me.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessagingPrivacy"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagingPrivacy"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/wallet:
+    get:
+      operationId: getWalletSummary
+      tags:
+        - wallet
+      summary: "Balances from the ledger projection; available = purchased + promotional − reserved."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletSummary"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/wallet/entries:
+    get:
+      operationId: listWalletEntries
+      tags:
+        - wallet
+      summary: Ledger history for this account.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WalletEntry"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/purchases/packages:
+    get:
+      operationId: listDiamondPackages
+      tags:
+        - purchases
+      summary: Active Diamond package catalogue (product id → Diamonds). Prices come from Google Play.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiamondPackageList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/purchases/google-play:
+    post:
+      operationId: verifyGooglePlayPurchase
+      tags:
+        - purchases
+      summary: Verify a Play purchase token and credit Diamonds exactly once.
+      description: "Server behaviour:
+1. Hash the purchase token; the purchases table is UNIQUE on token hash, so replays return the original result.
+2. Call the Google Play Developer API (purchases.products) with the service account; check package name, product id, purchase state, and that the order is not already consumed elsewhere.
+3. Pending payment → status pending, no credit (credited later from RTDN).
+4. Purchased → in one transaction insert the purchase and post ledger.PurchaseCredit (key purchase_credit:<token_hash>); award XP = 8 × Diamonds.
+5. Acknowledge/consume with Play per current Billing requirements; the client completes only after credited."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyGooglePlayRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseVerification"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: purchase_token_invalid, purchase_already_used_by_other_account, product_unknown"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/webhooks/google-play/rtdn:
+    post:
+      operationId: googlePlayNotification
+      tags:
+        - webhooks
+      summary: "Real-Time Developer Notifications via Pub/Sub push (OIDC-authenticated). Drives late credits, refunds and voided purchases."
+      description: "Server behaviour:
+1. Verify the Pub/Sub push OIDC token (audience = this endpoint, service account allow-list).
+2. Deduplicate by message id.
+3. On voided/refunded purchases (also poll the Voided Purchases API daily): post ledger.PurchaseReversal for the unspent part; open a fraud case for any spent part; claw back host Beans still on hold; reverse XP."
+      security: []
+      responses:
+        "204":
+          description: No content
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/reports:
+    post:
+      operationId: reportUser
+      tags:
+        - safety
+      summary: Report a user (optionally during/after a call; reporting during a call also ends it client-side).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportReceipt"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: self_report"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/blocks:
+    post:
+      operationId: blockUser
+      tags:
+        - safety
+      summary: "Block a user (hidden from each other, no calls or messages)."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockedUser"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: self_block"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    get:
+      operationId: listBlockedUsers
+      tags:
+        - safety
+      summary: Blocked users.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlockedUser"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/blocks/{userId}":
+    delete:
+      operationId: unblockUser
+      tags:
+        - safety
+      summary: Remove a block.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No content
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/enforcement:
+    get:
+      operationId: listEnforcementNotices
+      tags:
+        - safety
+      summary: Enforcement actions on this account.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EnforcementNotice"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/appeals:
+    post:
+      operationId: submitAppeal
+      tags:
+        - safety
+      summary: Appeal an enforcement action.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppealRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealReceipt"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: not_appealable, appeal_exists"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/me/devices:
+    put:
+      operationId: registerDevice
+      tags:
+        - notifications
+      summary: Register a push token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceRegistration"
+      responses:
+        "204":
+          description: No content
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/me/devices/{token}":
+    delete:
+      operationId: unregisterDevice
+      tags:
+        - notifications
+      summary: Remove a push token.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No content
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/notifications:
+    get:
+      operationId: listInbox
+      tags:
+        - notifications
+      summary: In-app notifications.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InboxItem"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/notifications/{notificationId}/read":
+    post:
+      operationId: markRead
+      tags:
+        - notifications
+      summary: Mark a notification read.
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No content
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/admin/moderation/queue:
+    get:
+      operationId: listModerationQueue
+      tags:
+        - admin
+      summary: "Open reports and automated nudity flags, highest severity first."
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      x-required-roles:
+        - moderator
+        - admin
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ModerationCase"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/admin/reports/{reportId}/decisions":
+    post:
+      operationId: decideReport
+      tags:
+        - admin
+      summary: Record a moderation decision and apply enforcement.
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+      x-required-roles:
+        - moderator
+        - admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationDecisionRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationDecision"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: already_decided"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/admin/appeals/{appealId}/decisions":
+    post:
+      operationId: decideAppeal
+      tags:
+        - admin
+      summary: Decide an appeal (different reviewer than the original decision).
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+      x-required-roles:
+        - moderator
+        - admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppealDecisionRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationDecision"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: same_reviewer"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/admin/ledger/reconciliation:
+    get:
+      operationId: getReconciliation
+      tags:
+        - admin
+      summary: Latest reconciliation run.
+      x-required-roles:
+        - finance
+        - admin
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationReport"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /v1/admin/ledger/adjustments:
+    post:
+      operationId: proposeAdjustment
+      tags:
+        - admin
+      summary: Propose a manual ledger adjustment (needs a second approver; never edits history).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      x-required-roles:
+        - finance
+        - admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustmentRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdjustmentProposal"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/v1/admin/payout-cycles/{cycleId}/approve":
+    post:
+      operationId: approvePayoutCycle
+      tags:
+        - admin
+      summary: Approve a prepared weekly payout cycle for submission to the payout provider.
+      parameters:
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+      x-required-roles:
+        - finance
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayoutCycleApproval"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: cycle_not_ready, payouts_not_enabled"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "501":
+          description: Scaffolded endpoint not implemented yet
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          description: Payouts disabled until incorporation and payout-provider onboarding (R3-7)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /healthz:
+    get:
+      operationId: healthz
+      tags:
+        - ops
+      summary: Liveness.
+      security: []
+      responses:
+        "200":
+          description: Alive
+  /readyz:
+    get:
+      operationId: readyz
+      tags:
+        - ops
+      summary: Readiness (database reachable).
+      security: []
+      responses:
+        "200":
+          description: Ready
+        "503":
+          description: Not ready
+  /v1/me/rules-acceptance:
+    post:
+      operationId: acceptCommunityRules
+      tags:
+        - accounts
+      summary: "Accept the current community rules (A13)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RulesAcceptanceRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/locations/cities:
+    get:
+      operationId: listCities
+      tags:
+        - accounts
+      summary: "Supported cities (coarse location, ADR-012)."
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CityList"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/locations/resolve:
+    post:
+      operationId: resolveCity
+      tags:
+        - accounts
+      summary: "Nearest supported city for rounded coordinates; coordinates are not stored."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveCityRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/City"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/discovery/hosts/{userId}:
+    get:
+      operationId: getHostCard
+      tags:
+        - discovery
+      summary: "Host detail (C07–C09); 404 when blocked either way."
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostDetail"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/discovery/summary:
+    get:
+      operationId: getDiscoverySummary
+      tags:
+        - discovery
+      summary: "Online host count."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverySummary"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/purchases/cashfree/orders:
+    post:
+      operationId: createCashfreeOrder
+      tags:
+        - purchases
+      summary: "Create a Cashfree PG order for a Diamond package (ADR-011)."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCashfreeOrderRequest"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashfreeOrder"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: rail_disabled, product_unknown, phone_required"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/purchases/cashfree/orders/{orderId}:
+    get:
+      operationId: getCashfreeOrder
+      tags:
+        - purchases
+      summary: "Order state; re-verifies with Cashfree server-to-server and credits once."
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashfreeOrder"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/webhooks/cashfree:
+    post:
+      operationId: cashfreeWebhook
+      tags:
+        - webhooks
+      summary: "Cashfree PG webhook (x-webhook-signature HMAC-SHA256)."
+      security: []
+      responses:
+        "204":
+          description: OK
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/calls/history:
+    get:
+      operationId: listCallHistory
+      tags:
+        - calls
+      summary: "Own calls, newest first."
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallSessionPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/calls/{callId}/moderation-frames:
+    post:
+      operationId: submitModerationFrame
+      tags:
+        - calls
+      summary: "Own-camera JPEG during the first 180 s (S7, ADR-013)."
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationFrameRequest"
+      responses:
+        "202":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrameAccepted"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: moderation_window_closed, not_participant"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/conversations/{conversationId}/read:
+    post:
+      operationId: markConversationRead
+      tags:
+        - chat
+      summary: "Mark the conversation read up to now."
+      description: >-
+        EXPERIMENT (docs/chat): when the marker passes at least one of the
+        peer's messages, the server publishes `chat.read`
+        `{conversation_id}` on `user:<peer>` (drives "Read" receipts). No event
+        when nothing new was read, so two open screens cannot loop.
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/hosts/{userId}/kyc-decision:
+    post:
+      operationId: decideHostKyc
+      tags:
+        - admin
+      summary: "Moderator decision for manual KYC (MVP provider)."
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KycDecisionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostStatus"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/me/photos/{photoId}:
+    delete:
+      operationId: deleteMyPhoto
+      tags:
+        - accounts
+      summary: "Delete an own profile photo (frees a slot; removes the Storage object)."
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: OK
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/photos/pending:
+    get:
+      operationId: listPendingPhotos
+      tags:
+        - admin
+      summary: "Profile photos awaiting moderation, oldest first (moderator/admin; audited)."
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingPhotoPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/photos/{photoId}/decision:
+    post:
+      operationId: decidePhoto
+      tags:
+        - admin
+      summary: "Approve or reject a pending profile photo (moderator/admin; audited)."
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoDecisionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhotoDecision"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          description: "Business rule or conflict. `code`/`rule` one of: photo_not_pending, photo_not_uploaded"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Supabase Auth access token; verified against the project JWKS. Roles come from the Dashuri database, not token claims."
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID per user intent; reuse it for every retry of that intent. Same key + different body → 422.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 64
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    PendingPhotoItem:
+      type: object
+      required: [photo_id, user_id, read_url, created_at]
+      properties:
+        photo_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        read_url: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+    PendingPhotoPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/PendingPhotoItem"}
+        next_cursor: {type: [string, "null"]}
+    PhotoDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approve, reject]}
+        reason: {type: [string, "null"], maxLength: 500}
+    PhotoDecision:
+      type: object
+      required: [photo_id, status]
+      properties:
+        photo_id: {type: string, format: uuid}
+        status: {type: string, enum: [approved, rejected]}
+    City:
+      type: object
+      required: [id, name, state]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        state: {type: string}
+    CityList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/City"}
+    ResolveCityRequest:
+      type: object
+      additionalProperties: false
+      required: [latitude, longitude]
+      properties:
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+    RulesAcceptanceRequest:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: string}
+    HostDetail:
+      allOf:
+        - $ref: "#/components/schemas/HostCard"
+        - type: object
+          properties:
+            bio: {type: [string, "null"]}
+            photo_urls:
+              type: array
+              items: {type: string}
+    DiscoverySummary:
+      type: object
+      required: [online_count]
+      properties:
+        online_count: {type: integer}
+    CreateCashfreeOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [product_id]
+      properties:
+        product_id: {type: string}
+    CashfreeOrder:
+      type: object
+      required: [order_id, product_id, amount_paise, diamonds, environment, state, diamonds_credited]
+      properties:
+        order_id: {type: string}
+        product_id: {type: string}
+        amount_paise: {type: integer, format: int64}
+        diamonds: {type: integer, format: int64}
+        payment_session_id: {type: [string, "null"]}
+        environment: {type: string, enum: [sandbox, production]}
+        state: {type: string, enum: [created, pending, credited, failed, expired]}
+        diamonds_credited: {type: integer, format: int64}
+    CallSessionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/CallSession"}
+        next_cursor: {type: [string, "null"]}
+    ModerationFrameRequest:
+      type: object
+      additionalProperties: false
+      required: [image_base64, captured_at]
+      properties:
+        image_base64: {type: string, description: "JPEG, at most 200 KB before encoding"}
+        captured_at: {type: string, format: date-time}
+    FrameAccepted:
+      type: object
+      required: [accepted]
+      properties:
+        accepted: {type: boolean}
+    KycDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approve, reject]}
+        date_of_birth: {type: string, format: date}
+        reason: {type: string, maxLength: 500}
+    AccountStatus:
+      type: object
+      description: Server view of the signed-in account; route guards use this.
+      additionalProperties: false
+      required:
+        - user_id
+        - age_eligible
+        - is_host
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        age_eligible:
+          type: boolean
+        is_host:
+          type: boolean
+        restriction:
+          type:
+            - string
+            - "null"
+    Profile:
+      type: object
+      additionalProperties: false
+      required:
+        - user_id
+        - display_name
+        - languages
+        - photo_urls
+        - is_host
+        - level
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        bio:
+          type:
+            - string
+            - "null"
+        languages:
+          type: array
+          items:
+            type: string
+        photo_urls:
+          type: array
+          items:
+            type: string
+        is_host:
+          type: boolean
+        level:
+          type: integer
+          format: int32
+    UpdateProfileRequest:
+      type: object
+      additionalProperties: false
+      required: []
+      properties:
+        display_name:
+          type:
+            - string
+            - "null"
+          maxLength: 40
+        bio:
+          type:
+            - string
+            - "null"
+          maxLength: 300
+        languages:
+          type: array
+          items:
+            type: string
+    PhotoUploadTicketRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - content_type
+      properties:
+        content_type:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+            - image/webp
+    PhotoUploadTicket:
+      type: object
+      description: Signed Supabase Storage upload URL for one photo; the photo stays private until moderated.
+      additionalProperties: false
+      required:
+        - photo_id
+        - upload_url
+        - expires_at
+      properties:
+        photo_id:
+          type: string
+          format: uuid
+        upload_url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    AgeStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - eligible
+      properties:
+        eligible:
+          type: boolean
+        method:
+          type:
+            - string
+            - "null"
+    AgeDeclarationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - date_of_birth
+      properties:
+        date_of_birth:
+          type: string
+          format: date
+    ConsentState:
+      type: object
+      additionalProperties: false
+      required:
+        - analytics
+        - marketing
+        - updated_at
+      properties:
+        analytics:
+          type: boolean
+        marketing:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+    UpdateConsentsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - analytics
+        - marketing
+      properties:
+        analytics:
+          type: boolean
+        marketing:
+          type: boolean
+    DeletionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - request_id
+        - status
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        scheduled_for:
+          type:
+            - string
+            - "null"
+          format: date-time
+    DataExportRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - request_id
+        - status
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+    LevelProgress:
+      type: object
+      description: "XP = 8 × eligible Diamonds purchased + eligible Beans earned; one shared level per account."
+      additionalProperties: false
+      required:
+        - level
+        - lifetime_xp
+        - current_level_xp
+      properties:
+        level:
+          type: integer
+          format: int32
+        lifetime_xp:
+          type: integer
+          format: int64
+        current_level_xp:
+          type: integer
+          format: int64
+        next_level_xp:
+          type:
+            - integer
+            - "null"
+          format: int64
+    HostCard:
+      type: object
+      additionalProperties: false
+      required:
+        - user_id
+        - display_name
+        - languages
+        - level
+        - rate_per_minute
+        - availability
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        photo_url:
+          type:
+            - string
+            - "null"
+        languages:
+          type: array
+          items:
+            type: string
+        level:
+          type: integer
+          format: int32
+        rate_per_minute:
+          type: integer
+          format: int64
+        availability:
+          type: string
+          enum:
+            - available
+            - busy
+    HostStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - kyc_state
+        - is_available
+        - rate_per_minute
+        - min_rate_per_minute
+        - max_rate_per_minute
+        - free_call_opt_in
+      properties:
+        state:
+          type: string
+          enum:
+            - not_applied
+            - applied
+            - kyc_pending
+            - approved
+            - suspended
+        kyc_state:
+          type: string
+        is_available:
+          type: boolean
+        rate_per_minute:
+          type: integer
+          format: int64
+        min_rate_per_minute:
+          type: integer
+          format: int64
+        max_rate_per_minute:
+          type: integer
+          format: int64
+        free_call_opt_in:
+          type: boolean
+    SetAvailabilityRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - is_available
+      properties:
+        is_available:
+          type: boolean
+    SetRateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - rate_per_minute
+      properties:
+        rate_per_minute:
+          type: integer
+          format: int64
+          minimum: 500
+          maximum: 10000
+    SetFreeCallOptInRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - opt_in
+      properties:
+        opt_in:
+          type: boolean
+    KycSession:
+      type: object
+      additionalProperties: false
+      required:
+        - session_id
+      properties:
+        session_id:
+          type: string
+        redirect_url:
+          type:
+            - string
+            - "null"
+    HostEarnings:
+      type: object
+      additionalProperties: false
+      required:
+        - beans_on_hold
+        - beans_available
+        - beans_pending_payout
+        - available_inr_paise
+      properties:
+        beans_on_hold:
+          type: integer
+          format: int64
+        beans_available:
+          type: integer
+          format: int64
+        beans_pending_payout:
+          type: integer
+          format: int64
+        available_inr_paise:
+          type: integer
+          format: int64
+        next_payout_date:
+          type:
+            - string
+            - "null"
+          format: date-time
+    WithdrawalRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - beans
+      properties:
+        beans:
+          type: integer
+          format: int64
+          minimum: 100000
+    Withdrawal:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - beans
+        - amount_paise
+        - status
+        - requested_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        beans:
+          type: integer
+          format: int64
+        amount_paise:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+            - requested
+            - in_cycle
+            - paid
+            - failed
+            - reversed
+        requested_at:
+          type: string
+          format: date-time
+        paid_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+    FreeCallCard:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - available
+            - used
+            - not_eligible
+            - unavailable_on_platform
+        used_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+    FreeCallRequestBody:
+      type: object
+      additionalProperties: false
+      required: []
+      properties:
+        play_integrity_token:
+          type:
+            - string
+            - "null"
+    FreeCallRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - request_id
+        - status
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - searching
+            - matched
+            - no_host_available
+            - cancelled
+        call_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+    CallRequestBody:
+      type: object
+      additionalProperties: false
+      required:
+        - host_user_id
+      properties:
+        host_user_id:
+          type: string
+          format: uuid
+    CallSession:
+      type: object
+      description: Server-owned call state. billed_seconds and diamonds_charged are computed only by the server.
+      additionalProperties: false
+      required:
+        - call_id
+        - role
+        - peer_user_id
+        - phase
+        - rate_per_minute
+        - billed_seconds
+        - diamonds_charged
+        - is_free_call
+      properties:
+        call_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum:
+            - caller
+            - receiver
+        peer_user_id:
+          type: string
+          format: uuid
+        phase:
+          type: string
+          enum:
+            - requested
+            - ringing
+            - accepted
+            - connecting
+            - active
+            - paused
+            - ending
+            - ended
+            - declined
+            - missed
+            - failed
+        rate_per_minute:
+          type: integer
+          format: int64
+        billed_seconds:
+          type: integer
+          format: int64
+        diamonds_charged:
+          type: integer
+          format: int64
+        is_free_call:
+          type: boolean
+        end_reason:
+          type:
+            - string
+            - "null"
+    EndCallRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          enum:
+            - hangup
+            - report
+            - low_balance
+            - other
+    CallCredentials:
+      type: object
+      description: Short-lived token that lets this user join exactly this call.
+      additionalProperties: false
+      required:
+        - provider
+        - provider_call_id
+        - user_token
+        - expires_at
+      properties:
+        provider:
+          type: string
+        provider_call_id:
+          type: string
+        user_token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    Conversation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - peer_user_id
+        - peer_display_name
+        - unread_count
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        peer_user_id:
+          type: string
+          format: uuid
+        peer_display_name:
+          type: string
+        last_message_preview:
+          type:
+            - string
+            - "null"
+        unread_count:
+          type: integer
+          format: int32
+        updated_at:
+          type: string
+          format: date-time
+    StartConversationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - peer_user_id
+      properties:
+        peer_user_id:
+          type: string
+          format: uuid
+    ChatMessage:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - conversation_id
+        - sender_id
+        - body
+        - sent_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+        context:
+          type: string
+          enum: [chat, call]
+          description: >-
+            EXPERIMENT (unified chat, docs/chat). Where the message was sent
+            from: `chat` (inbox) or `call` (the in-call panel). Metadata only:
+            same conversation, same store. `chat` unless the server runs with
+            CHAT_MESSAGE_CONTEXT_ENABLED. Older servers omit it.
+        read_by_peer:
+          type: boolean
+          description: >-
+            EXPERIMENT. For the viewer's own messages: the other participant's
+            read marker is at or after `sent_at`. Always false for received
+            messages. A `chat.read` hint on `user:<sender>` announces changes.
+    SendMessageRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - body
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        context:
+          type: string
+          enum: [chat, call]
+          default: chat
+          description: >-
+            EXPERIMENT. `call` = sent from the in-call panel; requires
+            `call_id`. The message still goes to the pair's one conversation.
+            Sending is never billed and never changes the call.
+        call_id:
+          type: string
+          format: uuid
+          description: >-
+            EXPERIMENT. Only with `context: call`: a call between the two
+            participants (else 422 `call_id: not_found`). Stored server-side
+            only; never returned.
+        client_message_id:
+          type: string
+          format: uuid
+          description: >-
+            EXPERIMENT. The sender's id for this message (the client sends its
+            Idempotency-Key). A repeat returns the stored message without a
+            second row, realtime hint or push — also after the 24 h
+            Idempotency-Key window.
+    MessagingPrivacy:
+      type: object
+      additionalProperties: false
+      required:
+        - who_can_message
+      properties:
+        who_can_message:
+          type: string
+          enum:
+            - everyone
+            - past_call_partners
+    WalletSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - purchased_diamonds
+        - promotional_diamonds
+        - reserved_diamonds
+        - available_diamonds
+        - beans_on_hold
+        - beans_available
+        - beans_pending_payout
+      properties:
+        purchased_diamonds:
+          type: integer
+          format: int64
+        promotional_diamonds:
+          type: integer
+          format: int64
+        reserved_diamonds:
+          type: integer
+          format: int64
+        available_diamonds:
+          type: integer
+          format: int64
+        beans_on_hold:
+          type: integer
+          format: int64
+        beans_available:
+          type: integer
+          format: int64
+        beans_pending_payout:
+          type: integer
+          format: int64
+    WalletEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - currency
+        - kind
+        - amount
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        currency:
+          type: string
+          enum:
+            - DIAMOND
+            - BEAN
+        kind:
+          type: string
+        amount:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        reference:
+          type:
+            - string
+            - "null"
+    DiamondPackageItem:
+      type: object
+      additionalProperties: false
+      required:
+        - product_id
+        - diamonds
+      properties:
+        product_id:
+          type: string
+        diamonds:
+          type: integer
+          format: int64
+    DiamondPackageList:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiamondPackageItem"
+    VerifyGooglePlayRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - product_id
+        - purchase_token
+      properties:
+        product_id:
+          type: string
+        purchase_token:
+          type: string
+          maxLength: 4096
+        order_id:
+          type:
+            - string
+            - "null"
+    PurchaseVerification:
+      type: object
+      additionalProperties: false
+      required:
+        - purchase_id
+        - status
+        - diamonds_credited
+      properties:
+        purchase_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - credited
+            - pending
+            - rejected
+        diamonds_credited:
+          type: integer
+          format: int64
+    ReportRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - target_user_id
+        - category
+      properties:
+        target_user_id:
+          type: string
+          format: uuid
+        category:
+          type: string
+          enum:
+            - nudity
+            - sexual_content
+            - minor_safety
+            - harassment
+            - spam_or_scam
+            - fake_profile
+            - other
+        call_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        details:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+    ReportReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - report_id
+        - status
+      properties:
+        report_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+    BlockRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+    BlockedUser:
+      type: object
+      additionalProperties: false
+      required:
+        - user_id
+        - display_name
+        - blocked_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        blocked_at:
+          type: string
+          format: date-time
+    EnforcementNotice:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - action
+        - reason
+        - created_at
+        - appealable
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        appealable:
+          type: boolean
+    AppealRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - enforcement_id
+        - statement
+      properties:
+        enforcement_id:
+          type: string
+          format: uuid
+        statement:
+          type: string
+          maxLength: 2000
+    AppealReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - appeal_id
+        - status
+      properties:
+        appeal_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+    DeviceRegistration:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - platform
+      properties:
+        token:
+          type: string
+          maxLength: 4096
+        platform:
+          type: string
+          enum:
+            - android
+            - ios
+    InboxItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - kind
+        - title
+        - body
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        read_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+    ModerationCase:
+      type: object
+      additionalProperties: false
+      required:
+        - report_id
+        - status
+        - category
+        - target_user_id
+        - created_at
+        - evidence_count
+      properties:
+        report_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        category:
+          type: string
+        target_user_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        evidence_count:
+          type: integer
+          format: int32
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - action
+        - reason
+      properties:
+        action:
+          type: string
+          enum:
+            - dismiss
+            - warn
+            - restrict_calls
+            - suspend
+            - ban
+            - escalate_legal
+        reason:
+          type: string
+          maxLength: 2000
+    ModerationDecision:
+      type: object
+      additionalProperties: false
+      required:
+        - decision_id
+        - action
+        - status
+      properties:
+        decision_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        status:
+          type: string
+    AppealDecisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - outcome
+        - reason
+      properties:
+        outcome:
+          type: string
+          enum:
+            - upheld
+            - overturned
+        reason:
+          type: string
+          maxLength: 2000
+    ReconciliationReport:
+      type: object
+      description: Ledger vs balance-projection and vs Google Play settlement checks.
+      additionalProperties: false
+      required:
+        - as_of
+        - customer_diamond_liability
+        - host_bean_liability
+        - discrepancies
+      properties:
+        as_of:
+          type: string
+          format: date-time
+        customer_diamond_liability:
+          type: integer
+          format: int64
+        host_bean_liability:
+          type: integer
+          format: int64
+        discrepancies:
+          type: integer
+          format: int32
+    AdjustmentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - account
+        - currency
+        - amount
+        - reason
+      properties:
+        account:
+          type: string
+        currency:
+          type: string
+          enum:
+            - DIAMOND
+            - BEAN
+        amount:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          maxLength: 2000
+    AdjustmentProposal:
+      type: object
+      additionalProperties: false
+      required:
+        - proposal_id
+        - status
+      properties:
+        proposal_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - awaiting_second_approval
+            - posted
+            - rejected
+    PayoutCycleApproval:
+      type: object
+      additionalProperties: false
+      required:
+        - cycle_id
+        - status
+      properties:
+        cycle_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+    Problem:
+      type: object
+      description: "RFC 9457 problem. Clients switch on `code`; business-rule refusals use code business_rule with the rule name in `rule`."
+      required:
+        - type
+        - title
+        - status
+        - code
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        rule:
+          type: string
+        detail:
+          type: string
+        request_id:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required:
+              - field
+              - reason
+            properties:
+              field:
+                type: string
+              reason:
+                type: string

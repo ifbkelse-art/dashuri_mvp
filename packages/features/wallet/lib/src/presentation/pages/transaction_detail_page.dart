@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../application/transaction_detail_cubit.dart';
+import '../../domain/entities/sent_gift.dart';
 import '../../domain/entities/wallet_entry.dart';
 import '../widgets/transaction_row.dart';
 import '../widgets/wallet_format.dart';
@@ -28,7 +29,10 @@ class TransactionDetailPage extends StatelessWidget {
               ),
               onRetry: () => context.read<TransactionDetailCubit>().load(),
             ),
-            TransactionDetailLoaded(:final entry) => _Receipt(entry: entry),
+            TransactionDetailLoaded(:final entry, :final gift) => _Receipt(
+              entry: entry,
+              gift: gift,
+            ),
           },
         ),
       ),
@@ -37,9 +41,10 @@ class TransactionDetailPage extends StatelessWidget {
 }
 
 class _Receipt extends StatelessWidget {
-  const _Receipt({required this.entry});
+  const _Receipt({required this.entry, this.gift});
 
   final WalletEntry entry;
+  final SentGift? gift;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +55,13 @@ class _Receipt extends StatelessWidget {
       DashuriColors.of(context),
     );
     final beans = WalletFormat.isBeans(entry);
+    final g = gift;
     final rows = <(String, String)>[
+      if (g != null) ...[
+        ('Gift', '${g.emoji} ${g.giftName}'),
+        ('Sent to', g.recipientName.isEmpty ? 'A host' : g.recipientName),
+        ('Gift value', '${DashuriFormat.count(g.diamondCost)} Diamonds'),
+      ],
       ('Date', WalletFormat.dateTime(entry.createdAt)),
       ('Currency', beans ? 'Beans' : 'Diamonds'),
       if (entry.reference != null) ('Reference', entry.reference!),

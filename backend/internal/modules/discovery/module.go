@@ -19,6 +19,11 @@ type Deps struct {
 	Photos PhotoSigner // optional; without it cards have no photo
 	Rules  economy.Rules
 	Clock  clock.Clock
+	// VerifiedBoostXP: see config.DiscoveryVerifiedBoostXP.
+	VerifiedBoostXP int64
+	// ArrivalPhotos signs the private host-arrival-photos bucket (optional;
+	// without it cards carry no arrival photo).
+	ArrivalPhotos PhotoSigner
 }
 
 // Page is the list envelope {items, next_cursor}.
@@ -29,7 +34,8 @@ type Page[T any] struct {
 
 func parseList(r *http.Request) (ListRequest, error) {
 	q := r.URL.Query()
-	p := ListRequest{Cursor: q.Get("cursor"), Limit: 20, Language: q.Get("language"), CityID: q.Get("city_id"), Sort: q.Get("sort")}
+	p := ListRequest{Cursor: q.Get("cursor"), Limit: 20, Language: q.Get("language"), CityID: q.Get("city_id"), Sort: q.Get("sort"),
+		Verification: q.Get("verification")}
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {

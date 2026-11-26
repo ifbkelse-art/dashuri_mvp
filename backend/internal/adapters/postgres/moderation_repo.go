@@ -69,7 +69,7 @@ func (r ModerationRepo) OpenAutomatedCase(ctx context.Context, c moderation.Auto
 
 func (r ModerationRepo) Queue(ctx context.Context, after *moderation.QueueCursor, limit int) ([]moderation.ModerationCase, []moderation.QueueCursor, error) {
 	q := `select r.id, r.status, r.category, coalesce(r.target_user_id::text, ''), r.created_at, r.priority,
-		  (select count(*) from moderation.evidence e where e.report_id = r.id)::int
+		  (select count(*) from moderation.evidence e where e.report_id = r.id)::int, r.details
 		from safety.reports r where r.status in ('open','in_review')`
 	args := []any{limit}
 	if after != nil {
@@ -87,7 +87,7 @@ func (r ModerationRepo) Queue(ctx context.Context, after *moderation.QueueCursor
 	for rows.Next() {
 		var m moderation.ModerationCase
 		var pr int
-		if err := rows.Scan(&m.ReportId, &m.Status, &m.Category, &m.TargetUserId, &m.CreatedAt, &pr, &m.EvidenceCount); err != nil {
+		if err := rows.Scan(&m.ReportId, &m.Status, &m.Category, &m.TargetUserId, &m.CreatedAt, &pr, &m.EvidenceCount, &m.Details); err != nil {
 			return nil, nil, err
 		}
 		items = append(items, m)
@@ -156,6 +156,9 @@ func (r ModerationRepo) DecideReport(ctx context.Context, d moderation.ReportDec
 					if _, err := tx.Exec(ctx, `update identity.accounts set status = $2 where id = $1`, target, next); err != nil {
 						return err
 					}
+				}
+				if _, err := tx.Exec(ctx, `select set_config('dashuri.offline_reason', 'host_ineligible', true)`); err != nil {
+					return err
 				}
 				if _, err := tx.Exec(ctx, `update hosting.hosts set is_available = false where user_id = $1`, target); err != nil {
 					return err

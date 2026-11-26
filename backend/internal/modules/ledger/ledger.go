@@ -87,6 +87,7 @@ const (
 	EntryBeanClawback         EntryType = "bean_clawback"
 	EntryPromoExpiry          EntryType = "promo_expiry"
 	EntryAdjustment           EntryType = "adjustment" // manual; dual control required
+	EntryGiftSend             EntryType = "gift_send"  // virtual gift during a call
 )
 
 // Entry is one atomic, balanced journal entry.

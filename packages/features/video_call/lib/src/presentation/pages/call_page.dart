@@ -7,7 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../application/call_bloc.dart';
+import '../../application/gift_celebration_cubit.dart';
+import '../../application/gift_sheet_bloc.dart';
 import '../../domain/entities/call_session.dart';
+import '../gifts/gift_celebration_overlay.dart';
+import '../gifts/gift_sheet.dart';
 import '../in_call_chat.dart';
 import '../video/video_view_factory.dart';
 import '../widgets/call_widgets.dart';
@@ -19,12 +23,19 @@ import '../widgets/call_widgets.dart';
 /// EXPERIMENT — with [chat], a live call gets a chat control that opens the
 /// pair's conversation in a panel over the video. The panel is plain UI on
 /// this page: it never sends call events, so it cannot end, pause or bill.
+///
+/// Gifts (DASHURI_GIFTS_ENABLED): with [giftsEnabled], the route provides a
+/// [GiftSheetBloc] and a [GiftCelebrationCubit]. The customer gets a Gift
+/// control in place of the former camera on/off control (the camera stays
+/// on for the whole call; the Stream engine still owns its lifecycle);
+/// both sides see server-confirmed gift celebrations.
 class CallPage extends StatefulWidget {
   const CallPage({
     required this.views,
     super.key,
     this.manageSystemUi = true,
     this.chat,
+    this.giftsEnabled = false,
   });
 
   final VideoViewFactory views;
@@ -34,6 +45,9 @@ class CallPage extends StatefulWidget {
 
   /// In-call chat (null: no chat control).
   final InCallChat? chat;
+
+  /// Gift control and celebrations (blocs provided by the route).
+  final bool giftsEnabled;
 
   @override
   State<CallPage> createState() => _CallPageState();
@@ -45,6 +59,8 @@ class _CallPageState extends State<CallPage> {
   int _frozenElapsed = 0;
   InCallChatSession? _chat;
   bool _chatOpen = false;
+  bool _giftsStarted = false;
+  bool _wasReconnecting = false;
 
   @override
   void initState() {
@@ -56,7 +72,9 @@ class _CallPageState extends State<CallPage> {
     }
     // The listener only sees changes; pick up a call that is already live.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncChat(context.read<CallBloc>().state);
+      if (!mounted) return;
+      _syncChat(context.read<CallBloc>().state);
+      _syncGifts(context.read<CallBloc>().state);
     });
   }
 
@@ -88,6 +106,39 @@ class _CallPageState extends State<CallPage> {
     if (_chatOpen && !_isLive(s)) _setChatOpen(false);
   }
 
+  /// Starts gift celebrations once the call is live; keeps the gift sheet's
+  /// eligibility in step with the call; after a reconnect, fetches gifts
+  /// missed meanwhile from the server (no replay of older ones).
+  void _syncGifts(CallState s) {
+    if (!widget.giftsEnabled) return;
+    final session = s.session;
+    if (session == null) return;
+    final celebrations = context.read<GiftCelebrationCubit>();
+    if (!_giftsStarted && _isLive(s)) {
+      _giftsStarted = true;
+      unawaited(celebrations.start(session.callId));
+    }
+    if (_wasReconnecting && !s.reconnecting && _giftsStarted) {
+      unawaited(celebrations.resync());
+    }
+    _wasReconnecting = s.reconnecting;
+    final eligible = s.status == CallUiStatus.active;
+    final sheet = context.read<GiftSheetBloc>();
+    if (sheet.state.callEligible != eligible) {
+      sheet.add(GiftCallEligibilityChanged(eligible: eligible));
+    }
+  }
+
+  Future<void> _openGifts(BuildContext context, CallSession session) =>
+      showGiftSheet(
+        context,
+        bloc: context.read<GiftSheetBloc>(),
+        callId: session.callId,
+        recipientUserId: session.peerUserId,
+        recipientName: session.peerName,
+        onOpenWallet: () => unawaited(context.push(RoutePaths.wallet)),
+      );
+
   void _setChatOpen(bool open) {
     if (_chatOpen == open) return;
     if (!open) FocusManager.instance.primaryFocus?.unfocus();
@@ -97,13 +148,14 @@ class _CallPageState extends State<CallPage> {
 
   void _onState(BuildContext context, CallState s) {
     _syncChat(s);
+    _syncGifts(s);
     if (s.status != CallUiStatus.ended) return;
     final session = s.session;
     final router = GoRouter.of(context);
     if (session == null) {
       router.go(
         s.requestedEndReason == 'declined'
-            ? RoutePaths.hostDashboard
+            ? '${RoutePaths.hostDashboard}?after=declined'
             : RoutePaths.discovery,
       );
       return;
@@ -114,7 +166,11 @@ class _CallPageState extends State<CallPage> {
             session.phase == CallPhase.missed ||
             s.requestedEndReason == 'declined');
     if (receiverNoCall) {
-      router.go(RoutePaths.hostDashboard);
+      // Back to Host Home (still online); it says what happened.
+      final missed = session.phase == CallPhase.missed;
+      router.go(
+        '${RoutePaths.hostDashboard}?after=${missed ? 'missed' : 'declined'}',
+      );
       return;
     }
     router.go(
@@ -175,28 +231,40 @@ class _CallPageState extends State<CallPage> {
   @override
   Widget build(BuildContext context) => Theme(
     data: DashuriTheme.dark(),
-    child: BlocConsumer<CallBloc, CallState>(
-      listener: _onState,
-      builder: (context, s) => PopScope(
-        canPop:
-            s.status == CallUiStatus.failed ||
-            s.status == CallUiStatus.ended ||
-            s.status == CallUiStatus.idle,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          // Back closes the chat panel first; it never ends the call.
-          if (_chatOpen) {
-            _setChatOpen(false);
-          } else {
-            unawaited(_confirmLeave(context));
-          }
-        },
-        child: Scaffold(
-          backgroundColor: DashuriTokens.neutral950,
-          // The video stays full-screen; the call chrome handles the keyboard.
-          resizeToAvoidBottomInset: false,
-          body: _body(context, s),
-        ),
+    child: widget.giftsEnabled
+        ? BlocListener<GiftSheetBloc, GiftSheetState>(
+            // Only the server's receipt celebrates a sent gift.
+            listenWhen: (a, b) =>
+                b.sentCount != a.sentCount && b.lastReceipt != null,
+            listener: (context, s) => context
+                .read<GiftCelebrationCubit>()
+                .offer(s.lastReceipt!.event),
+            child: _consumer(),
+          )
+        : _consumer(),
+  );
+
+  Widget _consumer() => BlocConsumer<CallBloc, CallState>(
+    listener: _onState,
+    builder: (context, s) => PopScope(
+      canPop:
+          s.status == CallUiStatus.failed ||
+          s.status == CallUiStatus.ended ||
+          s.status == CallUiStatus.idle,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // Back closes the chat panel first; it never ends the call.
+        if (_chatOpen) {
+          _setChatOpen(false);
+        } else {
+          unawaited(_confirmLeave(context));
+        }
+      },
+      child: Scaffold(
+        backgroundColor: DashuriTokens.neutral950,
+        // The video stays full-screen; the call chrome handles the keyboard.
+        resizeToAvoidBottomInset: false,
+        body: _body(context, s),
       ),
     ),
   );
@@ -242,6 +310,8 @@ class _CallPageState extends State<CallPage> {
           chat: _isLive(s) ? _chat : null,
           chatOpen: _chatOpen,
           onChatOpen: _setChatOpen,
+          giftsEnabled: widget.giftsEnabled,
+          onGift: () => unawaited(_openGifts(context, session)),
         );
     }
   }
@@ -306,12 +376,27 @@ class _IncomingView extends StatelessWidget {
                         radius: (c.maxHeight * .1).clamp(40.0, 64.0),
                       ),
                       const SizedBox(height: DashuriTokens.space5),
-                      Text(
-                        name,
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: theme.textTheme.displaySmall?.copyWith(
+                                color: Colors.white,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          if (session.peer?.isVerified ?? false) ...[
+                            const SizedBox(width: DashuriTokens.space2),
+                            const VerifiedHostBadge(
+                              compact: true,
+                              size: 26,
+                              onMedia: true,
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: DashuriTokens.space3),
                       GlassPill(
@@ -421,6 +506,8 @@ class _CallCanvas extends StatelessWidget {
     required this.chat,
     required this.chatOpen,
     required this.onChatOpen,
+    this.giftsEnabled = false,
+    this.onGift,
   });
 
   final CallState state;
@@ -433,6 +520,8 @@ class _CallCanvas extends StatelessWidget {
   final InCallChatSession? chat;
   final bool chatOpen;
   final ValueChanged<bool> onChatOpen;
+  final bool giftsEnabled;
+  final VoidCallback? onGift;
 
   /// Height of the call screen (without keyboard) below which the top bar
   /// gives way to the chat while typing.
@@ -492,16 +581,14 @@ class _CallCanvas extends StatelessWidget {
                   ? () => bloc.add(const CallMicrophoneToggled())
                   : null,
             ),
-            RoundControl(
-              icon: state.cameraOn
-                  ? Icons.videocam_rounded
-                  : Icons.videocam_off_rounded,
-              label: state.cameraOn ? 'Turn camera off' : 'Turn camera on',
-              active: !state.cameraOn,
-              onPressed: state.mediaJoined
-                  ? () => bloc.add(const CallCameraToggled())
-                  : null,
-            ),
+            // The former camera on/off control: the customer's Gift
+            // control. Hosts have no control here (they never send gifts).
+            if (giftsEnabled && session.role == CallRole.caller)
+              RoundControl(
+                icon: Icons.card_giftcard_rounded,
+                label: 'Send a gift',
+                onPressed: state.status == CallUiStatus.active ? onGift : null,
+              ),
             if (chat != null)
               ValueListenableBuilder<int>(
                 valueListenable: chat.unseen,
@@ -577,6 +664,14 @@ class _CallCanvas extends StatelessWidget {
               ),
             if (_live && state.reconnecting)
               const Positioned.fill(child: _ReconnectingOverlay()),
+            // Gift celebrations: above the video, below the call chrome, and
+            // never hit-testable.
+            if (giftsEnabled && _live)
+              Positioned.fill(
+                child: GiftCelebrationOverlay(
+                  viewerIsCustomer: session.role == CallRole.caller,
+                ),
+              ),
             // Top bar, chat and controls share one column, so the chat can
             // never sit under the controls or the timer, on any screen.
             Positioned.fill(
@@ -603,7 +698,13 @@ class _CallCanvas extends StatelessWidget {
                             ),
                           ),
                         ),
+                      // Keyed: when the keyboard opens on a short screen
+                      // (tablet or phone in landscape) the top bar and the
+                      // controls leave this Column. Without a key the chat
+                      // would be rebuilt from scratch, dropping the text
+                      // field's focus and closing the keyboard again.
                       Expanded(
+                        key: const ValueKey('call-chat-area'),
                         child: showChat
                             ? _ChatArea(
                                 chat: chat,
@@ -855,16 +956,30 @@ class _TopBar extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        peerName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        // Over live video: shadows keep it readable on
-                        // bright frames (there is no panel behind it).
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          shadows: _videoTextShadows,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              peerName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              // Over live video: shadows keep it readable on
+                              // bright frames (there is no panel behind it).
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                shadows: _videoTextShadows,
+                              ),
+                            ),
+                          ),
+                          if (session.peer?.isVerified ?? false) ...[
+                            const SizedBox(width: DashuriTokens.space1),
+                            const VerifiedHostBadge(
+                              compact: true,
+                              size: 16,
+                              onMedia: true,
+                            ),
+                          ],
+                        ],
                       ),
                       Text(
                         session.role == CallRole.receiver

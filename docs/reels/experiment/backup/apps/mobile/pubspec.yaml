@@ -1,0 +1,65 @@
+name: dashuri_mobile
+description: Dashuri Android app (iOS-ready). Composition root only — features live in packages/features.
+publish_to: none
+version: 0.1.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.35.0"
+
+dependencies:
+  bloc: ^9.0.0
+  dashuri_core:
+    path: ../../packages/core
+  dashuri_design_system:
+    path: ../../packages/design_system
+  dashuri_navigation:
+    path: ../../packages/navigation
+  dashuri_network:
+    path: ../../packages/network
+  dashuri_storage:
+    path: ../../packages/storage
+  dashuri_supabase:
+    path: ../../packages/supabase
+  feature_auth:
+    path: ../../packages/features/auth
+  feature_chat:
+    path: ../../packages/features/chat
+  feature_discovery:
+    path: ../../packages/features/discovery
+  feature_free_call:
+    path: ../../packages/features/free_call
+  feature_host:
+    path: ../../packages/features/host
+  feature_location:
+    path: ../../packages/features/location
+  feature_notifications:
+    path: ../../packages/features/notifications
+  feature_profile:
+    path: ../../packages/features/profile
+  feature_purchases:
+    path: ../../packages/features/purchases
+  feature_safety:
+    path: ../../packages/features/safety
+  feature_settings:
+    path: ../../packages/features/settings
+  feature_video_call:
+    path: ../../packages/features/video_call
+  feature_wallet:
+    path: ../../packages/features/wallet
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.1.1
+  get_it: ^9.2.1
+  image_picker: ^1.2.4
+  shared_preferences: ^2.5.3
+
+dev_dependencies:
+  dashuri_lints:
+    path: ../../packages/lints
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

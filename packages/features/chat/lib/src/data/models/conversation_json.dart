@@ -17,6 +17,7 @@ Conversation conversationFromJson(JsonMap json) {
     peerDisplayName:
         (peer?['display_name'] ?? json['peer_display_name']) as String? ?? '',
     peerPhotoUrl: (peer?['photo_url'] ?? json['peer_photo_url']) as String?,
+    peerIsVerified: peer?['is_verified'] == true,
     lastMessagePreview: json['last_message_preview'] as String? ?? last?.body,
     lastMessage: last,
     unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,

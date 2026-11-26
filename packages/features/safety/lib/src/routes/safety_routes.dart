@@ -34,6 +34,7 @@ final class SafetyRoutes implements FeatureRoutes {
     required String userId,
     required String name,
     String? callId,
+    String? arrivalPhotoId,
     bool block = false,
   }) => Uri(
     path: RoutePaths.report,
@@ -42,6 +43,7 @@ final class SafetyRoutes implements FeatureRoutes {
       'userId': userId,
       'name': name,
       'callId': ?callId,
+      'arrivalPhotoId': ?arrivalPhotoId,
     },
   ).toString();
 
@@ -101,6 +103,10 @@ final class SafetyRoutes implements FeatureRoutes {
               GetIt.instance<BlockUser>(),
               targetUserId: userId,
               callId: (callId?.isEmpty ?? true) ? null : callId,
+              arrivalPhotoId: switch (q['arrivalPhotoId']) {
+                final String id when id.isNotEmpty => id,
+                _ => null,
+              },
             ),
             child: ReportPage(
               name: name,

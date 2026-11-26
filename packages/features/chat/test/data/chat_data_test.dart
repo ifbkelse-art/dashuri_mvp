@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dashuri_core/dashuri_core.dart';
 import 'package:dashuri_network/dashuri_network.dart';
 import 'package:feature_chat/src/data/datasources/chat_remote_data_source.dart';
+import 'package:feature_chat/src/data/models/chat_message_json.dart';
 import 'package:feature_chat/src/data/models/conversation_json.dart';
 import 'package:feature_chat/src/data/repositories/chat_repository_impl.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +86,16 @@ void main() {
     expect(c.unreadCount, 3);
   });
 
+  test('maps the peer Verified Host flag (2026-11-23)', () {
+    final c = conversationFromJson({
+      'id': 'c1',
+      'peer': {'user_id': 'u2', 'display_name': 'Meera', 'is_verified': true},
+      'unread_count': 0,
+      'updated_at': '2026-11-21T10:00:00Z',
+    });
+    expect(c.peerIsVerified, isTrue);
+  });
+
   test('maps the original flat conversation shape', () {
     final c = conversationFromJson({
       'id': 'c1',
@@ -153,5 +164,19 @@ void main() {
       session: session,
     );
     expect(await repo.markRead('c1'), isA<Success<void>>());
+  });
+
+  test('gift messages: kind gift maps to isGift; text is the default', () {
+    final base = <String, Object?>{
+      'id': 'm1',
+      'conversation_id': 'c1',
+      'sender_id': 'u1',
+      'body': '💎 Asha sent Diamond Ring to Meera.',
+      'sent_at': '2026-11-26T10:00:00Z',
+      'context': 'call',
+    };
+    expect(chatMessageFromJson({...base, 'kind': 'gift'}).isGift, isTrue);
+    expect(chatMessageFromJson({...base, 'kind': 'text'}).isGift, isFalse);
+    expect(chatMessageFromJson(base).isGift, isFalse);
   });
 }

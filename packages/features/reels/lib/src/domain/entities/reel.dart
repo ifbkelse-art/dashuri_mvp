@@ -88,20 +88,32 @@ final class ReelCreator extends Equatable {
   ];
 }
 
+/// How a reel is delivered: progressive MP4 (Cloudflare R2, the target)
+/// or HLS (legacy Mux reels during the transition).
+enum ReelMediaFormat {
+  mp4,
+  hls;
+
+  static ReelMediaFormat parse(String? v) => v == 'mp4' ? mp4 : hls;
+}
+
 /// Short-lived signed playback URLs (never stored).
 final class ReelPlayback extends Equatable {
   const ReelPlayback({
-    required this.hlsUrl,
+    required this.url,
     required this.thumbnailUrl,
     required this.expiresAt,
+    this.format = ReelMediaFormat.mp4,
   });
 
-  final String hlsUrl;
+  /// What the player opens.
+  final String url;
+  final ReelMediaFormat format;
   final String thumbnailUrl;
   final DateTime expiresAt;
 
   @override
-  List<Object?> get props => [hlsUrl, thumbnailUrl, expiresAt];
+  List<Object?> get props => [url, format, thumbnailUrl, expiresAt];
 }
 
 final class Reel extends Equatable {

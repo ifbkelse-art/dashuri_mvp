@@ -21,7 +21,14 @@ class HostRatePage extends StatelessWidget {
       'The maximum rate is 10,000 Diamonds per minute.',
     RateError.aboveLevelLimit =>
       'Your level allows up to ${DashuriFormat.count(limit)} Diamonds per minute.',
+    RateError.requiresVerification =>
+      'Rates above 3,000 Diamonds per minute need an active Verified Host '
+          'status.',
   };
+
+  /// The founder-specified call to action for non-verified hosts.
+  static const verificationCta =
+      'Want to charge more than 3,000 Diamonds/minute? Become a Verified Host.';
 
   @override
   Widget build(BuildContext context) =>
@@ -145,17 +152,17 @@ class _RateEditor extends StatelessWidget {
           ],
         ),
         const SizedBox(height: DashuriTokens.space4),
-        Slider(
-          value: state.rate
-              .clamp(BeanRules.minRate, BeanRules.maxRate)
-              .toDouble(),
-          min: BeanRules.minRate.toDouble(),
-          max: BeanRules.maxRate.toDouble(),
-          divisions:
-              (BeanRules.maxRate - BeanRules.minRate) ~/ BeanRules.rateStep,
-          label: DashuriFormat.count(state.rate),
-          onChanged: (v) => cubit.setRate(v.round()),
-        ),
+        // Dynamic range: 500 up to what this host may charge now (level ×
+        // 1,000, and 3,000 unless an active Verified Host).
+        if (state.limit > BeanRules.minRate)
+          Slider(
+            value: state.rate.clamp(BeanRules.minRate, state.limit).toDouble(),
+            min: BeanRules.minRate.toDouble(),
+            max: state.limit.toDouble(),
+            divisions: (state.limit - BeanRules.minRate) ~/ BeanRules.rateStep,
+            label: DashuriFormat.count(state.rate),
+            onChanged: (v) => cubit.setRate(v.round()),
+          ),
         Row(
           children: [
             const Text('500'),
@@ -166,8 +173,20 @@ class _RateEditor extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
             ),
-            const Text('10,000'),
+            Text(DashuriFormat.count(state.limit)),
           ],
+        ),
+        const SizedBox(height: DashuriTokens.space2),
+        Text(
+          [
+            if (state.host?.level != null) 'Level ${state.host!.level}',
+            'level limit ${DashuriFormat.count(state.levelLimit)}',
+            if (state.isVerified) VerifiedHostBadge.label else 'not verified',
+          ].join(' · '),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         if (state.error != null) ...[
           const SizedBox(height: DashuriTokens.space3),
@@ -187,13 +206,39 @@ class _RateEditor extends StatelessWidget {
               '${HostFormat.approxRupees(paisePerMin * 60)} for every hour on calls '
               '(approximate, before tax)',
         ),
+        if (state.showVerificationCta) ...[
+          const SizedBox(height: DashuriTokens.space4),
+          VerifiedHostCta(
+            onPressed: () => context.push(RoutePaths.hostVerifiedHost),
+          ),
+        ],
         const SizedBox(height: DashuriTokens.space4),
-        const HostNotice(
+        HostNotice(
           icon: Icons.trending_up_rounded,
           message:
-              'Your level sets your maximum rate. Level up to unlock higher rates.',
+              'Your level sets your maximum rate: level × 1,000 Diamonds per '
+              'minute.${state.host?.nextLevelMaxRatePerMinute == null ? '' : ' Next level: up to ${DashuriFormat.count(state.host!.nextLevelMaxRatePerMinute!)}.'}',
         ),
       ],
     );
   }
+}
+
+/// "Want to charge more than 3,000 Diamonds/minute? Become a Verified Host."
+class VerifiedHostCta extends StatelessWidget {
+  const VerifiedHostCta({required this.onPressed, super.key});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => HostCard(
+    child: Row(
+      children: [
+        const VerifiedHostBadge(compact: true, size: 28),
+        const SizedBox(width: DashuriTokens.space3),
+        const Expanded(child: Text(HostRatePage.verificationCta)),
+        TextButton(onPressed: onPressed, child: const Text('Start')),
+      ],
+    ),
+  );
 }

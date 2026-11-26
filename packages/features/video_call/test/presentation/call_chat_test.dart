@@ -156,6 +156,38 @@ void main() {
     return (b, chat);
   }
 
+  // Regression: on a tablet (or phone) in landscape, opening the keyboard
+  // leaves too little height for the top bar, so it leaves the layout.
+  // The chat must survive that relayout: the field keeps focus and text,
+  // and the keyboard is not closed again.
+  for (final (name, size, keyboard) in [
+    ('tablet landscape', const Size(1180, 820), 420.0),
+    ('small tablet landscape', const Size(1024, 768), 400.0),
+    ('phone landscape', const Size(844, 390), 200.0),
+  ]) {
+    testWidgets('$name: opening the keyboard keeps the chat field focused', (
+      t,
+    ) async {
+      await pump(t, live(), size: size);
+      await t.tap(find.byTooltip('Open chat'));
+      await t.pumpAndSettle();
+      final composer = find.byKey(const Key('composer'));
+      await t.tap(composer);
+      await t.pump();
+      await t.enterText(composer, 'typing during the call');
+      final before = t.state<EditableTextState>(find.byType(EditableText));
+
+      setKeyboard(t, keyboard);
+      await t.pumpAndSettle();
+
+      final after = t.state<EditableTextState>(find.byType(EditableText));
+      expect(identical(before, after), isTrue, reason: 'field was rebuilt');
+      expect(after.widget.focusNode.hasFocus, isTrue);
+      expect(find.text('typing during the call'), findsOneWidget);
+      expect(t.takeException(), isNull);
+    });
+  }
+
   testWidgets('no chat control before the call is live', (t) async {
     final (_, chat) = await pump(
       t,
@@ -168,11 +200,16 @@ void main() {
     expect(chat.opened, isEmpty);
   });
 
-  testWidgets('selfie camera only: no flip-camera control', (t) async {
+  testWidgets('selfie camera only: no flip-camera control and, since the '
+      'gifts spec (2026-11-26), no camera on/off control', (t) async {
     await pump(t, live());
-    expect(find.byTooltip('Turn camera off'), findsOneWidget);
     expect(find.byTooltip('Flip camera'), findsNothing);
     expect(find.byIcon(Icons.cameraswitch_rounded), findsNothing);
+    expect(find.byTooltip('Turn camera off'), findsNothing);
+    expect(find.byTooltip('Turn camera on'), findsNothing);
+    expect(find.byIcon(Icons.videocam_off_rounded), findsNothing);
+    // The camera stays on: the local preview is shown, not the off tile.
+    expect(find.text('local-video'), findsOneWidget);
   });
 
   testWidgets('10: opening and closing the chat keeps the call: video, '
@@ -275,7 +312,6 @@ void main() {
           expectTextInsideWindow(t);
           for (final c in [
             'Mute microphone',
-            'Turn camera off',
             'Open chat',
             'Report',
             'End call',

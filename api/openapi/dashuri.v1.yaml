@@ -17,6 +17,8 @@ tags:
   - name: chat
   - name: discovery
   - name: free-call
+  - name: gifts
+    description: Virtual gifts during calls (GIFTS_ENABLED)
   - name: host
   - name: levels
   - name: notifications
@@ -397,7 +399,24 @@ paths:
       tags:
         - discovery
       summary: "Hosts online and accepting calls, with their rates. Excludes blocked users."
+      description: >-
+        rate_per_minute is the price the next call uses (stored price within
+        current eligibility). In the `recommended` sort an ACTIVE Verified Host
+        ranks as if it had DISCOVERY_VERIFIED_BOOST_XP more lifetime XP (a
+        configurable ranking signal); non-verified hosts are never excluded
+        unless the `verification` filter asks for it.
       parameters:
+        - name: verification
+          in: query
+          required: false
+          description: "Verified Host filter (2026-11-23)."
+          schema:
+            type: string
+            enum:
+              - all
+              - verified
+              - non_verified
+            default: all
         - name: cursor
           in: query
           required: false
@@ -603,7 +622,15 @@ paths:
       operationId: setRate
       tags:
         - host
-      summary: "Set Diamonds/min within 500–10,000 and the level cap (S2). Applies to the next call."
+      summary: "Set an integer Diamonds/min price. Applies to the next call; live calls keep their rate."
+      description: >-
+        Founder rules 2026-11-23, validated by the server under the host row
+        lock (level and Verified Host status are read in the same transaction,
+        never taken from the client): minimum 500; maximum level × 1,000
+        (levels 1–10); above 3,000 requires an ACTIVE Verified Host.
+        Errors (422 business_rule): rate_below_minimum,
+        rate_outside_level_limits, verification_required_for_rate; 422
+        validation rate_per_minute: must_be_integer for fractional numbers.
       x-required-roles:
         - host
       requestBody:
@@ -2196,6 +2223,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
   /v1/admin/ledger/adjustments:
+    get:
+      operationId: listLedgerAdjustments
+      tags:
+        - admin
+      summary: "Admin console: ledger adjustment proposals, oldest first. proposed_by_me marks proposals the caller cannot approve."
+      x-required-roles:
+        - finance
+        - admin
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [awaiting_second_approval, posted, rejected, all]
+            default: awaiting_second_approval
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdjustmentItem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
     post:
       operationId: proposeAdjustment
       tags:
@@ -2642,6 +2713,425 @@ paths:
           $ref: "#/components/responses/Problem"
         "503":
           $ref: "#/components/responses/Problem"
+  /v1/host/verification:
+    get:
+      operationId: getHostVerification
+      tags:
+        - host
+      summary: "The host's Verified Host status, open request and uploaded evidence (metadata only, never URLs)."
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/host/verification/evidence:
+    post:
+      operationId: createVerificationEvidenceUpload
+      tags:
+        - host
+      summary: "Signed upload URL for one PRIVATE evidence object (face video or ID image). 503 storage_not_configured without a bucket."
+      x-required-roles:
+        - host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvidenceUploadRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceUploadTicket"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/host/verification/submissions:
+    post:
+      operationId: submitHostVerification
+      tags:
+        - host
+      summary: "Submit a Verified Host application (needs face_video + id_document_front) or reply to an information request."
+      x-required-roles:
+        - host
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitVerificationRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/me:
+    get:
+      operationId: getStaffMe
+      tags:
+        - admin
+      summary: "Admin console: the caller's staff identity and roles. 403 role_required for non-staff accounts."
+      x-required-roles:
+        - moderator
+        - admin
+        - finance
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMe"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/users:
+    get:
+      operationId: listUserNames
+      tags:
+        - admin
+      summary: "Admin console: display names for up to 50 user ids (unknown ids are left out)."
+      x-required-roles:
+        - moderator
+        - admin
+        - finance
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Comma-separated user ids (uuid), at most 50.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserName"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/host-applications:
+    get:
+      operationId: listHostApplications
+      tags:
+        - admin
+      summary: "Admin console: hosts waiting for basic activation (applied or kyc_pending), oldest first. Decide with POST /v1/admin/hosts/{userId}/kyc-decision."
+      x-required-roles:
+        - moderator
+        - admin
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/HostApplication"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/appeals:
+    get:
+      operationId: listAppeals
+      tags:
+        - admin
+      summary: "Admin console: appeals with their enforcement action, oldest first. Decide with POST /v1/admin/appeals/{appealId}/decisions."
+      x-required-roles:
+        - moderator
+        - admin
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [open, upheld, overturned, all]
+            default: open
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AppealItem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/audit:
+    get:
+      operationId: listAuditEvents
+      tags:
+        - admin
+      summary: "Admin console: recent audit events, newest first. Only the reason is exposed from event details."
+      x-required-roles:
+        - admin
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditItem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/host-verifications:
+    get:
+      operationId: listHostVerifications
+      tags:
+        - admin
+      summary: "Verified Host review queue (oldest first). Default: submitted, under_review and info_required."
+      x-required-roles:
+        - moderator
+        - admin
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [submitted, under_review, info_required, approved, rejected, suspended, revoked]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VerificationQueueItem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/hosts/{userId}/verification:
+    get:
+      operationId: getAdminHostVerification
+      tags:
+        - admin
+      summary: "Staff view: application, evidence metadata and audited history. The view itself is audited. 403 self_review for one's own account."
+      x-required-roles:
+        - moderator
+        - admin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVerificationDetail"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/hosts/{userId}/verification/actions:
+    post:
+      operationId: actOnHostVerification
+      tags:
+        - admin
+      summary: "Move a Verified Host application through the state machine (audited). Suspend/revoke cap the price at min(3,000, level max) in the same transaction."
+      description: >-
+        Allowed: start_review (submitted→under_review); request_info
+        (submitted|under_review→info_required, info_request required); approve
+        (under_review→verified, required evidence present); reject
+        (submitted|under_review|info_required→rejected); suspend
+        (verified→suspended); reinstate (suspended→verified); revoke
+        (verified|suspended→revoked). reject/suspend/reinstate/revoke need a
+        reason. 403 self_review on one's own account; 409 invalid_transition.
+        Approval and reinstatement never change the price; live calls keep
+        their rate.
+      x-required-roles:
+        - moderator
+        - admin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationActionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVerificationDetail"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/hosts/{userId}/verification/evidence/{evidenceId}/access:
+    post:
+      operationId: accessHostVerificationEvidence
+      tags:
+        - admin
+      summary: "Signed read URL for one private evidence object, valid 5 minutes. Audited before the URL is issued; never for one's own account."
+      x-required-roles:
+        - moderator
+        - admin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: evidenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceAccess"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
   /v1/me/photos/{photoId}:
     delete:
       operationId: deleteMyPhoto
@@ -2823,6 +3313,34 @@ paths:
         "422":
           $ref: "#/components/responses/Problem"
         "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/reels/{reelId}/upload-complete:
+    post:
+      operationId: completeReelUpload
+      tags:
+        - reels
+      summary: "Creator only. The app calls this after the PUT finished; the server checks the storage itself and moves awaiting_upload → processing (idempotent). 409 upload_not_received when the file is not there yet."
+      parameters:
+        - name: reelId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reel"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
           $ref: "#/components/responses/Problem"
         "503":
           $ref: "#/components/responses/Problem"
@@ -3315,6 +3833,531 @@ paths:
           $ref: "#/components/responses/Problem"
         "503":
           $ref: "#/components/responses/Problem"
+  /v1/gifts/catalogue:
+    get:
+      operationId: getGiftCatalogue
+      tags:
+        - gifts
+      summary: "Gifts that can be sent now (active, within their availability window), in display order. Prices are authoritative here; the client never sends a price. 503 gifts_disabled while GIFTS_ENABLED is off."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GiftCatalogue"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/calls/{callId}/gifts:
+    parameters:
+      - name: callId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: sendGift
+      tags:
+        - gifts
+      summary: "Customer sends a virtual gift to the host of an ACTIVE call. Server-authoritative and atomic: price from the catalogue, Diamonds spent promotional-first (never the call's reserved Diamonds), host Beans from the versioned economy rule set into the 7-day hold, one ledger entry (gift_send), one immutable gift transaction and one chat line, or nothing. The Idempotency-Key MUST be a UUIDv4: a retry with the same key and body returns the stored gift (200, replayed=true) without charging again; the same key with a different gift/recipient/call is refused (422). Business rules: hosts_cannot_send_gifts, call_not_giftable, host_cannot_receive_gifts, blocked, gift_unavailable, insufficient_diamonds, gift_spend_limit, account_restricted, not_age_eligible; 429 gift_rate_limited."
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendGiftRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendGiftResponse"
+        "200":
+          description: Replayed (same Idempotency-Key and body)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendGiftResponse"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+    get:
+      operationId: listCallGifts
+      tags:
+        - gifts
+      summary: "The call's gifts, oldest first, for its two participants: the canonical history used to recover after a reconnect (realtime call.gift events are hints only)."
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GiftEventPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/me/gifts/sent:
+    get:
+      operationId: listSentGifts
+      tags:
+        - gifts
+      summary: "The customer's sent gifts, newest first (gift, recipient, Diamond cost, date, call). The wallet history also lists each gift as a gift_send entry."
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SentGiftPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/host/gifts:
+    get:
+      operationId: listReceivedGifts
+      tags:
+        - gifts
+      summary: "The host's received gifts, newest first, with the host's own Beans earned and settlement status (on_hold until the 7-day hold ends, then released)."
+      x-required-roles:
+        - host
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceivedGiftPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/host/gifts/summary:
+    get:
+      operationId: getReceivedGiftSummary
+      tags:
+        - gifts
+      summary: "Host dashboard gift totals (all time and today, IST)."
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceivedGiftSummary"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/gifts:
+    get:
+      operationId: adminListGifts
+      tags:
+        - admin
+      summary: "The whole gift catalogue, including inactive and retired gifts."
+      x-required-roles: [admin, finance, moderator]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/AdminGift"}
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: adminCreateGift
+      tags:
+        - admin
+      summary: "Create a gift (admin). The initial price is recorded in the price history and audited."
+      x-required-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGiftRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminGift"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/gifts/{giftId}:
+    parameters:
+      - {name: giftId, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$"}}
+    patch:
+      operationId: adminUpdateGift
+      tags:
+        - admin
+      summary: "Edit metadata, animation, active status, sort order or availability window, or retire the gift (admin; audited). Never the price."
+      x-required-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGiftRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminGift"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/gifts/{giftId}/price:
+    parameters:
+      - {name: giftId, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: adminChangeGiftPrice
+      tags:
+        - admin
+      summary: "Change a gift's Diamond price (admin; reason required; price history + audit row in the same transaction). Applies to gifts sent afterwards only: completed gifts keep the price they were charged."
+      x-required-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeGiftPriceRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminGift"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/gifts/{giftId}/price-history:
+    parameters:
+      - {name: giftId, in: path, required: true, schema: {type: string}}
+    get:
+      operationId: adminGiftPriceHistory
+      tags:
+        - admin
+      summary: "Audited price changes of one gift, newest first."
+      x-required-roles: [admin, finance, moderator]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/GiftPriceChange"}
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/gifts/performance:
+    get:
+      operationId: adminGiftPerformance
+      tags:
+        - admin
+      summary: "Per-gift sales over the last N days (count, Diamond value, host Beans, unique senders and hosts)."
+      x-required-roles: [admin, finance, moderator]
+      parameters:
+        - {name: days, in: query, schema: {type: integer, minimum: 1, maximum: 365, default: 30}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, days]
+                properties:
+                  days: {type: integer}
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/GiftPerformance"}
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/gifts/transactions:
+    get:
+      operationId: adminListGiftTransactions
+      tags:
+        - admin
+      summary: "Investigation list of gift transactions (staff): filter by user (sender or recipient), call, or risk-flagged only. Includes the split, Beans, rule-set version, ledger entry and risk flags."
+      x-required-roles: [admin, finance, moderator]
+      parameters:
+        - {name: user_id, in: query, schema: {type: string, format: uuid}}
+        - {name: call_id, in: query, schema: {type: string, format: uuid}}
+        - {name: flagged, in: query, schema: {type: boolean}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminGiftTransactionPage"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/host/arrival-photo:
+    get:
+      operationId: getArrivalPhoto
+      tags:
+        - host
+      summary: "The current online session's arrival photo (204 when there is none). 503 arrival_photos_disabled while ARRIVAL_PHOTOS_ENABLED is off."
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArrivalPhotoView"
+        "204":
+          description: No arrival photo in the current session
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteArrivalPhoto
+      tags:
+        - host
+      summary: "Remove the current arrival photo (never affects availability). Idempotent."
+      x-required-roles:
+        - host
+      responses:
+        "204":
+          description: Removed (or nothing to remove)
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/host/arrival-photo/upload-tickets:
+    post:
+      operationId: createArrivalPhotoUpload
+      tags:
+        - host
+      summary: "Signed upload URL for an OPTIONAL arrival photo of the host's CURRENT online session (approved, online hosts only; JPEG only; private bucket). Confirm within 10 minutes. A new ticket replaces the session's previous photo; photos are never reused across sessions. Business rules: not_online, host_not_approved, account_restricted."
+      x-required-roles:
+        - host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArrivalUploadRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArrivalUploadTicket"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/host/arrival-photo/{photoId}/confirm:
+    parameters:
+      - {name: photoId, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: confirmArrivalPhoto
+      tags:
+        - host
+      summary: "After uploading: the server downloads the object, checks it is a fully decodable JPEG (≤ 2 MiB, 240–4096 px), re-encodes it (dropping EXIF/GPS), then moderates it (classifier → approved/rejected; otherwise pending_review for staff unless ARRIVAL_PHOTO_AUTO_APPROVE_UNSCANNED). 422 photo=invalid_image|too_large; 409 upload_missing (retry after uploading) or arrival_photo_expired (session or window ended). Idempotent."
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArrivalPhotoView"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/arrival-photos:
+    get:
+      operationId: adminArrivalPhotoQueue
+      tags:
+        - admin
+      summary: "Arrival photos waiting for review, oldest first, with short-lived signed URLs (viewing is audited)."
+      x-required-roles: [moderator, admin]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/ArrivalQueueItem"}
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /v1/admin/arrival-photos/{photoId}/decision:
+    parameters:
+      - {name: photoId, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: adminDecideArrivalPhoto
+      tags:
+        - admin
+      summary: "approve (pending only), reject (pending or approved) or remove (any current photo). Reason required for reject/remove. Audited."
+      x-required-roles: [moderator, admin]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArrivalDecisionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArrivalQueueItem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "503":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     bearerAuth:
@@ -3340,6 +4383,378 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    GiftParty:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name]
+      properties:
+        user_id: {type: string, format: uuid}
+        display_name: {type: string}
+    Gift:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, emoji, icon_asset, animation_asset, animation_duration_ms, sound_asset, tier, sort_order, diamond_price]
+      properties:
+        id: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$", description: Stable gift id}
+        name: {type: string}
+        description: {type: string}
+        emoji: {type: string}
+        icon_asset: {type: string, description: "App asset key (e.g. gift/rose) or https URL"}
+        animation_asset: {type: string, description: "Celebration reference (e.g. celebration/rose)"}
+        animation_duration_ms: {type: integer, minimum: 1000, maximum: 10000}
+        sound_asset: {type: ["string", "null"]}
+        tier: {type: string, enum: [common, rare, epic, legendary, mythic]}
+        sort_order: {type: integer}
+        diamond_price: {type: integer, format: int64, minimum: 1}
+    GiftCatalogue:
+      type: object
+      additionalProperties: false
+      required: [items, updated_at]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Gift"}
+        updated_at: {type: string, format: date-time, description: "Newest catalogue change; clients refresh when it moves"}
+    SendGiftRequest:
+      type: object
+      additionalProperties: false
+      required: [gift_id, recipient_user_id]
+      description: "No price or amount: the server prices the gift."
+      properties:
+        gift_id: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$"}
+        recipient_user_id: {type: string, format: uuid, description: "Must be the call's host"}
+    GiftEvent:
+      type: object
+      additionalProperties: false
+      description: "Public, canonical description of one sent gift (also the call.gift realtime payload on call:<id>). No wallet balances, ledger or accounting data. Clients dedupe by gift_transaction_id."
+      required: [gift_transaction_id, gift_id, gift_name, emoji, tier, diamond_value, sender, recipient, call_id, animation_asset, animation_duration_ms, chat_message_id, sent_at]
+      properties:
+        gift_transaction_id: {type: string, format: uuid}
+        gift_id: {type: string}
+        gift_name: {type: string}
+        emoji: {type: string}
+        tier: {type: string, enum: [common, rare, epic, legendary, mythic]}
+        diamond_value: {type: integer, format: int64, description: "Price charged when sent (never re-priced)"}
+        sender: {$ref: "#/components/schemas/GiftParty"}
+        recipient: {$ref: "#/components/schemas/GiftParty"}
+        call_id: {type: string, format: uuid}
+        animation_asset: {type: string}
+        animation_duration_ms: {type: integer}
+        chat_message_id: {type: ["string", "null"], format: uuid}
+        sent_at: {type: string, format: date-time}
+    SendGiftResponse:
+      type: object
+      additionalProperties: false
+      required: [gift, available_diamonds, replayed]
+      properties:
+        gift: {$ref: "#/components/schemas/GiftEvent"}
+        available_diamonds: {type: integer, format: int64, description: "The sender's own available Diamonds after the gift (balance minus call reservations)"}
+        replayed: {type: boolean}
+    GiftEventPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/GiftEvent"}
+        next_cursor: {type: string}
+    SentGift:
+      allOf:
+        - $ref: "#/components/schemas/GiftEvent"
+        - type: object
+          required: [diamond_cost]
+          properties:
+            diamond_cost: {type: integer, format: int64}
+    SentGiftPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/SentGift"}
+        next_cursor: {type: string}
+    ReceivedGift:
+      allOf:
+        - $ref: "#/components/schemas/GiftEvent"
+        - type: object
+          required: [beans_earned, settlement_status, releases_at]
+          properties:
+            beans_earned: {type: integer, format: int64}
+            settlement_status: {type: string, enum: [on_hold, released]}
+            releases_at: {type: string, format: date-time}
+    ReceivedGiftPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/ReceivedGift"}
+        next_cursor: {type: string}
+    ReceivedGiftSummary:
+      type: object
+      additionalProperties: false
+      required: [total_gifts, total_diamond_value, total_beans_earned, today_gifts, today_beans_earned]
+      properties:
+        total_gifts: {type: integer, format: int64}
+        total_diamond_value: {type: integer, format: int64}
+        total_beans_earned: {type: integer, format: int64}
+        today_gifts: {type: integer, format: int64}
+        today_beans_earned: {type: integer, format: int64}
+    AdminGift:
+      allOf:
+        - $ref: "#/components/schemas/Gift"
+        - type: object
+          required: [active, available_from, available_until, earning_rule, retired_at, created_at, updated_at]
+          properties:
+            active: {type: boolean}
+            available_from: {type: ["string", "null"], format: date-time}
+            available_until: {type: ["string", "null"], format: date-time}
+            earning_rule: {type: string, enum: [standard_conversion], description: "Host Beans use the economy rule set in force (same conversion as calls); no gift-specific commission"}
+            retired_at: {type: ["string", "null"], format: date-time}
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+    CreateGiftRequest:
+      type: object
+      additionalProperties: false
+      required: [id, name, emoji, icon_asset, animation_asset, tier, diamond_price, reason]
+      properties:
+        id: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$"}
+        name: {type: string, maxLength: 40}
+        description: {type: string, maxLength: 200}
+        emoji: {type: string}
+        icon_asset: {type: string}
+        animation_asset: {type: string}
+        animation_duration_ms: {type: integer, minimum: 1000, maximum: 10000, default: 5000}
+        sound_asset: {type: ["string", "null"]}
+        tier: {type: string, enum: [common, rare, epic, legendary, mythic]}
+        sort_order: {type: integer}
+        diamond_price: {type: integer, format: int64, minimum: 1, maximum: 1000000}
+        active: {type: boolean}
+        available_from: {type: ["string", "null"], format: date-time}
+        available_until: {type: ["string", "null"], format: date-time}
+        reason: {type: string, minLength: 3, maxLength: 500}
+    UpdateGiftRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: {type: string}
+        description: {type: string}
+        emoji: {type: string}
+        icon_asset: {type: string}
+        animation_asset: {type: string}
+        animation_duration_ms: {type: integer, minimum: 1000, maximum: 10000}
+        sound_asset: {type: ["string", "null"]}
+        tier: {type: string, enum: [common, rare, epic, legendary, mythic]}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        available_from: {type: string, format: date-time}
+        available_until: {type: string, format: date-time}
+        clear_schedule: {type: boolean}
+        retire: {type: boolean, description: "Permanent: a retired gift is never sold or changed again"}
+    ChangeGiftPriceRequest:
+      type: object
+      additionalProperties: false
+      required: [diamond_price, reason]
+      properties:
+        diamond_price: {type: integer, format: int64, minimum: 1, maximum: 1000000}
+        reason: {type: string, minLength: 3, maxLength: 500}
+    GiftPriceChange:
+      type: object
+      additionalProperties: false
+      required: [old_price, new_price, changed_by, reason, changed_at]
+      properties:
+        old_price: {type: ["integer", "null"], format: int64}
+        new_price: {type: integer, format: int64}
+        changed_by: {type: string}
+        reason: {type: string}
+        changed_at: {type: string, format: date-time}
+    GiftPerformance:
+      type: object
+      additionalProperties: false
+      required: [gift_id, gift_name, count, diamond_value, host_beans, unique_senders, unique_hosts]
+      properties:
+        gift_id: {type: string}
+        gift_name: {type: string}
+        count: {type: integer, format: int64}
+        diamond_value: {type: integer, format: int64}
+        host_beans: {type: integer, format: int64}
+        unique_senders: {type: integer, format: int64}
+        unique_hosts: {type: integer, format: int64}
+    AdminGiftTransaction:
+      allOf:
+        - $ref: "#/components/schemas/GiftEvent"
+        - type: object
+          required: [from_promotional, from_purchased, host_beans, rule_set_version, ledger_entry_id, risk_flags]
+          properties:
+            from_promotional: {type: integer, format: int64}
+            from_purchased: {type: integer, format: int64}
+            host_beans: {type: integer, format: int64}
+            rule_set_version: {type: string}
+            ledger_entry_id: {type: string, format: uuid}
+            risk_flags:
+              type: array
+              items: {type: string, enum: [high_value, new_sender_account, repeat_pair_volume, promotional_diamonds]}
+    AdminGiftTransactionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/AdminGiftTransaction"}
+        next_cursor: {type: string}
+    ArrivalUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [content_type]
+      properties:
+        content_type: {type: string, enum: [image/jpeg]}
+    ArrivalUploadTicket:
+      type: object
+      additionalProperties: false
+      required: [photo_id, session_id, upload_url, expires_at, max_bytes]
+      properties:
+        photo_id: {type: string, format: uuid}
+        session_id: {type: string, format: uuid}
+        upload_url: {type: string, format: uri, description: "Short-lived signed upload URL (PUT the JPEG). The storage key never leaves the server."}
+        expires_at: {type: string, format: date-time, description: "Confirm before this (10 minutes)"}
+        max_bytes: {type: integer}
+    ArrivalPhotoView:
+      type: object
+      additionalProperties: false
+      required: [photo_id, session_id, status, captured_at, photo_url]
+      properties:
+        photo_id: {type: string, format: uuid}
+        session_id: {type: string, format: uuid}
+        status: {type: string, enum: [awaiting_upload, pending_review, approved, rejected]}
+        captured_at: {type: ["string", "null"], format: date-time, description: "Server time the upload was confirmed"}
+        photo_url: {type: ["string", "null"], description: "Short-lived signed URL of the host's own photo"}
+        reason: {type: string, description: "Set when rejected"}
+    ArrivalDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approve, reject, remove]}
+        reason: {type: string, maxLength: 500}
+    ArrivalQueueItem:
+      type: object
+      additionalProperties: false
+      required: [photo_id, host_user_id, host_name, status, captured_at, session_open, photo_url]
+      properties:
+        photo_id: {type: string, format: uuid}
+        host_user_id: {type: string, format: uuid}
+        host_name: {type: string}
+        status: {type: string}
+        captured_at: {type: ["string", "null"], format: date-time}
+        session_open: {type: boolean}
+        photo_url: {type: ["string", "null"]}
+    HostArrivalPhoto:
+      type: object
+      additionalProperties: false
+      description: "A recent photo the host captured in the app when this online session started. NOT live video and NOT identity verification: show it as 'Captured N minutes ago' from captured_at."
+      required: [photo_id, url, captured_at]
+      properties:
+        photo_id: {type: string, format: uuid, description: "To report this photo (POST /v1/reports arrival_photo_id)"}
+        url: {type: string, description: "Short-lived (15 min) signed URL"}
+        captured_at: {type: string, format: date-time}
+    OnlineSession:
+      type: object
+      additionalProperties: false
+      required: [id, started_at]
+      properties:
+        id: {type: string, format: uuid}
+        started_at: {type: string, format: date-time}
+    GiftMessageInfo:
+      type: object
+      additionalProperties: false
+      required: [gift_transaction_id, gift_id, gift_name, emoji, tier, diamond_value]
+      properties:
+        gift_transaction_id: {type: string, format: uuid}
+        gift_id: {type: string}
+        gift_name: {type: string}
+        emoji: {type: string}
+        tier: {type: string}
+        diamond_value: {type: integer, format: int64}
+    StaffMe:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, roles]
+      properties:
+        user_id: {type: string, format: uuid}
+        display_name: {type: ["string", "null"]}
+        roles:
+          type: array
+          items: {type: string, enum: [customer, host, moderator, admin, finance]}
+    UserName:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name]
+      properties:
+        user_id: {type: string, format: uuid}
+        display_name: {type: string}
+    HostApplication:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, city, state, kyc_state, declared_date_of_birth, applied_at]
+      properties:
+        user_id: {type: string, format: uuid}
+        display_name: {type: ["string", "null"]}
+        city: {type: ["string", "null"]}
+        state: {type: string, enum: [applied, kyc_pending]}
+        kyc_state: {type: string, enum: [not_started, in_progress, approved, rejected]}
+        declared_date_of_birth:
+          type: ["string", "null"]
+          format: date
+          description: Self-declared at sign-up; the reviewer confirms the date from the ID before approving.
+        applied_at: {type: string, format: date-time}
+    AppealItem:
+      type: object
+      additionalProperties: false
+      required: [appeal_id, user_id, display_name, statement, status, created_at, enforcement]
+      properties:
+        appeal_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        display_name: {type: ["string", "null"]}
+        statement: {type: string}
+        status: {type: string, enum: [open, upheld, overturned]}
+        created_at: {type: string, format: date-time}
+        enforcement:
+          type: object
+          additionalProperties: false
+          required: [action, reason, created_at]
+          properties:
+            action: {type: string, enum: [warn, restrict_calls, suspend, ban, escalate_legal]}
+            reason: {type: string}
+            created_at: {type: string, format: date-time}
+    AdjustmentItem:
+      type: object
+      additionalProperties: false
+      required: [proposal_id, owner_user_id, owner_display_name, account_kind, currency, amount, reason, proposed_by, proposed_by_name, status, created_at, proposed_by_me]
+      properties:
+        proposal_id: {type: string, format: uuid}
+        owner_user_id: {type: ["string", "null"], format: uuid}
+        owner_display_name: {type: ["string", "null"]}
+        account_kind: {type: string}
+        currency: {type: string, enum: [DIAMOND, BEAN, INR_PAISE]}
+        amount: {type: integer, format: int64}
+        reason: {type: string}
+        proposed_by: {type: string, format: uuid}
+        proposed_by_name: {type: ["string", "null"]}
+        status: {type: string, enum: [awaiting_second_approval, posted, rejected]}
+        created_at: {type: string, format: date-time}
+        proposed_by_me: {type: boolean}
+    AuditItem:
+      type: object
+      additionalProperties: false
+      required: [at, actor, actor_name, action, target, target_name, reason]
+      properties:
+        at: {type: string, format: date-time}
+        actor: {type: string, description: "User id, system:<job> or provider:<name>."}
+        actor_name: {type: ["string", "null"]}
+        action: {type: string}
+        target: {type: ["string", "null"]}
+        target_name: {type: ["string", "null"]}
+        reason: {type: ["string", "null"]}
     PendingPhotoItem:
       type: object
       required: [photo_id, user_id, read_url, created_at]
@@ -3691,6 +5106,23 @@ components:
           enum:
             - available
             - busy
+            - offline
+        city:
+          type:
+            - object
+            - "null"
+        age:
+          type:
+            - integer
+            - "null"
+        is_verified:
+          type: boolean
+          description: "ACTIVE Verified Host (premium badge). Since 2026-11-23 this no longer means hosting KYC approved."
+        arrival_photo:
+          oneOf:
+            - $ref: "#/components/schemas/HostArrivalPhoto"
+            - type: "null"
+          description: "Optional photo from the host's CURRENT online session (2026-11-26). Null when none, not approved, or the host is offline."
     HostStatus:
       type: object
       additionalProperties: false
@@ -3726,6 +5158,217 @@ components:
           format: int64
         free_call_opt_in:
           type: boolean
+        today_earned_beans:
+          type: integer
+          format: int64
+        today_calls:
+          type: integer
+          format: int64
+        level:
+          type: integer
+          format: int32
+        kyc_rejection_reason:
+          type:
+            - string
+            - "null"
+        verification_status:
+          type: string
+          enum: [not_applied, submitted, under_review, info_required, verified, rejected, suspended, revoked]
+        is_verified:
+          type: boolean
+        verification_note:
+          type:
+            - string
+            - "null"
+        online_session:
+          oneOf:
+            - $ref: "#/components/schemas/OnlineSession"
+            - type: "null"
+          description: "The open online session (2026-11-26); null when offline."
+          description: "Open information request, or the rejection/suspension/revocation reason."
+        level_max_rate_per_minute:
+          type: integer
+          format: int64
+          description: "level × 1,000. max_rate_per_minute is the highest price this host may set NOW (≤ 3,000 unless verified)."
+        next_level_max_rate_per_minute:
+          type:
+            - integer
+            - "null"
+          format: int64
+        verified_rate_threshold:
+          type: integer
+          format: int64
+          description: "3,000: prices above it need an ACTIVE Verified Host."
+    VerificationView:
+      type: object
+      additionalProperties: false
+      required: [status, is_verified, can_submit, evidence, required_evidence]
+      properties:
+        status:
+          type: string
+          enum: [not_applied, submitted, under_review, info_required, verified, rejected, suspended, revoked]
+        is_verified:
+          type: boolean
+        application_id:
+          type: ["string", "null"]
+        submitted_at:
+          type: ["string", "null"]
+          format: date-time
+        decided_at:
+          type: ["string", "null"]
+          format: date-time
+        verified_at:
+          type: ["string", "null"]
+          format: date-time
+        note:
+          type: ["string", "null"]
+        can_submit:
+          type: boolean
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceItem"
+        required_evidence:
+          type: array
+          items:
+            type: string
+    EvidenceItem:
+      type: object
+      additionalProperties: false
+      description: "Metadata only. Evidence objects are in a private bucket and never appear in public APIs."
+      required: [id, kind, submitted, uploaded_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [face_video, id_document_front, id_document_back]
+        submitted:
+          type: boolean
+        uploaded_at:
+          type: string
+          format: date-time
+    EvidenceUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, content_type]
+      properties:
+        kind:
+          type: string
+          enum: [face_video, id_document_front, id_document_back]
+        content_type:
+          type: string
+          enum: [video/mp4, video/quicktime, image/jpeg, image/png]
+          description: "face_video: video/*; ID images: image/jpeg or image/png."
+    EvidenceUploadTicket:
+      type: object
+      additionalProperties: false
+      required: [evidence_id, upload_url, expires_at]
+      properties:
+        evidence_id:
+          type: string
+          format: uuid
+        upload_url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    SubmitVerificationRequest:
+      type: object
+      additionalProperties: false
+      required: [evidence_ids]
+      properties:
+        evidence_ids:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            format: uuid
+    VerificationActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [start_review, request_info, approve, reject, suspend, reinstate, revoke]
+        reason:
+          type: string
+          maxLength: 1000
+        info_request:
+          type: string
+          maxLength: 1000
+    VerificationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [application_id, host_id, display_name, status, submitted_at, level]
+      properties:
+        application_id:
+          type: string
+        host_id:
+          type: string
+        display_name:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        level:
+          type: integer
+    AdminVerificationDetail:
+      type: object
+      additionalProperties: false
+      required: [host_id, status, level, rate_per_minute, application, evidence, history]
+      properties:
+        host_id:
+          type: string
+        status:
+          type: string
+        level:
+          type: integer
+        rate_per_minute:
+          type: integer
+          format: int64
+        application:
+          type: ["object", "null"]
+          properties:
+            id: {type: string}
+            status: {type: string}
+            submitted_at: {type: string, format: date-time}
+            resubmitted_at: {type: ["string", "null"], format: date-time}
+            reviewer_id: {type: ["string", "null"]}
+            review_started_at: {type: ["string", "null"], format: date-time}
+            info_request: {type: ["string", "null"]}
+            decided_by: {type: ["string", "null"]}
+            decided_at: {type: ["string", "null"], format: date-time}
+            decision_reason: {type: ["string", "null"]}
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceItem"
+        history:
+          type: array
+          description: "Audited actions (host.verification.*, host.rate_capped, host.rate_changed): actor, time, details incl. application_id and reason."
+          items:
+            type: object
+            required: [at, actor, action, details]
+            properties:
+              at: {type: string, format: date-time}
+              actor: {type: string}
+              action: {type: string}
+              details: {type: object}
+    EvidenceAccess:
+      type: object
+      additionalProperties: false
+      required: [url, expires_at]
+      properties:
+        url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
     SetAvailabilityRequest:
       type: object
       additionalProperties: false
@@ -4055,6 +5698,12 @@ components:
             EXPERIMENT. For the viewer's own messages: the other participant's
             read marker is at or after `sent_at`. Always false for received
             messages. A `chat.read` hint on `user:<sender>` announces changes.
+        kind:
+          type: string
+          enum: [text, gift]
+          description: "2026-11-26. gift = a server-written gift line (POST .../messages never creates one)."
+        gift:
+          $ref: "#/components/schemas/GiftMessageInfo"
     SendMessageRequest:
       type: object
       additionalProperties: false
@@ -4250,6 +5899,10 @@ components:
             - string
             - "null"
           maxLength: 1000
+        arrival_photo_id:
+          type: string
+          format: uuid
+          description: "2026-11-26. The reported host's arrival photo this report is about (linked only when it belongs to target_user_id)."
     ReportReceipt:
       type: object
       additionalProperties: false
@@ -4403,6 +6056,9 @@ components:
         evidence_count:
           type: integer
           format: int32
+        details:
+          type: ["string", "null"]
+          description: The reporter's own text (staff-only).
     ModerationDecisionRequest:
       type: object
       additionalProperties: false
@@ -4562,8 +6218,12 @@ components:
     # --- EXPERIMENT: Dashuri Reels (schemas)
     ReelsConfig:
       type: object
-      required: [enabled, uploads_available, min_duration_ms, max_duration_ms, max_caption_length, daily_upload_limit, max_upload_bytes]
+      required: [enabled, uploads_available, min_duration_ms, max_duration_ms, max_caption_length, daily_upload_limit, max_upload_bytes, video_provider, upload_content_types]
       properties:
+        video_provider: {type: string, enum: [r2, mux, ""], description: "Provider that receives new uploads (r2 = target; mux = transition only)."}
+        upload_content_types:
+          type: array
+          items: {type: string}
         enabled: {type: boolean}
         uploads_available: {type: boolean}
         min_duration_ms: {type: integer}
@@ -4593,9 +6253,11 @@ components:
             - type: "null"
     ReelPlayback:
       type: object
-      required: [hls_url, thumbnail_url, expires_at]
+      required: [url, format, hls_url, thumbnail_url, expires_at]
       properties:
-        hls_url: {type: string, description: Signed HLS URL}
+        url: {type: string, description: "Signed playback URL (open with the player). Never stored; refetch after expires_at."}
+        format: {type: string, enum: [mp4, hls], description: "mp4 for R2 reels (progressive, faststart); hls for legacy Mux reels."}
+        hls_url: {type: string, description: "Deprecated: equals url for HLS reels and is empty for MP4 reels. Kept for app builds from before R2."}
         thumbnail_url: {type: string}
         expires_at: {type: string, format: date-time}
     Reel:
@@ -4635,12 +6297,18 @@ components:
         caption: {type: string, maxLength: 300}
         language: {type: string, pattern: "^[a-z]{2}$"}
         duration_ms: {type: integer, minimum: 15000, maximum: 60000, description: Client-read duration; the server re-checks the provider's}
+        size_bytes: {type: integer, minimum: 1, maximum: 157286400, description: "File size in bytes. Required when video_provider is r2 (signed into the upload URL)."}
+        content_type: {type: string, enum: [video/mp4, video/quicktime, video/webm, video/3gpp], description: "Required when video_provider is r2."}
     ReelUploadTicket:
       type: object
-      required: [reel, upload_url, expires_at]
+      required: [reel, upload_url, upload_headers, expires_at]
       properties:
         reel: {$ref: "#/components/schemas/Reel"}
         upload_url: {type: string, description: PUT the file here; the URL is the grant}
+        upload_headers:
+          type: object
+          additionalProperties: {type: string}
+          description: "Send these headers unchanged with the PUT (R2 signs Content-Type and Content-Length into the URL, so a different file is refused). Empty for Mux."
         expires_at: {type: string, format: date-time}
     ReelLikeRequest:
       type: object

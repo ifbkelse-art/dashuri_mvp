@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"regexp"
+	"time"
 )
 
 // Wire types. Keep in sync with api/openapi/dashuri.v1.yaml and
@@ -25,8 +26,23 @@ type HostCard struct {
 	Availability string `json:"availability"`
 	City         *City  `json:"city"`
 	// Age from the KYC-verified date of birth; null when not verified.
-	Age        *int `json:"age"`
+	Age *int `json:"age"`
+	// IsVerified: ACTIVE Verified Host (premium badge). Since 2026-11-23 this
+	// no longer means "hosting KYC approved" (true for every listed host).
 	IsVerified bool `json:"is_verified"`
+	// ArrivalPhoto is the host's optional photo captured in-app when the
+	// current online session started (2026-11-26). It is a recent captured
+	// photo, never live video and never identity verification; clients
+	// show "Captured N minutes ago" from captured_at. Null when none.
+	ArrivalPhoto *ArrivalPhoto `json:"arrival_photo"`
+}
+
+// ArrivalPhoto is a short-lived signed URL plus the server capture time.
+type ArrivalPhoto struct {
+	// PhotoId lets a customer report this specific photo.
+	PhotoId    string    `json:"photo_id"`
+	Url        string    `json:"url"`
+	CapturedAt time.Time `json:"captured_at"`
 }
 
 // HostDetail is GET /v1/discovery/hosts/{userId}: a HostCard plus bio.
@@ -54,8 +70,10 @@ type ListRequest struct {
 	Language string
 	CityID   string
 	Sort     string
-	Cursor   string
-	Limit    int
+	// Verification: all (default) | verified | non_verified.
+	Verification string
+	Cursor       string
+	Limit        int
 }
 
 var (
@@ -77,6 +95,13 @@ func (r *ListRequest) validate() map[string]string {
 	case SortRecommended, SortRateLow, SortRateHigh:
 	default:
 		errs["sort"] = "invalid_value"
+	}
+	switch r.Verification {
+	case "", "all":
+		r.Verification = ""
+	case "verified", "non_verified":
+	default:
+		errs["verification"] = "invalid_value"
 	}
 	if r.Limit < 1 || r.Limit > 100 {
 		errs["limit"] = "must_be_1_to_100"

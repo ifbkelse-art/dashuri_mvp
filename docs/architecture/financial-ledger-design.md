@@ -60,6 +60,7 @@ Diamonds and Beans are separate currencies: a Diamond debit can never balance a 
 | `PromoExpiry` | user promo −x; expired +x | `promo_expiry:<grant>` |
 | `PurchaseReversal` | user purchased −unspent; reversed +unspent | `purchase_reversal:<purchase>` |
 | `BeanClawback` | host bean_held −B; clawed_back +B | `bean_clawback:<case>` |
+| `GiftSend` (2026-11-26) | user promo −x, user purchased −(P−x), consumed +P; bean_issued −B, host bean_held +B. P is the catalogue price, B = `BeansForDiamonds(P)` from the active rule set (no gift commission). Spends only `balance − active call reservations`; Beans follow the normal hold and release. | `gift_send:<gift transaction id>` |
 | Adjustment | proposal + second approver → entry | `adjustment:<proposal>` |
 
 ## Reservations (concurrent call billing)

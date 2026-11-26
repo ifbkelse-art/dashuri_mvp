@@ -14,6 +14,9 @@ type ReportRequest struct {
 	Category     string  `json:"category"`
 	CallId       *string `json:"call_id,omitempty"`
 	Details      *string `json:"details,omitempty"`
+	// ArrivalPhotoId: the report is about this host's arrival photo
+	// (2026-11-26). It must belong to the reported user.
+	ArrivalPhotoId *string `json:"arrival_photo_id,omitempty"`
 }
 
 func (r ReportRequest) validate() map[string]string {
@@ -33,6 +36,9 @@ func (r ReportRequest) validate() map[string]string {
 	}
 	if r.Details != nil && utf8.RuneCountInString(*r.Details) > 1000 {
 		errs["details"] = "too_long"
+	}
+	if r.ArrivalPhotoId != nil && !isUUID(*r.ArrivalPhotoId) {
+		errs["arrival_photo_id"] = "invalid_uuid"
 	}
 	return errs
 }

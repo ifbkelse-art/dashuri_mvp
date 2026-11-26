@@ -168,6 +168,13 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (bubble.isGift) {
+      return _GiftLine(
+        bubble: bubble,
+        overlay: overlay,
+        showContext: showContext,
+      );
+    }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final mine = bubble.mine;
@@ -444,6 +451,93 @@ class MessageComposer extends StatelessWidget {
               icon: const Icon(Icons.send_rounded),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A gift event in the conversation: centred, never a speech bubble, so it
+/// reads as something that happened in the call rather than text someone
+/// typed. Server-written; it has no delivery state.
+class _GiftLine extends StatelessWidget {
+  const _GiftLine({
+    required this.bubble,
+    required this.overlay,
+    required this.showContext,
+  });
+
+  final ChatBubble bubble;
+  final bool overlay;
+  final bool showContext;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fg = overlay ? Colors.white : scheme.onSurface;
+    final line = ChatFormat.giftLineFor(bubble.body, mine: bubble.mine);
+    final meta = [
+      ChatFormat.time(bubble.sentAt),
+      if (showContext && bubble.context == MessageContext.call)
+        'During video call',
+    ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Center(
+        child: LayoutBuilder(
+          builder: (context, c) => ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: c.maxWidth * .9),
+            child: Semantics(
+              label: 'Gift: $line',
+              child: ExcludeSemantics(
+                child: DecoratedBox(
+                  key: const Key('gift-line'),
+                  decoration: BoxDecoration(
+                    color: overlay
+                        ? ChatOverlayStyle.theirBubble
+                        : DashuriTokens.gold100.withValues(
+                            alpha: theme.brightness == Brightness.dark
+                                ? .16
+                                : 1,
+                          ),
+                    borderRadius: BorderRadius.circular(
+                      DashuriTokens.radiusPill,
+                    ),
+                    border: Border.all(color: DashuriTokens.gold),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          line,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: fg,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          meta,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: overlay
+                                ? Colors.white
+                                : scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

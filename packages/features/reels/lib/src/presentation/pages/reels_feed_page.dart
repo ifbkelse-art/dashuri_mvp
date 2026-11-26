@@ -177,14 +177,21 @@ class _Tabs extends StatelessWidget {
   );
 }
 
-/// State views use the light theme's text colours; give them a surface.
+/// The feed is a dark, full-screen page (the nav bar and status bar are
+/// light on it), so its empty and error views use the dark theme on black.
 class _OnDark extends StatelessWidget {
   const _OnDark({required this.child});
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: Theme.of(context).colorScheme.surface,
-    child: SafeArea(child: ResponsiveCenter(child: child)),
-  );
+  Widget build(BuildContext context) {
+    final dark = DashuriTheme.dark();
+    return Theme(
+      data: dark,
+      child: ColoredBox(
+        color: Colors.black,
+        child: SafeArea(child: ResponsiveCenter(child: child)),
+      ),
+    );
+  }
 }

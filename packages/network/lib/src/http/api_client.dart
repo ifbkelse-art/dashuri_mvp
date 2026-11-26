@@ -75,6 +75,7 @@ final class ApiClient {
     Uri url,
     List<int> bytes, {
     required String contentType,
+    Map<String, String> headers = const {},
     void Function(double fraction)? onProgress,
   }) async {
     try {
@@ -89,7 +90,15 @@ final class ApiClient {
           method: 'PUT',
           contentType: contentType,
           responseType: ResponseType.plain,
-          headers: {Headers.contentLengthHeader: bytes.length},
+          // Signed headers from the server (R2) first; Content-Type and
+          // Content-Length always describe these exact bytes.
+          headers: {
+            for (final e in headers.entries)
+              if (e.key.toLowerCase() != 'content-type' &&
+                  e.key.toLowerCase() != 'content-length')
+                e.key: e.value,
+            Headers.contentLengthHeader: bytes.length,
+          },
         ),
       );
       final status = response.statusCode ?? 0;

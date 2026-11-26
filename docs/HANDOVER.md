@@ -1,0 +1,55 @@
+# Dashuri: account handover record
+
+Purpose: continuity between Claude accounts. The previous (Pro) account hit its weekly limit; the second account is the active assistant until it resets. **Append to the log at the bottom after each piece of work.** Never rewrite earlier entries.
+
+## 1. Baseline established 2026-11-25 (second account, first session)
+
+Nothing was changed in code during this inspection. Sources read: `PROJECT_STATUS.md`, `README.md`, `docs/mvp/WORKSTREAM_RULES.md`, `docs/finance/dashuri_implementation_readiness_checklist.md`, `docs/DASHURI_JOURNEY.md` (tail), git log/status, and the first account's project memory. There is no `CLAUDE.md`.
+
+- Branch: `feat/calls-720p-and-app-icon` (pushed to github.com/ifbkelse-art/dashuri_mvp). Do not touch `main` until production.
+- HEAD: `533a90e` (Docs: monetization decision pack, Play Billing setup).
+- Working tree: **139 uncommitted paths** (95 modified, 44 untracked). They cover Verified Host + level pricing, the admin console (`apps/admin`), CORS/admin read endpoints, chat/discovery/host edits, finance docs. Treat them as valuable, unreviewed work. Do not run `git checkout/reset/clean/stash`.
+
+### Work completed (per the first account's records)
+- MVP modules built: auth, profile, discovery, free-call matchmaking, video calls (Stream), chat, wallet, payments (Play + Cashfree behind flag), location, safety, settings, host, admin/finance. 13 scheduled jobs.
+- Verified Host + level pricing (23 Nov): spec `docs/mvp/VERIFIED_HOST_AND_PRICING.md`, ADR-014, migration `20261123000300_verified_hosts_and_level_pricing.sql`. Uncommitted, not on hosted Supabase.
+- Admin web console `apps/admin` (24 Nov): React+Vite+TS, role-gated. Uncommitted, not deployed.
+- Play Billing set up and tested end to end on the internal track (24 Nov); RTDN refund path verified. Cloud Run `dashuri-api` serves revision 00014 built from HEAD 6d912f5 plus 7 fix files.
+- Monetization: 5 Diamonds → 4 Beans at ₹0.005/Bean approved **for modelling only**; decision pack, ledger spec, audit and readiness checklist written (verdict: not implementation-ready).
+- Last validated test run (23 Nov): 1,259 Flutter tests, Go `-race` and integration (31 packages), 17 migration invariants all pass. Not re-run by this account yet.
+
+### Architectural decisions in force
+Go modular backend + Postgres ledger (never update balances directly); Flutter feature packages with layer and dependency rules; Stream video; Supabase auth/Realtime; Play Billing default, Cashfree flagged off; coarse opt-in city; `is_verified` now means active Verified Host (not KYC approved). Rules for parallel work: `docs/mvp/WORKSTREAM_RULES.md`.
+
+### Standing user constraints (from memory)
+- Keep cloud cost minimal; ask before any paid resource.
+- Ask before hosted migrations/deploys. **Never build/deploy from the dirty working tree**; build from HEAD plus only the intended files, and exclude `backend/.env`. Never route traffic to Cloud Run revisions 00012/00013.
+- Commit only to the feature branch; no APK rebuild until admin/payments/legal are in.
+- 5:4 approval is not approval of any other monetization item; implementation needs explicit go-ahead.
+
+### Current blockers
+- Founder approval needed for: applying the Verified Host migration to hosted Supabase, Firebase Hosting for the admin console, Cloud Run redeploy with `ADMIN_ORIGINS`.
+- Monetization implementation blocked on open decisions (D-01…D-04, register items still Proposed) and CA/legal review.
+- External: payout provider, KYC vendor, `google-services.json` for push, legal text review, Cashfree rejected for production.
+
+### Pending tasks (from status docs)
+1. Review and commit the uncommitted Verified Host, admin console and related work to the feature branch (needs founder go-ahead on commit).
+2. Deploy admin console and migration (approval first).
+3. Play: refund-notification test, de-duplicate the double verify request, trim licence-tester list.
+4. `firebase_messaging` in the app; Flutter integration tests; CI.
+5. Open product decisions D-03…D-22; legal/CA review; Play Console listing items.
+6. Monetization ledger implementation only after readiness checklist phases 1-3.
+
+## 2. Work log (append below)
+
+| Date | Account | Work | Files | Notes |
+|---|---|---|---|---|
+| 2026-11-25 | 2nd | Inspected project, created this handover | `docs/HANDOVER.md` | No code changes |
+| 2026-11-25 | 2nd | Read-only review of all uncommitted work, then unit tests | none | Go (race), vet, build, `dart analyze`, dependency rules, all Flutter package tests and the 28 admin console tests pass. A pre-existing format nit in committed `purchases_data_test.dart` fails `melos format:check`. Postgres integration tests and migration validation not run. Key risk: the working-tree backend reads `hosting.hosts.verification_status`, which only exists after the unapplied migration 20261123000300, including in the live Play refund path. |
+| 2026-11-25 | 2nd | Public website (Netlify, not deployed) | `apps/website/**`, `.claude/launch.json` (added "website" config) | Static site, no dependencies, no JS, strict CSP. Marketing pages plus the Play-required policy pages (privacy, delete-account, child-safety) and the other policies, all labelled "Draft, pending legal review". Founder chose Netlify and support.dashuri@gmail.com (temporary). Operator name, Grievance Officer, Play link and domain are empty in `src/site.mjs` until the founder provides them. Policy text starts from in-app `legal_texts.dart`; keep both in sync. Uncommitted. |
+| 2026-11-25 | 2nd | Website policies rewritten as production text v1.0 (founder: no lawyer/CA available) | `apps/website/src/{legal,site,pages,styles}.mjs/.css`, `build.mjs`, `check.mjs`, `netlify.toml`, `README.md` | Full Terms, Privacy (DPDP), Community Guidelines (IT Rules 3(1)(b)), Child Safety (POCSO), Billing & Refunds, new Host Agreement, Grievance Redressal (IT Rules, E-Commerce Rules, GAC, DPB), Delete account. Draft labels removed. Netlify build runs `check.mjs --production`, which FAILS until operator legal name, address, customer-care phone, Grievance Officer and court city are set in `src/site.mjs`. Text/system gaps and business commitments to confirm are listed in `apps/website/README.md` "Legal status" (manual phone deletion, 30-day default log retention vs DPDP 1 year, in-app texts still drafts). Not reviewed by a lawyer or CA. Uncommitted. |
+| 2026-11-25 | 2nd | Company details added to the website | `apps/website/src/site.mjs` | Founder gave: operator "Dashuri", 10 Lakshmipuram Main Road, Palani, TN 624601; phone 04545-295 719; email contact.dashuri@gmail.com (replaces support.dashuri@gmail.com on the site). Court city set to Palani, Tamil Nadu from the address (not stated by the founder). Grievance Officer still missing, so the production build still fails. The backend's `SUPPORT_EMAIL` (shown in the app) is not changed; set it on the next approved deploy. |
+| 2026-11-25 | 2nd | Grievance Officer added; operator set to BK Enterprises | `apps/website/src/site.mjs` | Grievance Officer: Balakumaaran Bharathiyar, Founder & CEO, BK Enterprises. Operator changed from "Dashuri" to "BK Enterprises" because the founder named it as the organisation (Dashuri is the brand). `check.mjs --production` now passes, so the site is ready for Netlify. Not committed or deployed. |
+| 2026-11-25 | 2nd | Website deployed by the founder via Netlify Drop: https://dashuri.netlify.app | `apps/website/src/site.mjs` (origin), commits 9589d86, 7ca522a | All 13 pages and assets return 200, unknown paths 404, security headers from `_headers` are live. Netlify's free tier injects a comment and a HUD script; the CSP blocks the script (one harmless console error). Updates: rebuild `apps/website/dist` and drag it onto the site's Deploys page (a new drop makes a new site). Play Console URLs: /privacy/, /delete-account/, /child-safety/. Branch not pushed. |
+| 2026-11-25 | 2nd | Play Console setup guidance and store assets | `docs/play-store/**` (icon_512.png, feature_graphic_1024x500.png, screenshot_1..4 at 1080x1920, raw/ simulator captures, src/ HTML templates) | Founder entered Play app-content answers (sign-in details with 2 test accounts, content rating Social/12+, target audience 18+, data safety with 14 types all collected-not-shared, government/financial/health = none, store settings). Screenshots were taken on the iOS Simulator (iPhone 16) because the founder asked to always use it; status bar and DEBUG ribbon are cropped, so Play may prefer real Android captures. Build used `config/phone.json` (hosted dev backend) from the working tree; screens showing Verified Host UI and "Prices are provisional" were deliberately not used. Open items: Supabase test numbers and Diamonds/host setup for Play reviewers, remove the Cashfree SDK or keep it declared, update Data safety when push/crash reporting is added, tablet screenshots. Uncommitted. |
+| 2026-11-25 | 2nd | Play release 0.1.0+3 without foreground-service permissions | `apps/mobile/android/app/src/main/AndroidManifest.xml`, `apps/mobile/pubspec.yaml` (0.1.0+2 -> +3); bundle at `apps/mobile/build/play/dashuri-0.1.0+3.aab` (git-ignored) | Play Console flagged 5 undeclared FOREGROUND_SERVICE_* permissions that come from the Stream SDK manifest (call, livestream viewer, screen share services). Founder chose to avoid the declaration + demo video: all 5 permissions plus FOREGROUND_SERVICE and MANAGE_OWN_CALLS and the 3 Stream services are removed with tools:node="remove". The SDK tolerates missing services (ServiceManager.start returns false), so calls do not crash but are not kept alive in the background. To restore background calls later, remove the PHONE_CALL/MICROPHONE/CAMERA lines and StreamCallService line and declare them in Play Console with a video. Built from a clean `git archive HEAD` export plus those two files, signed with the upload key, `config/phone.json` (hosted dev backend); verified merged manifest has versionCode 3 and no foreground-service entries. A geolocator service with foregroundServiceType=location remains but its FOREGROUND_SERVICE_LOCATION permission is not declared, so Play did not flag it. Source edits are uncommitted. Not uploaded to Play. |

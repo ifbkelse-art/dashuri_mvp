@@ -19,13 +19,15 @@ type PeerAccount struct {
 
 // ConversationRow is a conversation as seen by one participant.
 type ConversationRow struct {
-	ID          string
-	PeerID      string
-	PeerName    string
-	PeerPhoto   *string // storage path of the peer's first approved photo
-	LastMessage *ChatMessage
-	Unread      int
-	UpdatedAt   time.Time
+	ID        string
+	PeerID    string
+	PeerName  string
+	PeerPhoto *string // storage path of the peer's first approved photo
+	// PeerVerified: the peer is an ACTIVE Verified Host (badge only).
+	PeerVerified bool
+	LastMessage  *ChatMessage
+	Unread       int
+	UpdatedAt    time.Time
 }
 
 // Repository is the chat.* persistence port.

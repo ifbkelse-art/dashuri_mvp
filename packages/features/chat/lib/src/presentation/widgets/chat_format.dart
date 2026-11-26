@@ -44,4 +44,29 @@ abstract final class ChatFormat {
     RateLimitedFailure() => "You're sending messages too fast. Wait a moment.",
     _ => "We couldn't load messages. Please try again.",
   };
+
+  /// The server writes one gift line for both people: "🌹 Rita sent Rose to
+  /// Meera." The sender sees "🌹 You sent Rose to Meera." instead.
+  static String giftLineAsYou(String body) {
+    final space = body.indexOf(' ');
+    if (space < 0) return body;
+    final emoji = body.substring(0, space);
+    final rest = body.substring(space + 1);
+    final sent = rest.indexOf(' sent ');
+    if (sent < 0) return body;
+    return '$emoji You${rest.substring(sent)}';
+  }
+
+  /// The gift line as the viewer should read it: the sender sees
+  /// "🌹 You sent Rose to Meera.", the recipient "🌹 Rita sent you Rose."
+  static String giftLineFor(String body, {required bool mine}) {
+    if (mine) return giftLineAsYou(body);
+    final sent = body.indexOf(' sent ');
+    if (sent < 0) return body;
+    final afterSent = sent + ' sent '.length;
+    final to = body.lastIndexOf(' to ');
+    if (to < afterSent) return body;
+    final gift = body.substring(afterSent, to);
+    return '${body.substring(0, sent)} sent you $gift.';
+  }
 }

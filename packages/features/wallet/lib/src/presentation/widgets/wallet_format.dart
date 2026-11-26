@@ -61,6 +61,7 @@ abstract final class WalletFormat {
     'bean_clawback' => 'Beans reversed',
     'promo_expiry' => 'Promotional Diamonds expired',
     'adjustment' => 'Balance adjustment',
+    'gift_send' => isBeans(e) ? 'Gift received' : 'Gift sent',
     _ => _humanize(e.kind),
   };
 
@@ -71,6 +72,7 @@ abstract final class WalletFormat {
     'purchase_reversal' || 'payout_failed' => Icons.replay_rounded,
     'withdrawal_requested' || 'payout_paid' => Icons.account_balance_outlined,
     'promo_expiry' => Icons.hourglass_bottom_rounded,
+    'gift_send' => Icons.redeem_rounded,
     _ => Icons.receipt_long_outlined,
   };
 

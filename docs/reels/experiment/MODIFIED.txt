@@ -1,0 +1,13 @@
+backend/internal/platform/config/config.go
+backend/internal/app/wire_mvp.go
+packages/network/lib/src/http/api_client.dart
+packages/navigation/lib/src/route_paths.dart
+pubspec.yaml
+apps/mobile/pubspec.yaml
+packages/core/lib/src/config/app_config.dart
+apps/mobile/lib/app/di/injector.dart
+apps/mobile/lib/app/router/app_router.dart
+apps/mobile/lib/app/router/role_shells.dart
+apps/mobile/lib/app/app.dart
+api/openapi/dashuri.v1.yaml
+packages/features/host/lib/src/presentation/pages/host_profile_tab_page.dart

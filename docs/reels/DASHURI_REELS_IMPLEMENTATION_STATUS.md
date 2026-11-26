@@ -1,5 +1,15 @@
 # Dashuri Reels — implementation status (EXPERIMENT, 22 Nov 2026)
 
+## 00. Update 27 Nov 2026 — Mux being replaced by Cloudflare R2
+
+The founder decided to remove recurring Mux cost. New uploads now target
+Cloudflare R2 + our own ffmpeg processing (`REELS_VIDEO_PROVIDER=r2`,
+default); Mux stays only as a transitional legacy provider. Built and
+tested locally, no account, nothing deployed. Full design, cost, test
+results and the list of remaining Mux dependencies:
+`docs/reels/DASHURI_REELS_R2_MIGRATION.md`. Sections below that say "Mux"
+describe the earlier design.
+
 ## 0. Update 23 Nov 2026 — UI completion pass, committed
 
 Reels is now committed on `feat/calls-720p-and-app-icon` (flags still

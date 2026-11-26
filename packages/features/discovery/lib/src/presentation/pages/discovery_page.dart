@@ -159,6 +159,9 @@ class _Header extends StatelessWidget {
         const SizedBox(height: DashuriTokens.space5),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          // The filter-count badge sits above the button; the default clip
+          // would cut it in half.
+          clipBehavior: Clip.none,
           child: Row(
             children: [
               Badge.count(

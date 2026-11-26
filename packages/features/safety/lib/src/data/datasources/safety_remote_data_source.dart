@@ -26,6 +26,7 @@ final class SafetyRemoteDataSource {
     required String? callId,
     required String? details,
     required IdempotencyKey idempotencyKey,
+    String? arrivalPhotoId,
   }) => _api.post(
     '/v1/reports',
     decode: objectDecoder(reportReceiptFromJson),
@@ -34,6 +35,7 @@ final class SafetyRemoteDataSource {
       'category': category,
       'call_id': ?callId,
       'details': ?details,
+      'arrival_photo_id': ?arrivalPhotoId,
     },
     idempotencyKey: idempotencyKey,
   );

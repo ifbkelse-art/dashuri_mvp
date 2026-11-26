@@ -12,7 +12,10 @@ import '../widgets/wallet_hero.dart';
 
 /// W01 wallet overview (customer tab; hosts also see Beans).
 class WalletPage extends StatelessWidget {
-  const WalletPage({super.key});
+  const WalletPage({super.key, this.onGiftsSent});
+
+  /// Opens the customer's gift history (null hides the link).
+  final VoidCallback? onGiftsSent;
 
   static void openEntry(BuildContext context, WalletEntry e) => context.push(
     RoutePaths.withParams(RoutePaths.transactionDetail, {'entryId': e.id}),
@@ -32,7 +35,7 @@ class WalletPage extends StatelessWidget {
             ),
             final WalletStateLoaded s => RefreshIndicator(
               onRefresh: () => context.read<WalletCubit>().refresh(),
-              child: _Loaded(state: s),
+              child: _Loaded(state: s, onGiftsSent: onGiftsSent),
             ),
           },
         ),
@@ -42,9 +45,10 @@ class WalletPage extends StatelessWidget {
 }
 
 class _Loaded extends StatelessWidget {
-  const _Loaded({required this.state});
+  const _Loaded({required this.state, this.onGiftsSent});
 
   final WalletStateLoaded state;
+  final VoidCallback? onGiftsSent;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +66,16 @@ class _Loaded extends StatelessWidget {
         if (state.isHost) ...[
           const SizedBox(height: DashuriTokens.space4),
           _BeansCard(summary: state.summary),
+        ],
+        if (onGiftsSent != null) ...[
+          const SizedBox(height: DashuriTokens.space2),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.card_giftcard_rounded),
+            title: const Text('Gifts sent'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: onGiftsSent,
+          ),
         ],
       ],
     );

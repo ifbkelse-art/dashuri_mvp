@@ -29,14 +29,18 @@ final class CallPeer extends Equatable {
     required this.userId,
     required this.displayName,
     this.photoUrl,
+    this.isVerified = false,
   });
 
   final String userId;
   final String displayName;
   final String? photoUrl;
 
+  /// ACTIVE Verified Host (server-provided; badge only).
+  final bool isVerified;
+
   @override
-  List<Object?> get props => [userId, displayName, photoUrl];
+  List<Object?> get props => [userId, displayName, photoUrl, isVerified];
 }
 
 /// A call as reported by the server. Billing numbers are the server's.

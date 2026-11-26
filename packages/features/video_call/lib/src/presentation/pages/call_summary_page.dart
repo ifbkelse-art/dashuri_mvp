@@ -48,7 +48,11 @@ class CallSummaryPage extends StatelessWidget {
 
 void _done(BuildContext context, CallSummaryState s) {
   final host = s is CallSummaryLoaded && s.session.role == CallRole.receiver;
-  context.go(host ? RoutePaths.hostDashboard : RoutePaths.discovery);
+  // A host goes back to Host Home (it shows offline if the session
+  // ended meanwhile).
+  context.go(
+    host ? '${RoutePaths.hostDashboard}?after=ended' : RoutePaths.discovery,
+  );
 }
 
 void _report(BuildContext context, CallSession s) => context.push(
@@ -77,6 +81,10 @@ class _Content extends StatelessWidget {
     final header = Column(
       children: [
         UserAvatar(name: name, url: s.peer?.photoUrl, radius: 44),
+        if (s.peer?.isVerified ?? false) ...[
+          const SizedBox(height: DashuriTokens.space2),
+          const VerifiedHostBadge(),
+        ],
         const SizedBox(height: DashuriTokens.space4),
       ],
     );

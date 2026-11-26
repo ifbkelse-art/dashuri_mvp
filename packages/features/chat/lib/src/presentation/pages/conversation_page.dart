@@ -79,13 +79,18 @@ class _ConversationPageState extends State<ConversationPage> {
               children: [
                 UserAvatar(name: name, url: state.peerPhotoUrl, radius: 20),
                 const SizedBox(width: DashuriTokens.space3),
-                Expanded(
+                Flexible(
                   child: Text(
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (state.peerIsVerified) ...[
+                  const SizedBox(width: DashuriTokens.space1),
+                  const VerifiedHostBadge(compact: true),
+                ],
+                const Spacer(),
               ],
             ),
             actions: [

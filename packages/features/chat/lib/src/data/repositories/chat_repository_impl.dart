@@ -6,6 +6,7 @@ import '../../domain/entities/conversation.dart';
 import '../../domain/entities/messaging_privacy.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../datasources/chat_remote_data_source.dart';
+import '../models/chat_message_json.dart';
 
 /// Default [ChatRepository]: delegates to the API. Add caching here, never in BLoCs.
 /// Idempotency keys arrive from the caller: the BLoC creates one per user
@@ -34,6 +35,33 @@ final class ChatRepositoryImpl implements ChatRepository {
 
   @override
   Stream<String> readHints() => _hints('chat.read');
+
+  @override
+  Stream<ChatHintMessage> chatHintMessages() {
+    final userId = currentUserId();
+    if (userId == null) return const Stream.empty();
+    return _realtime
+        .subscribe('user:$userId')
+        .where((e) => e.type == 'chat.message')
+        .map((e) => _hintMessage(e.payload))
+        .where((m) => m != null)
+        .cast<ChatHintMessage>();
+  }
+
+  /// A malformed or missing message is ignored: the re-fetch still runs.
+  static ChatHintMessage? _hintMessage(Map<String, Object?> payload) {
+    final raw = payload['message'];
+    if (raw is! Map<String, Object?>) return null;
+    try {
+      final callId = payload['call_id'];
+      return ChatHintMessage(
+        chatMessageFromJson(raw),
+        callId: callId is String ? callId : null,
+      );
+    } on Object {
+      return null;
+    }
+  }
 
   Stream<String> _hints(String type) {
     final userId = currentUserId();

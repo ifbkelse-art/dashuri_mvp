@@ -31,6 +31,14 @@ final class HostStatus extends Equatable {
     this.todayEarnedBeans,
     this.todayCalls,
     this.kycRejectionReason,
+    this.level,
+    this.verificationStatus = 'not_applied',
+    this.verificationNote,
+    this.levelMaxRatePerMinute,
+    this.nextLevelMaxRatePerMinute,
+    this.verifiedRateThreshold = 3000,
+    this.onlineSessionId,
+    this.onlineSince,
   });
 
   /// The status of an account that has never applied (GET /v1/host → 404 or
@@ -41,7 +49,7 @@ final class HostStatus extends Equatable {
     isAvailable: false,
     ratePerMinute: 500,
     minRatePerMinute: 500,
-    maxRatePerMinute: 10000,
+    maxRatePerMinute: 1000,
     freeCallOptIn: false,
   );
 
@@ -55,6 +63,29 @@ final class HostStatus extends Equatable {
   final int? todayEarnedBeans;
   final int? todayCalls;
   final String? kycRejectionReason;
+
+  // Verified Host + level pricing (2026-11-23). [maxRatePerMinute] is the
+  // highest price this host may set now; [levelMaxRatePerMinute] is the
+  // level's ceiling (level × 1,000), reachable above [verifiedRateThreshold]
+  // only as an active Verified Host. Null when an older server omits them.
+  final int? level;
+  final String verificationStatus;
+  final String? verificationNote;
+  final int? levelMaxRatePerMinute;
+  final int? nextLevelMaxRatePerMinute;
+  final int verifiedRateThreshold;
+
+  /// The open online session (2026-11-26); null when offline or when the
+  /// server does not report sessions yet.
+  final String? onlineSessionId;
+  final DateTime? onlineSince;
+
+  /// ACTIVE Verified Host (premium badge; not the hosting KYC).
+  bool get isVerified => verificationStatus == 'verified';
+
+  /// The level allows more than this host may charge without verification.
+  bool get verificationWouldRaiseLimit =>
+      !isVerified && (levelMaxRatePerMinute ?? 0) > maxRatePerMinute;
 
   bool get hasApplied => state != HostStates.notApplied;
   bool get isApproved => state == HostStates.approved;
@@ -75,6 +106,14 @@ final class HostStatus extends Equatable {
     todayEarnedBeans: todayEarnedBeans,
     todayCalls: todayCalls,
     kycRejectionReason: kycRejectionReason,
+    level: level,
+    verificationStatus: verificationStatus,
+    verificationNote: verificationNote,
+    levelMaxRatePerMinute: levelMaxRatePerMinute,
+    nextLevelMaxRatePerMinute: nextLevelMaxRatePerMinute,
+    verifiedRateThreshold: verifiedRateThreshold,
+    onlineSessionId: onlineSessionId,
+    onlineSince: onlineSince,
   );
 
   @override
@@ -89,5 +128,13 @@ final class HostStatus extends Equatable {
     todayEarnedBeans,
     todayCalls,
     kycRejectionReason,
+    level,
+    verificationStatus,
+    verificationNote,
+    levelMaxRatePerMinute,
+    nextLevelMaxRatePerMinute,
+    verifiedRateThreshold,
+    onlineSessionId,
+    onlineSince,
   ];
 }

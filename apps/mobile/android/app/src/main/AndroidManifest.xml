@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Calls (Stream Video) -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
@@ -13,6 +14,21 @@
     <!-- Play Billing -->
     <uses-permission android:name="com.android.vending.BILLING"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Foreground services: the Stream SDK declares five FOREGROUND_SERVICE_* permissions
+         and three services (call, livestream viewer, screen share). Dashuri has no livestream
+         or screen sharing, and Play requires a demo video for every declared type, so all of
+         them are removed for the first release. The SDK handles a missing service without
+         crashing (ServiceManager.start returns false); a call then simply is not kept alive in
+         the background. To support background calls later, drop the PHONE_CALL, MICROPHONE and
+         CAMERA lines and the StreamCallService line below, and declare them in Play Console
+         (Policy > App content > Foreground service permissions, with a video). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" tools:node="remove"/>
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" tools:node="remove"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" tools:node="remove"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" tools:node="remove"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" tools:node="remove"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
 
@@ -24,6 +40,9 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <service android:name="io.getstream.video.flutter.stream_video_flutter.service.StreamCallService" tools:node="remove"/>
+        <service android:name="io.getstream.video.flutter.stream_video_flutter.service.StreamLivestreamViewerService" tools:node="remove"/>
+        <service android:name="io.getstream.video.flutter.stream_video_flutter.service.StreamScreenShareService" tools:node="remove"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

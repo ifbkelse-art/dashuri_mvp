@@ -52,6 +52,15 @@ const reelsTab = ShellTab(
   selectedIcon: Icons.play_circle,
 );
 
+/// The Reels tab of the host shell (after Home): a host who is online and
+/// waiting for calls can watch Reels in the meantime. Same feed, host path.
+const hostReelsTab = ShellTab(
+  path: RoutePaths.hostReels,
+  label: 'Reels',
+  icon: Icons.play_circle_outline,
+  selectedIcon: Icons.play_circle,
+);
+
 /// Customer tabs, with the Reels tab only when [reels] is true.
 List<ShellTab> customerTabsFor({required bool reels}) => reels
     ? [customerTabs.first, reelsTab, ...customerTabs.skip(1)]
@@ -83,6 +92,11 @@ const hostTabs = [
     selectedIcon: Icons.account_circle,
   ),
 ];
+
+/// Host tabs, with the Reels tab (after Home) only when [reels] is true.
+List<ShellTab> hostTabsFor({required bool reels}) => reels
+    ? [hostTabs.first, hostReelsTab, ...hostTabs.skip(1)]
+    : hostTabs;
 
 bool _under(String path, String root) =>
     path == root || path.startsWith('$root/');
@@ -120,7 +134,8 @@ ComposedRoutes composeRoutes(
   bool reelsTab = false,
 }) {
   final customer = customerTabsFor(reels: reelsTab);
-  final allTabs = [...customer, ...hostTabs];
+  final host = hostTabsFor(reels: reelsTab);
+  final allTabs = [...customer, ...host];
   final branchRoutes = {for (final t in allTabs) t.path: <RouteBase>[]};
   final fullScreen = <RouteBase>[];
 
@@ -167,12 +182,14 @@ ComposedRoutes composeRoutes(
   }
 
   final customerShell = StatefulShellRoute.indexedStack(
-    builder: (context, state, shell) => RoleShell(tabs: customer, shell: shell),
+    builder: (context, state, shell) =>
+        RoleShell(tabs: customer, shell: shell, location: state.uri.path),
     branches: [for (final t in customer) branch(t)],
   );
   final hostShell = StatefulShellRoute.indexedStack(
-    builder: (context, state, shell) => RoleShell(tabs: hostTabs, shell: shell),
-    branches: [for (final t in hostTabs) branch(t)],
+    builder: (context, state, shell) =>
+        RoleShell(tabs: host, shell: shell, location: state.uri.path),
+    branches: [for (final t in host) branch(t)],
   );
 
   final hostPaths = <String>{};
@@ -188,7 +205,7 @@ ComposedRoutes composeRoutes(
     }
   }
 
-  for (final t in hostTabs) {
+  for (final t in host) {
     for (final r in branchRoutes[t.path]!) {
       collect(r, '');
     }
@@ -204,10 +221,19 @@ ComposedRoutes composeRoutes(
 /// The role shell around a [StatefulNavigationShell]: bottom bar on phones,
 /// navigation rail on tablets ([AdaptiveShell]).
 class RoleShell extends StatelessWidget {
-  const RoleShell({required this.tabs, required this.shell, super.key});
+  const RoleShell({
+    required this.tabs,
+    required this.shell,
+    this.location,
+    super.key,
+  });
 
   final List<ShellTab> tabs;
   final StatefulNavigationShell shell;
+
+  /// The current route path; the see-through bar applies to the Reels feed
+  /// itself, not to pages opened from it (a creator profile is a normal page).
+  final String? location;
 
   @override
   Widget build(BuildContext context) => AdaptiveShell(
@@ -222,9 +248,16 @@ class RoleShell extends StatelessWidget {
     selectedIndex: shell.currentIndex,
     onSelected: (i) =>
         shell.goBranch(i, initialLocation: i == shell.currentIndex),
+    // Reels is full-screen video: the bar goes transparent over it, but only
+    // on the feed itself.
+    overlayBar: _isReelsFeed(tabs[shell.currentIndex].path, location),
     body: shell,
   );
 }
+
+bool _isReelsFeed(String tabPath, String? location) =>
+    (tabPath == RoutePaths.reels || tabPath == RoutePaths.hostReels) &&
+    (location == null || location == tabPath);
 
 /// Shown in a tab whose feature has not registered its page.
 class MissingTabPage extends StatelessWidget {

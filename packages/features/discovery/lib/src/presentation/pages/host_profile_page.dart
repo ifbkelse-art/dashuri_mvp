@@ -34,12 +34,17 @@ class HostProfilePage extends StatelessWidget {
       );
 }
 
-String _reportLocation(HostCard h, {bool block = false}) => Uri(
+String _reportLocation(
+  HostCard h, {
+  bool block = false,
+  String? arrivalPhotoId,
+}) => Uri(
   path: RoutePaths.report,
   queryParameters: {
     'userId': h.userId,
     'name': h.displayName,
     if (block) 'mode': 'block',
+    'arrivalPhotoId': ?arrivalPhotoId,
   },
 ).toString();
 
@@ -62,7 +67,7 @@ Future<void> _showActions(
               subtitle: Text(
                 [
                   if (h.city != null) h.city!.name,
-                  if (h.isVerified) 'Verified host',
+                  if (h.isVerified) VerifiedHostBadge.label,
                 ].join(' · '),
               ),
             ),
@@ -303,11 +308,7 @@ class _Details extends StatelessWidget {
             ),
             if (host.isVerified) ...[
               const SizedBox(width: DashuriTokens.space2),
-              Icon(
-                Icons.verified_rounded,
-                color: theme.colorScheme.primary,
-                semanticLabel: 'Verified',
-              ),
+              const VerifiedHostBadge(compact: true, size: 24),
             ],
           ],
         ),
@@ -328,8 +329,14 @@ class _Details extends StatelessWidget {
               ),
             StatusTag(label: status, tone: tone, dot: true),
             StatusTag(label: 'Level ${host.level}', tone: StatusTone.neutral),
+            if (host.isVerified) const VerifiedHostBadge(),
           ],
         ),
+        if (host.arrivalPhoto != null &&
+            host.status != HostAvailability.offline) ...[
+          const SizedBox(height: DashuriTokens.space4),
+          _ArrivalPhotoSection(host: host),
+        ],
         if (host.languages.isNotEmpty) ...[
           const SizedBox(height: DashuriTokens.space4),
           Wrap(
@@ -450,6 +457,63 @@ class _Actions extends StatelessWidget {
                     }),
                   )
                 : null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The host's arrival photo for the current online session: a recent
+/// captured photo with an honest timestamp, never "live" and never an
+/// identity check. Customers can report it.
+class _ArrivalPhotoSection extends StatelessWidget {
+  const _ArrivalPhotoSection({required this.host});
+
+  final HostCard host;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final photo = host.arrivalPhoto!;
+    final ago = arrivalCapturedAgo(photo.capturedAt, DateTime.now().toUtc());
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
+          child: SizedBox.square(
+            dimension: 96,
+            child: Image.network(
+              photo.url,
+              key: const Key('arrival-photo'),
+              fit: BoxFit.cover,
+              semanticLabel: 'Recent photo of ${host.displayName}. $ago.',
+              errorBuilder: (_, _, _) =>
+                  ColoredBox(color: theme.colorScheme.surfaceContainer),
+            ),
+          ),
+        ),
+        const SizedBox(width: DashuriTokens.space3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Recent photo', style: theme.textTheme.titleSmall),
+              Text(ago, style: theme.textTheme.bodyMedium),
+              Text(
+                'Taken in the app when they came online.',
+                style: theme.textTheme.bodySmall,
+              ),
+              TextButton.icon(
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                onPressed: () => context.push(
+                  _reportLocation(host, arrivalPhotoId: photo.photoId),
+                ),
+                icon: const Icon(Icons.flag_outlined, size: 18),
+                label: const Text('Report photo'),
+              ),
+            ],
           ),
         ),
       ],

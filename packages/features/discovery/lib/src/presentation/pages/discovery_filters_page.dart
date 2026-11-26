@@ -6,7 +6,8 @@ import '../../domain/entities/discovery_filter.dart';
 import '../widgets/discovery_widgets.dart';
 
 /// C03 filters. Pops the chosen [DiscoveryFilter]; the grid re-queries.
-/// The API filters by one language, a city and a sort order (contract 2.3).
+/// The API filters by one language, a city, Verified Host status and a sort
+/// order (contract 2.3; verification 2026-11-23).
 class DiscoveryFiltersPage extends StatefulWidget {
   const DiscoveryFiltersPage({
     super.key,
@@ -100,6 +101,26 @@ class _DiscoveryFiltersPageState extends State<DiscoveryFiltersPage> {
                                 icon: const Icon(Icons.close_rounded),
                               ),
                         onTap: _pickCity,
+                      ),
+                      const SizedBox(height: DashuriTokens.space6),
+                      Text('Hosts', style: theme.textTheme.titleLarge),
+                      const SizedBox(height: DashuriTokens.space3),
+                      Wrap(
+                        spacing: DashuriTokens.space2,
+                        runSpacing: DashuriTokens.space2,
+                        children: [
+                          for (final v in DiscoveryVerification.values)
+                            ChoiceChip(
+                              avatar: v == DiscoveryVerification.verified
+                                  ? const Icon(VerifiedHostBadge.icon, size: 18)
+                                  : null,
+                              label: Text(v.label),
+                              selected: _f.verification == v,
+                              onSelected: (_) => setState(
+                                () => _f = _f.copyWith(verification: v),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: DashuriTokens.space6),
                       Text('Sort by', style: theme.textTheme.titleLarge),

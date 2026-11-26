@@ -1,0 +1,7 @@
+OBSOLETE since commit dda1269 (23 Nov 2026).
+
+The UI/UX pass was committed, so restore.sh here would put the pre-pass
+versions of ~60 committed files back into the working tree. To undo the pass,
+use:  git revert dda1269
+
+For Reels, use docs/reels/experiment/restore.sh (re-based onto dda1269).

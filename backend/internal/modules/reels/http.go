@@ -17,6 +17,7 @@ func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 	mux.Handle("GET /v1/reels/config", mw.User(s.handleConfig))
 	mux.Handle("GET /v1/reels/feed", mw.User(s.handleFeed))
 	mux.Handle("POST /v1/reels/uploads", mw.User(idempotency.Require(mw.Idempotency, s.handleCreateUpload)))
+	mux.Handle("POST /v1/reels/{reelId}/upload-complete", mw.User(s.handleCompleteUpload))
 	mux.Handle("GET /v1/reels/{reelId}", mw.User(s.handleGetReel))
 	mux.Handle("DELETE /v1/reels/{reelId}", mw.User(s.handleDeleteReel))
 	mux.Handle("PUT /v1/reels/{reelId}/like", mw.User(s.handleLike))
@@ -75,6 +76,12 @@ func (s *Service) handleCreateUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := s.CreateUpload(r.Context(), p, in)
 	write(w, r, http.StatusCreated, out, err)
+}
+
+func (s *Service) handleCompleteUpload(w http.ResponseWriter, r *http.Request) {
+	p, _ := auth.FromContext(r.Context())
+	out, err := s.CompleteUpload(r.Context(), p, r.PathValue("reelId"))
+	write(w, r, http.StatusOK, out, err)
 }
 
 func (s *Service) handleGetReel(w http.ResponseWriter, r *http.Request) {

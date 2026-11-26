@@ -13,11 +13,13 @@ void main() {
   test('flag off: no Reels feature, tab or route; existing tabs unchanged', () {
     expect(appFeatures().whereType<ReelsRoutes>(), isEmpty);
     expect(customerTabsFor(reels: false), same(customerTabs));
+    expect(hostTabsFor(reels: false), same(hostTabs));
     final composed = composeRoutes(appFeatures());
     expect(composed.missingTabs, isEmpty);
     final router = GoRouter(routes: composed.routes);
     addTearDown(router.dispose);
     expect(matches(router, RoutePaths.reels), isFalse);
+    expect(matches(router, RoutePaths.hostReels), isFalse);
     expect(matches(router, RoutePaths.reelUpload), isFalse);
     expect(matches(router, RoutePaths.discovery), isTrue);
   });
@@ -52,5 +54,27 @@ void main() {
     ]) {
       expect(matches(router, p), isTrue, reason: p);
     }
+  });
+
+  test('flag on: hosts get a Reels tab after Home, in the host shell', () {
+    final tabs = hostTabsFor(reels: true).map((t) => t.path).toList();
+    expect(tabs, [
+      RoutePaths.hostDashboard,
+      RoutePaths.hostReels,
+      RoutePaths.hostCalls,
+      RoutePaths.hostEarnings,
+      RoutePaths.hostProfileTab,
+    ]);
+    final composed = composeRoutes(
+      appFeatures(reelsEnabled: true),
+      reelsTab: true,
+    );
+    expect(composed.missingTabs, isEmpty);
+    // The host feed stays in the host shell; the customer feed does not.
+    expect(composed.isHostShellLocation(RoutePaths.hostReels), isTrue);
+    expect(composed.isHostShellLocation(RoutePaths.reels), isFalse);
+    final router = GoRouter(routes: composed.routes);
+    addTearDown(router.dispose);
+    expect(matches(router, RoutePaths.hostReels), isTrue);
   });
 }

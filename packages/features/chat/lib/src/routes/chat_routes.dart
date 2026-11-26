@@ -7,6 +7,7 @@ import '../application/conversation_cubit.dart';
 import '../application/conversations_cubit.dart';
 import '../application/in_call_chat_controller.dart';
 import '../domain/entities/conversation.dart';
+import '../domain/usecases/chat_extras.dart';
 import '../presentation/pages/conversation_page.dart';
 import '../presentation/pages/conversations_page.dart';
 
@@ -30,6 +31,9 @@ ConversationCubit _conversationCubit({
     peerName: peerName,
     known: known,
     watchReadHints: sl(),
+    // Optional: hosts that register use cases by hand may omit it; the
+    // re-fetch on each hint still delivers.
+    watchHintMessages: sl.isRegistered<WatchChatHintMessages>() ? sl() : null,
   )..start();
 }
 
@@ -50,6 +54,9 @@ InCallChatController openInCallChat(
     listConversations: sl(),
     watchHints: sl(),
     watchReadHints: sl(),
+    // Optional: hosts that register use cases by hand may omit it; the
+    // re-fetch on each hint still delivers.
+    watchHintMessages: sl.isRegistered<WatchChatHintMessages>() ? sl() : null,
     currentUserId: sl(),
     conversationId: newConversationId,
     peerUserId: peerUserId,

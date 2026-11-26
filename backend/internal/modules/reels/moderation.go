@@ -75,11 +75,12 @@ func (s *Service) ModeratePending(ctx context.Context, limit int) (int, error) {
 
 func (s *Service) classify(ctx context.Context, repo Repository, v VideoRow, now time.Time) (ModerationOutcome, bool) {
 	unavailable := ModerationOutcome{Decision: "review", ReasonCode: "classifier_unavailable", Priority: 2, CaseSource: "provider_unavailable"}
-	if s.deps.Classifier == nil || !s.providerReady() || v.PlaybackID == nil || v.DurationMs == nil {
+	prov := s.providerFor(v.Provider)
+	if s.deps.Classifier == nil || prov == nil || v.PlaybackID == nil || v.DurationMs == nil {
 		return unavailable, true
 	}
 	giveUp := now.Sub(v.UpdatedAt) > ModerationGiveUp
-	urls, err := s.deps.Provider.FrameURLs(*v.PlaybackID, *v.DurationMs, s.deps.FrameInterval, 10*time.Minute)
+	urls, err := prov.FrameURLs(*v.PlaybackID, *v.DurationMs, s.deps.FrameInterval, 10*time.Minute)
 	if err != nil || len(urls) == 0 {
 		return unavailable, true
 	}
@@ -111,9 +112,6 @@ func (s *Service) ReconcileUploads(ctx context.Context, limit int) (int, error) 
 	if err != nil {
 		return 0, err
 	}
-	if !s.providerReady() {
-		return 0, nil
-	}
 	now := s.deps.Clock.Now()
 	n := 0
 	waiting, err := repo.StaleVideos(ctx, "awaiting_upload", now.Add(-10*time.Minute), limit)
@@ -121,10 +119,11 @@ func (s *Service) ReconcileUploads(ctx context.Context, limit int) (int, error) 
 		return 0, err
 	}
 	for _, v := range waiting {
-		if v.ProviderUploadID == nil {
+		prov := s.providerFor(v.Provider)
+		if v.ProviderUploadID == nil || prov == nil {
 			continue
 		}
-		st, err := s.deps.Provider.UploadStatus(ctx, *v.ProviderUploadID)
+		st, err := prov.UploadStatus(ctx, *v.ProviderUploadID)
 		if err != nil {
 			continue
 		}
@@ -148,15 +147,70 @@ func (s *Service) ReconcileUploads(ctx context.Context, limit int) (int, error) 
 		return n, err
 	}
 	for _, v := range processing {
-		if v.ProviderAssetID == nil {
+		prov := s.providerFor(v.Provider)
+		if v.ProviderAssetID == nil || prov == nil {
 			continue
 		}
-		a, err := s.deps.Provider.Asset(ctx, *v.ProviderAssetID)
+		if _, self := prov.(SelfProcessing); self {
+			continue // reels-process-media owns these
+		}
+		a, err := prov.Asset(ctx, *v.ProviderAssetID)
 		if err != nil {
 			continue
 		}
 		if s.applyAsset(ctx, repo, v.ID, a) == nil {
 			n++
+		}
+	}
+	return n, nil
+}
+
+// ProcessMedia validates and transcodes uploads stored with a
+// self-processing provider (R2) and extracts thumbnail and moderation frames
+// (job reels-process-media; needs ffmpeg, so it runs in the media worker
+// image). Invalid files fail with a reason code; transient errors retry until
+// ProcessingGiveUp, then the reel fails as processing_failed. A processed
+// reel goes to pending_moderation exactly like a Mux reel, so moderation is
+// unchanged and never skipped.
+func (s *Service) ProcessMedia(ctx context.Context, limit int) (int, error) {
+	repo, err := s.repo()
+	if err != nil {
+		return 0, err
+	}
+	now := s.deps.Clock.Now()
+	rows, err := repo.StaleVideos(ctx, "processing", now, limit)
+	if err != nil {
+		return 0, err
+	}
+	limits := MediaLimits{MaxBytes: MaxUploadBytes, MinDurationMs: MinDurationMs - DurationToleranceMs,
+		MaxDurationMs: MaxDurationMs + DurationToleranceMs, FrameInterval: s.deps.FrameInterval}
+	n := 0
+	for _, v := range rows {
+		prov := s.providerFor(v.Provider)
+		proc, ok := prov.(SelfProcessing)
+		if !ok || v.ProviderAssetID == nil {
+			continue
+		}
+		a, err := proc.Process(ctx, *v.ProviderAssetID, limits)
+		var me *MediaError
+		switch {
+		case errors.Is(err, ErrProcessorUnavailable):
+			slog.WarnContext(ctx, "reels media processing needs the media worker (ffmpeg); nothing failed")
+			return n, nil
+		case errors.As(err, &me):
+			if repo.MarkFailed(ctx, v.ID, me.Code) == nil {
+				n++
+			}
+		case err != nil:
+			slog.WarnContext(ctx, "reels media processing failed", "reel", v.ID, "err", err)
+			if now.Sub(v.UpdatedAt) > ProcessingGiveUp && repo.MarkFailed(ctx, v.ID, "processing_failed") == nil {
+				n++
+			}
+		default:
+			a.State = "ready"
+			if s.applyAsset(ctx, repo, v.ID, a) == nil {
+				n++
+			}
 		}
 	}
 	return n, nil
@@ -180,13 +234,14 @@ func (s *Service) HandleWebhook(ctx context.Context, provider string, headers ma
 	if err != nil {
 		return err
 	}
-	if s.deps.Provider == nil || provider != s.deps.Provider.Name() {
+	prov := s.providerNamed(provider)
+	if prov == nil {
 		return apperr.NotFound("webhook")
 	}
-	if !s.deps.Provider.Configured() {
+	if !prov.Configured() {
 		return apperr.Unavailable("video_provider_not_configured", "video hosting is not configured")
 	}
-	ev, err := s.deps.Provider.ParseWebhook(headers, body, s.deps.Clock.Now())
+	ev, err := prov.ParseWebhook(headers, body, s.deps.Clock.Now())
 	if errors.Is(err, ErrWebhookSignature) {
 		return apperr.Unauthenticated("invalid webhook signature")
 	}
@@ -266,10 +321,11 @@ func (s *Service) PurgeMedia(ctx context.Context, limit int) (int, error) {
 	n := 0
 	for _, v := range rows {
 		if v.ProviderAssetID != nil {
-			if !s.providerReady() {
-				return n, nil // keep for later; never mark purged without deleting
+			prov := s.providerFor(v.Provider)
+			if prov == nil {
+				continue // keep for later; never mark purged without deleting
 			}
-			if err := s.deps.Provider.DeleteAsset(ctx, *v.ProviderAssetID); err != nil && !errors.Is(err, ErrAssetNotFound) {
+			if err := prov.DeleteAsset(ctx, *v.ProviderAssetID); err != nil && !errors.Is(err, ErrAssetNotFound) {
 				slog.WarnContext(ctx, "reels asset delete failed", "reel", v.ID, "err", err)
 				continue
 			}

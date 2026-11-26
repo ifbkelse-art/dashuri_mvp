@@ -100,5 +100,5 @@ func New(cfg config.Config, pool *pgxpool.Pool) http.Handler {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	return httpx.Chain(mux, httpx.Recover, httpx.WithRequestID, httpx.AccessLog)
+	return httpx.Chain(mux, httpx.Recover, httpx.CORS(cfg.AdminOrigins), httpx.WithRequestID, httpx.AccessLog)
 }

@@ -10,7 +10,7 @@ import (
 // Cursor is the keyset position of the last card of a page. Rows are
 // ordered by (K1, K2, user id) ascending, where the keys depend on the sort:
 //
-//	recommended: K1 = 0 available / 1 busy, K2 = -lifetime XP (level desc)
+//	recommended: K1 = 0 available / 1 busy, K2 = -(lifetime XP + verified boost)
 //	rate_low:    K1 = rate,                 K2 = 0
 //	rate_high:   K1 = -rate,                K2 = 0
 type Cursor struct {
@@ -22,8 +22,12 @@ type Cursor struct {
 
 var errBadCursor = errors.New("invalid cursor")
 
-// SortKeys returns the keyset keys of a row for a sort.
-func SortKeys(sort string, h HostRow) (int64, int64) {
+// SortKeys returns the keyset keys of a row for a sort (no verification boost).
+func SortKeys(sort string, h HostRow) (int64, int64) { return RankKeys(sort, h, 0) }
+
+// RankKeys returns the keyset keys with the Verified Host ranking signal:
+// in the recommended sort a verified host ranks as if it had boost more XP.
+func RankKeys(sort string, h HostRow, boost int64) (int64, int64) {
 	switch sort {
 	case SortRateLow:
 		return h.RatePerMinute, 0
@@ -34,7 +38,11 @@ func SortKeys(sort string, h HostRow) (int64, int64) {
 		if h.Busy {
 			rank = 1
 		}
-		return rank, -h.LifetimeXP
+		xp := h.LifetimeXP
+		if h.Verified {
+			xp += boost
+		}
+		return rank, -xp
 	}
 }
 

@@ -96,7 +96,8 @@ class HostGridCard extends StatelessWidget {
         button: true,
         label:
             '${hostTitle(host)}, $label, ${host.ratePerMinute} Diamonds '
-            'per minute',
+            'per minute'
+            '${host.arrivalPhoto == null ? '' : ', has a recent photo'}',
         excludeSemantics: true,
         child: Material(
           clipBehavior: Clip.antiAlias,
@@ -132,15 +133,20 @@ class HostGridCard extends StatelessWidget {
                       ),
                       const Spacer(),
                       if (host.isVerified)
-                        const Icon(
-                          Icons.verified_rounded,
-                          color: Colors.white,
+                        const VerifiedHostBadge(
+                          compact: true,
                           size: 22,
-                          semanticLabel: 'Verified',
+                          onMedia: true,
                         ),
                     ],
                   ),
                 ),
+                if (host.arrivalPhoto != null)
+                  Positioned(
+                    right: 10,
+                    top: 44,
+                    child: ArrivalPhotoInset(photo: host.arrivalPhoto!),
+                  ),
                 Positioned(
                   left: 12,
                   right: 12,
@@ -231,6 +237,86 @@ class _HostCardSkeletonState extends State<HostCardSkeleton>
           borderRadius: BorderRadius.circular(DashuriTokens.radiusLarge),
         ),
         child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+/// "Captured 3 minutes ago" — an honest age for an arrival photo. Never
+/// "live": the photo was taken when the host came online.
+String arrivalCapturedAgo(DateTime capturedAt, DateTime now) {
+  final d = now.difference(capturedAt);
+  if (d.inSeconds < 60) return 'Captured just now';
+  if (d.inMinutes < 60) {
+    final m = d.inMinutes;
+    return 'Captured $m minute${m == 1 ? '' : 's'} ago';
+  }
+  final h = d.inHours;
+  return 'Captured $h hour${h == 1 ? '' : 's'} ago';
+}
+
+/// Compact form for grid cards: "3 min ago".
+String arrivalShortAgo(DateTime capturedAt, DateTime now) {
+  final d = now.difference(capturedAt);
+  if (d.inMinutes < 1) return 'just now';
+  if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+  return '${d.inHours} h ago';
+}
+
+/// Small inset on a grid card: the arrival photo with its age.
+class ArrivalPhotoInset extends StatelessWidget {
+  const ArrivalPhotoInset({required this.photo, super.key, this.now});
+
+  final HostArrivalPhoto photo;
+
+  /// For tests; defaults to the current time.
+  final DateTime? now;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = now ?? DateTime.now().toUtc();
+    return Semantics(
+      label: 'Recent photo. ${arrivalCapturedAgo(photo.capturedAt, t)}.',
+      child: ExcludeSemantics(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: ClipOval(
+                child: Image.network(
+                  photo.url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      const ColoredBox(color: DashuriTokens.neutral700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: .55),
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                child: Text(
+                  arrivalShortAgo(photo.capturedAt, t),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: Colors.white),
+                  maxLines: 1,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

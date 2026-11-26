@@ -93,7 +93,17 @@ class _CallTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: UserAvatar(name: name, url: call.peer?.photoUrl),
-      title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          if (call.peer?.isVerified ?? false) ...[
+            const SizedBox(width: DashuriTokens.space1),
+            const VerifiedHostBadge(compact: true, size: 16),
+          ],
+        ],
+      ),
       subtitle: Text(
         [
           if (call.isFreeCall) 'Free call',

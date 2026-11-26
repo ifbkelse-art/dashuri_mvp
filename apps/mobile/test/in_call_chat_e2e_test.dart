@@ -67,6 +67,7 @@ GetIt chatLocator(FakeChatServer server, String user) {
     ..registerFactory(() => ListConversations(repo))
     ..registerFactory(() => WatchChatHints(repo))
     ..registerFactory(() => WatchReadHints(repo))
+    ..registerFactory(() => WatchChatHintMessages(repo))
     ..registerFactory(() => GetCurrentUserId(repo));
 }
 

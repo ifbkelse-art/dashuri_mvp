@@ -15,6 +15,8 @@ type Peer struct {
 	UserId      string  `json:"user_id"`
 	DisplayName string  `json:"display_name"`
 	PhotoUrl    *string `json:"photo_url"`
+	// IsVerified: the peer is an ACTIVE Verified Host.
+	IsVerified bool `json:"is_verified"`
 }
 
 type Conversation struct {
@@ -54,6 +56,33 @@ type ChatMessage struct {
 	// ReadByPeer: for the viewer's own messages, the other participant has
 	// read up to (or past) this message. Always false for received ones.
 	ReadByPeer bool `json:"read_by_peer"`
+	// Kind is "text" or "gift" (2026-11-26). A gift message is written by
+	// the server when a gift commits (never by POST .../messages); Gift
+	// carries its public details.
+	Kind string           `json:"kind"`
+	Gift *GiftMessageInfo `json:"gift,omitempty"`
+}
+
+// GiftMessageInfo is the public part of a gift shown in chat.
+type GiftMessageInfo struct {
+	GiftTransactionId string `json:"gift_transaction_id"`
+	GiftId            string `json:"gift_id"`
+	GiftName          string `json:"gift_name"`
+	Emoji             string `json:"emoji"`
+	Tier              string `json:"tier"`
+	DiamondValue      int64  `json:"diamond_value"`
+}
+
+// ChatMessageHint is the chat.message realtime payload on user:<recipient>.
+// Message is the new message (absent in hints that only announce a
+// conversation); older clients read only conversation_id.
+type ChatMessageHint struct {
+	ConversationId string       `json:"conversation_id"`
+	Message        *ChatMessage `json:"message,omitempty"`
+	// CallId: the call an in-call message was sent during (sent only to the
+	// other participant of that call), so clients keep each call's session
+	// apart from the inbox exactly as the list endpoints do.
+	CallId *string `json:"call_id,omitempty"`
 }
 
 // Message contexts.

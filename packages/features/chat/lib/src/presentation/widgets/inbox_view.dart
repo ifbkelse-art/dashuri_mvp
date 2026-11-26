@@ -153,7 +153,14 @@ class _InboxRow extends StatelessWidget {
     final unread = c.unreadCount > 0;
     final last = c.lastMessage;
     final preview = last != null
-        ? (last.senderId == myUserId ? 'You: ${last.body}' : last.body)
+        ? (last.isGift
+              ? ChatFormat.giftLineFor(
+                  last.body,
+                  mine: last.senderId == myUserId,
+                )
+              : last.senderId == myUserId
+              ? 'You: ${last.body}'
+              : last.body)
         : (c.lastMessagePreview ?? 'Say hello');
     final name = c.peerDisplayName.isEmpty ? 'Dashuri user' : c.peerDisplayName;
     return Material(
@@ -177,7 +184,7 @@ class _InboxRow extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
                             name,
                             style: theme.textTheme.titleSmall,
@@ -185,6 +192,11 @@ class _InboxRow extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (c.peerIsVerified) ...[
+                          const SizedBox(width: DashuriTokens.space1),
+                          const VerifiedHostBadge(compact: true, size: 16),
+                        ],
+                        const Spacer(),
                         Text(
                           ChatFormat.listTime(c.updatedAt),
                           style: theme.textTheme.labelSmall?.copyWith(

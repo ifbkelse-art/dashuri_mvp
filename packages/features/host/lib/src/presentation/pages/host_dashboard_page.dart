@@ -1,23 +1,48 @@
+import 'dart:async';
+
 import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../application/arrival_photo_cubit.dart';
 import '../../application/host_dashboard_cubit.dart';
+import '../../application/host_gifts_cubit.dart';
+import '../../application/host_session_bloc.dart';
 import '../../domain/entities/host_earnings.dart';
 import '../../domain/entities/host_status.dart';
+import '../../domain/entities/host_verification.dart';
 import '../host_paths.dart';
+import '../session/arrival_flow.dart';
+import '../session/home_session_widgets.dart';
 import '../widgets/host_copy.dart';
 import '../widgets/host_widgets.dart';
+import 'host_rate_page.dart';
 
-/// H11/H12 host home (RoutePaths.hostDashboard, Home tab). Incoming calls are
-/// handled app-wide by the video-call feature.
+/// H11/H12 host home (RoutePaths.hostDashboard, Home tab). It owns the whole
+/// online experience: go online (with the optional arrival photo), how long
+/// you have been online, gifts received, notices after a call and
+/// connection problems. Incoming calls are handled app-wide by the
+/// video-call feature.
 class HostDashboardPage extends StatefulWidget {
-  const HostDashboardPage({super.key});
+  const HostDashboardPage({
+    super.key,
+    this.arrivalEnabled = false,
+    this.giftsEnabled = false,
+  });
+
+  /// An [ArrivalPhotoCubit] is provided (DASHURI_ARRIVAL_PHOTOS_ENABLED).
+  final bool arrivalEnabled;
+
+  /// A [HostGiftsCubit] is provided (DASHURI_GIFTS_ENABLED).
+  final bool giftsEnabled;
 
   @override
   State<HostDashboardPage> createState() => _HostDashboardPageState();
 }
+
+bool _listed(HostSessionState s) =>
+    s is HostSessionOnlineLike || s is HostSessionGoingOffline;
 
 class _HostDashboardPageState extends State<HostDashboardPage> {
   @override
@@ -25,51 +50,169 @@ class _HostDashboardPageState extends State<HostDashboardPage> {
     super.initState();
     // Heartbeats pause while the app is in the background.
     context.read<HostDashboardCubit>().attachLifecycle();
+    // Gifts are app-wide: load them whether or not the host is online.
+    if (widget.giftsEnabled) unawaited(context.read<HostGiftsCubit>().load());
+  }
+
+  /// Go online: the optional arrival photo first, then online. Skipping the
+  /// photo never blocks going online.
+  Future<void> _activate() async {
+    final bloc = context.read<HostSessionBloc>();
+    if (!widget.arrivalEnabled) {
+      bloc.add(const HostSessionActivationProceed());
+      return;
+    }
+    final arrival = context.read<ArrivalPhotoCubit>()..prompt();
+    var done = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheet) => BlocProvider.value(
+        value: arrival,
+        child: ArrivalPromptSheet(
+          onDone: () {
+            done = true;
+            Navigator.of(sheet).pop();
+          },
+        ),
+      ),
+    );
+    if (!mounted) return;
+    bloc.add(
+      done
+          ? const HostSessionActivationProceed()
+          : const HostSessionActivationCancelled(),
+    );
+  }
+
+  Future<void> _retake() async {
+    final arrival = context.read<ArrivalPhotoCubit>();
+    await arrival.capture();
+    if (!mounted || arrival.state is! ArrivalPreview) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheet) => BlocProvider.value(
+        value: arrival,
+        child: ArrivalPromptSheet(onDone: () => Navigator.of(sheet).pop()),
+      ),
+    );
+    if (arrival.state is ArrivalConfirmed) await arrival.upload();
+    if (arrival.state is ArrivalSkipped || arrival.state is ArrivalPrompt) {
+      await arrival.load();
+    }
+  }
+
+  void _onSession(BuildContext context, HostSessionState s) {
+    switch (s) {
+      case HostSessionGoingOnline(activating: false):
+        unawaited(_activate());
+      case HostSessionOnline():
+        if (widget.arrivalEnabled) {
+          final arrival = context.read<ArrivalPhotoCubit>();
+          if (arrival.state is ArrivalConfirmed) {
+            unawaited(arrival.upload());
+          } else if (arrival.state is ArrivalIdle ||
+              arrival.state is ArrivalSkipped) {
+            unawaited(arrival.load());
+          }
+        }
+        if (s.failure != null) {
+          showHostSnack(context, hostFailureMessage(s.failure!));
+        }
+      case HostSessionOffline(:final failure?):
+        showHostSnack(context, hostFailureMessage(failure));
+      default:
+    }
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) => BlocConsumer<HostDashboardCubit, HostDashboardState>(
-    listenWhen: (a, b) =>
-        b is HostDashboardStateLoaded &&
-        b.actionFailure != null &&
-        (a is! HostDashboardStateLoaded || a.actionFailure != b.actionFailure),
-    listener: (context, state) => showHostSnack(
-      context,
-      hostFailureMessage((state as HostDashboardStateLoaded).actionFailure!),
-    ),
-    builder: (context, state) {
-      final cubit = context.read<HostDashboardCubit>();
-      return Scaffold(
-        body: SafeArea(
-          child: switch (state) {
-            HostDashboardStateInitial() ||
-            HostDashboardStateLoading() => const LoadingView(),
-            HostDashboardStateFailed(:final failure) => ErrorStateView(
-              message: hostFailureMessage(failure),
-              onRetry: cubit.load,
-            ),
-            final HostDashboardStateLoaded loaded => HostWideBody(
-              onRefresh: cubit.refresh,
-              children: [
-                _Header(state: loaded),
-                if (!loaded.data.isApproved)
-                  _ApplicationCard(host: loaded.data)
-                else
-                  HostCardGrid(
-                    children: [
-                      _AvailabilityCard(state: loaded),
-                      _TodayCard(host: loaded.data),
-                      _QuickLinks(host: loaded.data),
-                    ],
-                  ),
-              ],
-            ),
-          },
+  Widget build(BuildContext context) => MultiBlocListener(
+    listeners: [
+      BlocListener<HostDashboardCubit, HostDashboardState>(
+        listenWhen: (a, b) =>
+            b is HostDashboardStateLoaded &&
+            b.actionFailure != null &&
+            (a is! HostDashboardStateLoaded ||
+                a.actionFailure != b.actionFailure),
+        listener: (context, state) => showHostSnack(
+          context,
+          hostFailureMessage(
+            (state as HostDashboardStateLoaded).actionFailure!,
+          ),
         ),
-      );
-    },
+      ),
+      BlocListener<HostSessionBloc, HostSessionState>(listener: _onSession),
+      // Home's own retry succeeded after the session could not load: start
+      // the session again so the availability card is not left on an error.
+      BlocListener<HostDashboardCubit, HostDashboardState>(
+        listenWhen: (a, b) =>
+            a is! HostDashboardStateLoaded && b is HostDashboardStateLoaded,
+        listener: (context, _) {
+          if (context.read<HostSessionBloc>().state is HostSessionLoadFailed) {
+            context.read<HostSessionBloc>().add(const HostSessionStarted());
+          }
+        },
+      ),
+      // Keep the header dot, pricing and earnings in step when the session
+      // goes online or offline.
+      BlocListener<HostSessionBloc, HostSessionState>(
+        // "Going offline" still counts as online: the server has not
+        // confirmed yet, so re-reading status then would show a stale dot.
+        listenWhen: (a, b) => _listed(a) != _listed(b),
+        listener: (context, _) =>
+            unawaited(context.read<HostDashboardCubit>().refresh()),
+      ),
+    ],
+    child: BlocBuilder<HostDashboardCubit, HostDashboardState>(
+      builder: (context, state) {
+        final cubit = context.read<HostDashboardCubit>();
+        return Scaffold(
+          body: SafeArea(
+            child: switch (state) {
+              HostDashboardStateInitial() ||
+              HostDashboardStateLoading() => const LoadingView(),
+              HostDashboardStateFailed(:final failure) => ErrorStateView(
+                message: hostFailureMessage(failure),
+                onRetry: cubit.load,
+              ),
+              final HostDashboardStateLoaded loaded => HostWideBody(
+                onRefresh: cubit.refresh,
+                children: [
+                  _Header(state: loaded),
+                  if (!loaded.data.isApproved)
+                    _ApplicationCard(host: loaded.data)
+                  else
+                    BlocBuilder<HostSessionBloc, HostSessionState>(
+                      builder: (context, session) => HostCardGrid(
+                        children: [
+                          HomeAvailabilityCard(
+                            session: session,
+                            dashboard: loaded,
+                          ),
+                          if (widget.arrivalEnabled &&
+                              session is HostSessionOnlineLike)
+                            HomeArrivalCard(
+                              onRetake: () => unawaited(_retake()),
+                            ),
+                          if (widget.giftsEnabled) const HomeGiftsCard(),
+                          _TodayCard(host: loaded.data),
+                          _PricingCard(host: loaded.data),
+                          _QuickLinks(host: loaded.data),
+                          const HomeTipCard(),
+                          const HomeSafetyCard(),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            },
+          ),
+        );
+      },
+    ),
   );
 }
 
@@ -203,139 +346,6 @@ class _ApplicationCard extends StatelessWidget {
   }
 }
 
-class _AvailabilityCard extends StatelessWidget {
-  const _AvailabilityCard({required this.state});
-
-  final HostDashboardStateLoaded state;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cubit = context.read<HostDashboardCubit>();
-    final host = state.data;
-    final online = host.isAvailable;
-    final ok = DashuriColors.of(context).success;
-    final light = theme.brightness == Brightness.light;
-    return HostCard(
-      // Theme-aware tint: text and chips inside use the theme's on-colours,
-      // which were unreadable on the fixed light green in dark mode.
-      color: online ? ok.container : null,
-      borderColor: online ? ok.icon.withValues(alpha: .4) : null,
-      padding: const EdgeInsets.all(DashuriTokens.space5),
-      child: Column(
-        children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: online
-                  ? theme.colorScheme.surface
-                  : theme.colorScheme.surfaceContainer,
-              border: online ? Border.all(color: ok.icon, width: 2) : null,
-            ),
-            child: Icon(
-              online ? Icons.videocam_rounded : Icons.bedtime_outlined,
-              size: 36,
-              color: online ? ok.icon : theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: DashuriTokens.space4),
-          Text(
-            online ? "You're online" : "You're offline",
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: online ? ok.onContainer : null,
-            ),
-          ),
-          const SizedBox(height: DashuriTokens.space1),
-          Text(
-            online
-                ? 'Waiting for calls · visible in Discover'
-                : "Customers can't see or call you.",
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: online ? ok.onContainer : null,
-            ),
-          ),
-          if (online) ...[
-            const SizedBox(height: DashuriTokens.space3),
-            Wrap(
-              spacing: DashuriTokens.space2,
-              runSpacing: DashuriTokens.space2,
-              alignment: WrapAlignment.center,
-              children: [
-                Chip(
-                  avatar: const DiamondIcon(size: 14),
-                  label: Text(
-                    '${DashuriFormat.count(host.ratePerMinute)} / min',
-                  ),
-                ),
-                Chip(
-                  avatar: const Icon(Icons.card_giftcard_rounded, size: 16),
-                  label: Text(
-                    host.freeCallOptIn ? 'Free calls on' : 'Free calls off',
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: DashuriTokens.space5),
-          Semantics(
-            toggled: online,
-            child: SizedBox(
-              width: double.infinity,
-              child: online
-                  ? OutlinedButton(
-                      onPressed: state.updating
-                          ? null
-                          : () => cubit.setAvailable(available: false),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
-                        backgroundColor: theme.colorScheme.surface,
-                      ),
-                      child: Text(state.updating ? 'Updating…' : 'Go offline'),
-                    )
-                  : FilledButton.icon(
-                      onPressed: state.updating
-                          ? null
-                          : () => cubit.setAvailable(available: true),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
-                        // White on the base green is 4.0:1; these are
-                        // ≥ 6:1 (light) and ≥ 9:1 (dark).
-                        backgroundColor: light
-                            ? DashuriTokens.successText
-                            : ok.icon,
-                        foregroundColor: light
-                            ? Colors.white
-                            : DashuriTokens.neutral950,
-                      ),
-                      icon: state.updating
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.radio_button_checked_rounded),
-                      label: const Text('Go online'),
-                    ),
-            ),
-          ),
-          const SizedBox(height: DashuriTokens.space2),
-          SwitchListTile(
-            value: host.freeCallOptIn,
-            onChanged: state.updating
-                ? null
-                : (v) => cubit.setFreeCallOptIn(optIn: v),
-            contentPadding: EdgeInsets.zero,
-            secondary: const Icon(Icons.card_giftcard_rounded),
-            title: const Text('Free Call Card calls'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _TodayCard extends StatelessWidget {
   const _TodayCard({required this.host});
 
@@ -384,6 +394,81 @@ class _TodayCard extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Verified Host status, level, current price, max eligible price, the next
+/// level's ceiling and the Verified Host call to action (2026-11-23). All
+/// numbers come from GET /v1/host; the app computes none of them.
+class _PricingCard extends StatelessWidget {
+  const _PricingCard({required this.host});
+
+  final HostStatus host;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cubit = context.read<HostDashboardCubit>();
+    final levelMax = host.levelMaxRatePerMinute;
+    final next = host.nextLevelMaxRatePerMinute;
+    return HostCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LabelValueRow(
+            label: Text('Pricing', style: theme.textTheme.titleLarge),
+            value: host.isVerified
+                ? const VerifiedHostBadge()
+                : StatusTag(
+                    label: VerificationStatuses.label(host.verificationStatus),
+                    tone: StatusTone.neutral,
+                  ),
+          ),
+          const SizedBox(height: DashuriTokens.space2),
+          HostCardGrid(
+            columns: 2,
+            children: [
+              HostStatCard(
+                label: 'Your price',
+                value: CurrencyAmount.diamonds(
+                  host.ratePerMinute,
+                  style: theme.textTheme.headlineSmall,
+                ),
+                caption: 'per minute',
+              ),
+              HostStatCard(
+                label: 'Max you can set',
+                value: CurrencyAmount.diamonds(
+                  host.maxRatePerMinute,
+                  style: theme.textTheme.headlineSmall,
+                ),
+                caption: host.level == null
+                    ? 'per minute'
+                    : 'Level ${host.level}'
+                          '${levelMax == null ? '' : ' · level limit ${DashuriFormat.count(levelMax)}'}',
+              ),
+            ],
+          ),
+          if (next != null) ...[
+            const SizedBox(height: DashuriTokens.space2),
+            Text(
+              'Next level: up to ${DashuriFormat.count(next)} Diamonds/minute'
+              '${!host.isVerified && next > host.verifiedRateThreshold ? ' (Verified Hosts only above ${DashuriFormat.count(host.verifiedRateThreshold)})' : ''}.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+          if (!host.isVerified) ...[
+            const SizedBox(height: DashuriTokens.space3),
+            VerifiedHostCta(
+              onPressed: () async {
+                await context.push(RoutePaths.hostVerifiedHost);
+                await cubit.refresh();
+              },
+            ),
+          ],
         ],
       ),
     );

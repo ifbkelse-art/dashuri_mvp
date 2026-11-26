@@ -21,6 +21,39 @@ enum HostAvailability {
       values.asNameMap()[v] ?? HostAvailability.offline;
 }
 
+/// A recent photo the host captured in the app when the current online
+/// session started (2026-11-26). It is NOT live video and NOT identity
+/// verification: always shown as "Captured N minutes ago".
+final class HostArrivalPhoto extends Equatable {
+  const HostArrivalPhoto({
+    required this.url,
+    required this.capturedAt,
+    this.id,
+  });
+
+  /// The photo id from the API (to report this photo).
+  final String? id;
+
+  /// Short-lived signed URL.
+  final String url;
+
+  /// Server time the photo was taken/uploaded.
+  final DateTime capturedAt;
+
+  /// The photo id from the signed path (`<host id>/<photo id>.jpg`), used to
+  /// report this specific photo; null if the URL has another shape.
+  String? get photoId {
+    if (id != null) return id;
+    final seg = Uri.tryParse(url)?.pathSegments ?? const <String>[];
+    if (seg.isEmpty) return null;
+    final last = seg.last;
+    return last.endsWith('.jpg') ? last.substring(0, last.length - 4) : null;
+  }
+
+  @override
+  List<Object?> get props => [url, capturedAt];
+}
+
 final class HostCard extends Equatable {
   const HostCard({
     required this.userId,
@@ -33,6 +66,7 @@ final class HostCard extends Equatable {
     this.city,
     this.age,
     this.isVerified = false,
+    this.arrivalPhoto,
   });
 
   final String userId;
@@ -52,6 +86,9 @@ final class HostCard extends Equatable {
   final int? age;
   final bool isVerified;
 
+  /// Optional photo from the current online session (null when none).
+  final HostArrivalPhoto? arrivalPhoto;
+
   HostAvailability get status => HostAvailability.parse(availability);
 
   @override
@@ -66,6 +103,7 @@ final class HostCard extends Equatable {
     city,
     age,
     isVerified,
+    arrivalPhoto,
   ];
 }
 

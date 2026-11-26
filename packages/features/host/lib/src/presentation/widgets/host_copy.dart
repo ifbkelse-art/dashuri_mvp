@@ -17,6 +17,15 @@ String hostFailureMessage(Failure failure) => switch (failure.code) {
   'in_call' => "You can't change availability during a call.",
   'rate_outside_level_limits' =>
     'That rate is above the limit for your level. Choose a lower rate.',
+  'rate_below_minimum' => 'The minimum rate is 500 Diamonds per minute.',
+  'verification_required_for_rate' =>
+    'Rates above 3,000 Diamonds per minute need an active Verified Host status.',
+  'verification_not_allowed' =>
+    'Your verification is already in progress or decided.',
+  'storage_not_configured' || 'storage_unavailable' =>
+    "Uploads aren't available right now. Please try again later.",
+  'too_many_uploads' =>
+    'You have too many unsent uploads. Submit them or try again later.',
   'profile_text_rejected' =>
     "Your name or bio can't include phone numbers, links, handles or blocked words.",
   'photo_limit_reached' => "You've reached the maximum of 6 photos.",

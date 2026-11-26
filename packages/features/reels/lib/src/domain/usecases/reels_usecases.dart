@@ -177,6 +177,8 @@ class UploadReel
     final ticket = await _r.createUpload(
       caption: i.caption,
       durationMs: i.durationMs,
+      sizeBytes: i.video.bytes.length,
+      contentType: i.video.contentType,
       language: i.language,
       idempotencyKey: i.idempotencyKey,
     );
@@ -188,9 +190,17 @@ class UploadReel
           uploadUrl: value.uploadUrl,
           bytes: i.video.bytes,
           contentType: i.video.contentType,
+          headers: value.uploadHeaders,
           onProgress: i.onProgress,
         );
-        return up.map((_) => value.reel);
+        if (up case Err(:final failure)) return Err(failure);
+        // Best effort: if this fails the server's reconcile job still finds
+        // the file, and the upload page keeps polling the reel's status.
+        final done = await _r.completeUpload(value.reel.id);
+        return Success(switch (done) {
+          Success(:final value) => value,
+          Err() => value.reel,
+        });
     }
   }
 }

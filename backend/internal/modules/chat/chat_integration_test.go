@@ -4,6 +4,7 @@ package chat_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -20,14 +21,21 @@ import (
 )
 
 type recorder struct {
-	mu     sync.Mutex
-	events []string
+	mu       sync.Mutex
+	events   []string
+	payloads []map[string]any
 }
 
 func (r *recorder) Publish(_ context.Context, ch, ev string, payload any) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.events = append(r.events, ch+" "+ev+" "+payload.(map[string]string)["conversation_id"])
+	// Decode as the client does (JSON), whatever Go type was published.
+	raw, _ := json.Marshal(payload)
+	var m map[string]any
+	_ = json.Unmarshal(raw, &m)
+	conv, _ := m["conversation_id"].(string)
+	r.events = append(r.events, ch+" "+ev+" "+conv)
+	r.payloads = append(r.payloads, m)
 	return nil
 }
 
@@ -76,6 +84,12 @@ func TestChatFlowPrivacyAndBlocks(t *testing.T) {
 	}
 	if len(rec.events) != 3 || rec.events[0] != "user:"+b+" chat.message "+conv.Id || len(pushed) != 3 {
 		t.Fatalf("events %v pushed %v", rec.events, pushed)
+	}
+	// The hint carries the message itself, so the recipient can show it
+	// without a second request.
+	if msg, ok := rec.payloads[0]["message"].(map[string]any); !ok || msg["body"] != "hello" ||
+		msg["sender_id"] != a || msg["conversation_id"] != conv.Id || msg["read_by_peer"] != false {
+		t.Fatalf("hint payload: %v", rec.payloads[0])
 	}
 	_, err = s.SendMessage(ctx, pa, conv.Id, chat.SendMessageRequest{Body: "pay me at arjun@okicici"})
 	if code(err) != "message_rejected" || apperr.As(err).Fields["body"] != "contact_details" {

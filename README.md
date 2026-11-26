@@ -11,6 +11,9 @@ A paid one-to-one video marketplace for India (Android first). This repository h
 | Know the business rules | `docs/business-model-report.md` (v0.3, Part C has the latest founder decisions) and `docs/discovery-log.md` |
 | See the money model | `docs/architecture/financial-ledger-design.md` |
 | See the API | `api/openapi/dashuri.v1.yaml`, `docs/architecture/api-contracts.md` |
+| Know host pricing and the Verified Host status | `docs/mvp/VERIFIED_HOST_AND_PRICING.md`, ADR-014 |
+| Know virtual gifts (flagged off) | `docs/gifts/VIRTUAL_GIFTS.md`, ADR-015 |
+| Know the host online session (Host Home) and arrival photo | `docs/host/HOST_HOME_SESSION_AND_ARRIVAL_PHOTO.md`, ADR-015 |
 
 ## Requirements
 
@@ -37,6 +40,8 @@ supabase start && supabase db reset   # full local Supabase with migrations (Doc
 
 ```text
 apps/mobile/            Flutter app (composition root: bootstrap, DI, router; no pages yet)
+apps/admin/             Staff web console (React + Vite): host approvals, Verified Host review,
+                        photos, reports, appeals, finance. See apps/admin/README.md
 packages/               core, network, supabase, storage, navigation, design_system, lints
 packages/features/      auth, profile, discovery, free_call, video_call, chat, wallet,
                         purchases, host, safety, notifications, settings

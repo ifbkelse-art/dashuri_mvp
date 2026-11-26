@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -22,6 +23,9 @@ import (
 type ChatRepo struct {
 	Pool           *pgxpool.Pool
 	MessageContext bool
+	// Gifts reads chat.messages.kind and the gift of gift messages
+	// (migration 20261126000200).
+	Gifts bool
 }
 
 // contextExpr selects a message's context ("chat" when not recorded).
@@ -129,14 +133,19 @@ func (r ChatRepo) ConversationPeer(ctx context.Context, conversationID, userID s
 
 // $1 is always the viewing user.
 func (r ChatRepo) conversationSelect() string {
-	return strings.NewReplacer("{{ctx}}", r.contextExpr("m"), "{{inchat}}", r.inChat("m")).Replace(idConversationSelectTmpl)
+	kind := `'text'`
+	if r.Gifts {
+		kind = `m.kind`
+	}
+	return strings.NewReplacer("{{ctx}}", r.contextExpr("m"), "{{inchat}}", r.inChat("m"), "{{kind}}", kind).Replace(idConversationSelectTmpl)
 }
 
 const idConversationSelectTmpl = `
 	select c.id, peer.id, coalesce(pp.display_name, ''),
 	       (select ph.storage_path from identity.profile_photos ph
 	         where ph.user_id = peer.id and ph.status = 'approved' order by ph.position, ph.created_at limit 1),
-	       c.updated_at, lm.id, lm.sender_id, lm.body, lm.sent_at, lm.context,
+	       exists (select 1 from hosting.hosts vh where vh.user_id = peer.id and vh.verification_status = 'verified'),
+	       c.updated_at, lm.id, lm.sender_id, lm.body, lm.sent_at, lm.context, lm.kind,
 	       (select count(*) from chat.messages m
 	         where m.conversation_id = c.id and m.sender_id <> $1 and m.removed_at is null
 	           and m.sent_at > coalesce(rm.last_read_at, '-infinity'::timestamptz) and {{inchat}})
@@ -145,21 +154,21 @@ const idConversationSelectTmpl = `
 	  left join identity.profiles pp on pp.user_id = peer.id
 	  left join chat.read_markers rm on rm.conversation_id = c.id and rm.user_id = $1
 	  left join lateral (
-	    select m.id, m.sender_id, m.body, m.sent_at, {{ctx}} as context from chat.messages m
+	    select m.id, m.sender_id, m.body, m.sent_at, {{ctx}} as context, {{kind}} as kind from chat.messages m
 	     where m.conversation_id = c.id and m.removed_at is null and {{inchat}}
 	     order by m.sent_at desc, m.id desc limit 1) lm on true
 	 where (c.user_a = $1 or c.user_b = $1)`
 
 func idScanConversation(row pgx.Row) (chat.ConversationRow, error) {
 	var c chat.ConversationRow
-	var mID, mSender, mBody, mCtx *string
+	var mID, mSender, mBody, mCtx, mKind *string
 	var mAt *time.Time
-	if err := row.Scan(&c.ID, &c.PeerID, &c.PeerName, &c.PeerPhoto, &c.UpdatedAt, &mID, &mSender, &mBody, &mAt, &mCtx, &c.Unread); err != nil {
+	if err := row.Scan(&c.ID, &c.PeerID, &c.PeerName, &c.PeerPhoto, &c.PeerVerified, &c.UpdatedAt, &mID, &mSender, &mBody, &mAt, &mCtx, &mKind, &c.Unread); err != nil {
 		return c, err
 	}
 	if mID != nil {
 		c.LastMessage = &chat.ChatMessage{Id: *mID, ConversationId: c.ID, SenderId: idDeref(mSender), Body: idDeref(mBody),
-			SentAt: *mAt, Context: idDeref(mCtx)}
+			SentAt: *mAt, Context: idDeref(mCtx), Kind: idDeref(mKind)}
 	}
 	return c, nil
 }
@@ -204,11 +213,30 @@ func (r ChatRepo) messageColumns(viewer string) string {
 	       (m.sender_id = ` + viewer + ` and exists (
 	          select 1 from chat.read_markers pr
 	           where pr.conversation_id = m.conversation_id and pr.user_id <> ` + viewer + `
-	             and pr.last_read_at >= m.sent_at))`
+	             and pr.last_read_at >= m.sent_at)), ` + r.giftColumns("m")
+}
+
+// giftColumns: the message kind and, for gift messages, the gift's public
+// details as JSON.
+func (r ChatRepo) giftColumns(alias string) string {
+	if !r.Gifts {
+		return `'text', null::json`
+	}
+	return alias + `.kind, (select json_build_object('gift_transaction_id', gt.id, 'gift_id', gt.gift_id,
+	          'gift_name', gt.gift_name, 'emoji', gt.emoji, 'tier', gt.tier, 'diamond_value', gt.diamond_price)
+	     from gifts.transactions gt where gt.id = ` + alias + `.gift_transaction_id)`
 }
 
 func scanMessage(row pgx.Row, m *chat.ChatMessage) error {
-	return row.Scan(&m.Id, &m.ConversationId, &m.SenderId, &m.Body, &m.SentAt, &m.Context, &m.ReadByPeer)
+	var gift []byte
+	if err := row.Scan(&m.Id, &m.ConversationId, &m.SenderId, &m.Body, &m.SentAt, &m.Context, &m.ReadByPeer, &m.Kind, &gift); err != nil {
+		return err
+	}
+	if len(gift) > 0 {
+		m.Gift = &chat.GiftMessageInfo{}
+		return json.Unmarshal(gift, m.Gift)
+	}
+	return nil
 }
 
 func (r ChatRepo) ListMessages(ctx context.Context, conversationID, viewerID string, callID *string, after *chat.Cursor, limit int) ([]chat.ChatMessage, error) {

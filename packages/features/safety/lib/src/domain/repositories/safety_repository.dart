@@ -15,6 +15,9 @@ abstract interface class SafetyRepository {
     required String? callId,
     required String? details,
     required IdempotencyKey idempotencyKey,
+    // The reported host's arrival photo (2026-11-26), when the report is
+    // about it.
+    String? arrivalPhotoId,
   });
 
   Future<Result<BlockedUser>> blockUser({

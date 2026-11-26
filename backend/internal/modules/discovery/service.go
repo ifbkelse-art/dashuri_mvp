@@ -48,6 +48,7 @@ func (s *Service) ListAvailableHosts(ctx context.Context, p auth.Principal, in L
 	}
 	rows, err := repo.ListHosts(ctx, ListQuery{
 		ViewerID: p.UserID, Language: in.Language, CityID: in.CityID, Sort: in.Sort, After: after, Limit: in.Limit + 1,
+		Verification: in.Verification, VerifiedBoost: s.deps.VerifiedBoostXP,
 	})
 	if err != nil {
 		return Page[HostCard]{}, apperr.Internal(err)
@@ -56,15 +57,55 @@ func (s *Service) ListAvailableHosts(ctx context.Context, p auth.Principal, in L
 	if len(rows) > in.Limit {
 		rows = rows[:in.Limit]
 		last := rows[len(rows)-1]
-		k1, k2 := SortKeys(in.Sort, last)
+		k1, k2 := RankKeys(in.Sort, last, s.deps.VerifiedBoostXP)
 		next := Cursor{Sort: in.Sort, K1: k1, K2: k2, ID: last.UserID}.Encode()
 		page.NextCursor = &next
 	}
 	photos := s.sign(ctx, rows)
+	arrivals := s.signArrival(ctx, rows)
 	for _, h := range rows {
-		page.Items = append(page.Items, s.card(h, photos))
+		c := s.card(h, photos)
+		c.ArrivalPhoto = arrivalOf(h, arrivals)
+		page.Items = append(page.Items, c)
 	}
 	return page, nil
+}
+
+// ArrivalPhotoTTL is the lifetime of signed arrival-photo URLs (short: the
+// photo is only current while the host stays online).
+const ArrivalPhotoTTL = 15 * time.Minute
+
+func (s *Service) signArrival(ctx context.Context, rows []HostRow) map[string]string {
+	if s.deps.ArrivalPhotos == nil {
+		return nil
+	}
+	var paths []string
+	for _, h := range rows {
+		if h.ArrivalPhotoPath != nil && Availability(h) != "offline" {
+			paths = append(paths, *h.ArrivalPhotoPath)
+		}
+	}
+	if len(paths) == 0 {
+		return nil
+	}
+	return s.deps.ArrivalPhotos.SignRead(ctx, paths, ArrivalPhotoTTL)
+}
+
+// arrivalOf is the card's arrival photo: only for an online or busy host
+// whose current session photo could be signed.
+func arrivalOf(h HostRow, urls map[string]string) *ArrivalPhoto {
+	if h.ArrivalPhotoPath == nil || h.ArrivalCapturedAt == nil || Availability(h) == "offline" {
+		return nil
+	}
+	u, ok := urls[*h.ArrivalPhotoPath]
+	if !ok {
+		return nil
+	}
+	id := ""
+	if h.ArrivalPhotoID != nil {
+		id = *h.ArrivalPhotoID
+	}
+	return &ArrivalPhoto{PhotoId: id, Url: u, CapturedAt: h.ArrivalCapturedAt.UTC()}
 }
 
 // GetHost: GET /v1/discovery/hosts/{userId} — host detail, also offline.
@@ -92,6 +133,7 @@ func (s *Service) GetHost(ctx context.Context, p auth.Principal, userID string) 
 		photos = s.deps.Photos.SignRead(ctx, paths, PhotoTTL)
 	}
 	d := HostDetail{HostCard: s.card(h, photos), Bio: h.Bio, PhotoUrls: []string{}}
+	d.ArrivalPhoto = arrivalOf(h, s.signArrival(ctx, []HostRow{h}))
 	for _, p := range paths {
 		if u, ok := photos[p]; ok {
 			d.PhotoUrls = append(d.PhotoUrls, u)
@@ -130,10 +172,15 @@ func (s *Service) sign(ctx context.Context, rows []HostRow) map[string]string {
 }
 
 func (s *Service) card(h HostRow, photos map[string]string) HostCard {
+	level := s.deps.Rules.LevelForXP(h.LifetimeXP)
 	c := HostCard{
-		UserId: h.UserID, DisplayName: h.DisplayName, Languages: h.Languages,
-		Level: s.deps.Rules.LevelForXP(h.LifetimeXP), RatePerMinute: h.RatePerMinute,
-		City: h.City, IsVerified: h.KYCApproved, Availability: Availability(h),
+		UserId: h.UserID, DisplayName: h.DisplayName, Languages: h.Languages, Level: level,
+		// Discovery exposes the price the next call will use: the stored
+		// rate within current eligibility (the same cap call creation applies).
+		RatePerMinute: h.RatePerMinute, City: h.City, IsVerified: h.Verified, Availability: Availability(h),
+	}
+	if s.deps.Rules.LevelRateStep > 0 {
+		c.RatePerMinute = s.deps.Rules.CapRate(h.RatePerMinute, level, h.Verified)
 	}
 	if c.Languages == nil {
 		c.Languages = []string{}

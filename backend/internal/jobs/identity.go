@@ -102,6 +102,7 @@ func deleteOne(ctx context.Context, env wiring.Env, requestID, userID string) (s
 			`delete from identity.profile_photos where user_id = $1`,
 			`delete from notify.devices where user_id = $1`,
 			`update identity.consents set analytics = false, marketing = false, updated_at = now() where user_id = $1`,
+			`select set_config('dashuri.offline_reason', 'host_ineligible', true), $1::uuid`,
 			`update hosting.hosts set is_available = false, free_call_opt_in = false where user_id = $1`,
 			`update identity.accounts set status = 'deleted', deleted_at = now(), date_of_birth = null where id = $1`,
 		}

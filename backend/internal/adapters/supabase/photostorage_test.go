@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -82,5 +83,41 @@ func TestPhotoStorageSigning(t *testing.T) {
 	}
 	if m := bad.SignRead(ctx, []string{"u1/a.jpg"}, time.Hour); len(m) != 0 {
 		t.Fatal("failed signing must yield no urls")
+	}
+}
+
+func TestDownloadAndPut(t *testing.T) {
+	var gotPut []byte
+	var upsert, ctype string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer key" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/storage/v1/object/b/u1/p.jpg":
+			_, _ = w.Write([]byte("0123456789"))
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusBadRequest)
+		case r.Method == http.MethodPut:
+			gotPut, _ = io.ReadAll(r.Body)
+			upsert, ctype = r.Header.Get("x-upsert"), r.Header.Get("Content-Type")
+			_, _ = w.Write([]byte(`{"Key":"b/u1/p.jpg"}`))
+		}
+	}))
+	defer srv.Close()
+	s := PhotoStorage{BaseURL: srv.URL, APIKey: "key", Bucket: "b"}
+	ctx := context.Background()
+	if b, err := s.Download(ctx, "u1/p.jpg", 10); err != nil || string(b) != "0123456789" {
+		t.Fatalf("download %q %v", b, err)
+	}
+	if _, err := s.Download(ctx, "u1/p.jpg", 9); !errors.Is(err, ErrObjectTooLarge) {
+		t.Fatalf("want too large, got %v", err)
+	}
+	if _, err := s.Download(ctx, "u1/missing.jpg", 10); !errors.Is(err, ErrObjectNotFound) {
+		t.Fatalf("want not found, got %v", err)
+	}
+	if err := s.Put(ctx, "u1/p.jpg", "image/jpeg", []byte("abc")); err != nil || string(gotPut) != "abc" || upsert != "true" || ctype != "image/jpeg" {
+		t.Fatalf("put %q %s %s %v", gotPut, upsert, ctype, err)
 	}
 }

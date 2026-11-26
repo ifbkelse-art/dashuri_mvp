@@ -1,0 +1,12 @@
+supabase/migrations/20261123000100_reels_experiment.sql
+backend/internal/modules/reels
+backend/internal/modules/reelsrank
+backend/internal/adapters/mux
+backend/internal/adapters/postgres/reels_repo.go
+backend/internal/adapters/sightengine/reels_frames.go
+backend/internal/adapters/sightengine/reels_frames_test.go
+backend/internal/app/wire_reels.go
+backend/internal/jobs/reels.go
+packages/features/reels
+apps/mobile/lib/app/platform/device_video_picker.dart
+apps/mobile/test/router/reels_flag_test.dart

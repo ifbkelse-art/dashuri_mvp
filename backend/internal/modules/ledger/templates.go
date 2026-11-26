@@ -177,3 +177,48 @@ func Adjustment(proposalID string, account AccountRef, amount int64, reason, pro
 		Metadata: map[string]string{"reason": reason, "proposed_by": proposedBy, "approved_by": approvedBy},
 	}, nil
 }
+
+// GiftCharge is the server-computed outcome of one virtual gift: the
+// catalogue price split across the customer's buckets (promotional first,
+// like calls) and the host's Beans from the versioned economy rule set.
+type GiftCharge struct {
+	GiftTransactionID, CallID, CustomerID, HostID, GiftID string
+	FromPromotional                                       int64
+	FromPurchased                                         int64
+	HostBeans                                             int64
+	RuleSetVersion                                        string
+	At                                                    time.Time
+}
+
+var ErrInvalidGiftCharge = errors.New("ledger: invalid gift charge")
+
+// GiftSend moves the gift's Diamonds to consumption and credits the host's
+// Beans into the 7-day hold, exactly like a call settlement but keyed per
+// gift transaction (key gift_send:<gift transaction id>), so a retried send
+// can never charge or credit twice.
+func GiftSend(c GiftCharge) (Entry, error) {
+	total := c.FromPromotional + c.FromPurchased
+	if total <= 0 || c.FromPromotional < 0 || c.FromPurchased < 0 || c.HostBeans < 0 ||
+		c.GiftTransactionID == "" || c.CustomerID == "" || c.HostID == "" || c.CustomerID == c.HostID {
+		return Entry{}, ErrInvalidGiftCharge
+	}
+	var ps []Posting
+	if c.FromPromotional > 0 {
+		ps = append(ps, Posting{User(c.CustomerID, UserDiamondPromotional), Diamond, -c.FromPromotional})
+	}
+	if c.FromPurchased > 0 {
+		ps = append(ps, Posting{User(c.CustomerID, UserDiamondPurchased), Diamond, -c.FromPurchased})
+	}
+	ps = append(ps, Posting{System(SystemDiamondConsumed), Diamond, total})
+	if c.HostBeans > 0 {
+		ps = append(ps,
+			Posting{System(SystemBeanIssued), Bean, -c.HostBeans},
+			Posting{User(c.HostID, UserBeanHeld), Bean, c.HostBeans},
+		)
+	}
+	return Entry{
+		Type: EntryGiftSend, IdempotencyKey: "gift_send:" + c.GiftTransactionID, RuleSetVersion: c.RuleSetVersion,
+		Reference: c.GiftTransactionID, OccurredAt: c.At, Postings: ps,
+		Metadata: map[string]string{"customer_id": c.CustomerID, "host_id": c.HostID, "call_id": c.CallID, "gift_id": c.GiftID},
+	}, nil
+}

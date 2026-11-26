@@ -313,3 +313,70 @@ Future<bool> showConfirmDialog(
   );
   return result ?? false;
 }
+
+/// The Verified Host badge: a shield with a check (founder spec 2026-11-23).
+/// Shown only for an ACTIVE Verified Host, everywhere a host appears
+/// (discovery cards, host profile, search results, incoming call, call
+/// screen, chat). [compact] shows the shield alone (cards, lists, call
+/// overlays); otherwise the shield and "Verified Host" in a pill.
+/// [onMedia] draws a light shield for use over video or photos.
+class VerifiedHostBadge extends StatelessWidget {
+  const VerifiedHostBadge({
+    super.key,
+    this.compact = false,
+    this.size = 18,
+    this.onMedia = false,
+  });
+
+  final bool compact;
+  final double size;
+  final bool onMedia;
+
+  static const label = 'Verified Host';
+  static const icon = Icons.verified_user_rounded;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = DashuriColors.of(context).info;
+    if (compact) {
+      return Tooltip(
+        message: label,
+        child: Icon(
+          icon,
+          size: size,
+          color: onMedia ? Colors.white : t.icon,
+          semanticLabel: label,
+          shadows: onMedia
+              ? const [Shadow(blurRadius: 4, color: Colors.black54)]
+              : null,
+        ),
+      );
+    }
+    return Semantics(
+      label: label,
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: t.container,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: size - 2, color: t.onContainer),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: t.onContainer),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

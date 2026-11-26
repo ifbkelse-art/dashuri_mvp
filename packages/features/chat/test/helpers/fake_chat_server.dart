@@ -25,10 +25,18 @@ final class FakeChatServer {
   final _msgCall = <String, String>{}; // message id -> call id (session)
   final _endedCalls = <String>{};
   final _hints =
-      StreamController<({String to, String type, String conv})>.broadcast();
+      StreamController<
+        ({String to, String type, String conv, ChatHintMessage? msg})
+      >.broadcast();
 
   /// Simulates a dead realtime connection: hints are dropped.
   bool realtimeDown = false;
+
+  /// Older server: `chat.message` hints carry only the conversation id.
+  bool hintsWithoutMessages = false;
+
+  /// While set, message-list requests wait for it (a slow API round trip).
+  Completer<void>? listGate;
 
   /// The next send is stored, but the response is lost (network drop after
   /// commit). The client must retry with the same key.
@@ -59,6 +67,39 @@ final class FakeChatServer {
     }
   }
 
+  /// The Go gifts module committed a gift: one server-written gift line in
+  /// the call's session (sent by the customer), announced to BOTH users;
+  /// [deliveries] repeats the hint to simulate duplicate realtime delivery.
+  ChatMessage serverGift({
+    required String customer,
+    required String host,
+    required String callId,
+    required String body,
+    int deliveries = 1,
+  }) {
+    final conv = _convs.entries
+        .firstWhere(
+          (e) => _pairKey(e.value.a, e.value.b) == _pairKey(customer, host),
+        )
+        .key;
+    final m = ChatMessage(
+      id: 'gift${_messages.values.fold(0, (n, l) => n + l.length) + 1}',
+      conversationId: conv,
+      senderId: customer,
+      body: body,
+      sentAt: _tick(),
+      context: MessageContext.call,
+      isGift: true,
+    );
+    (_messages[conv] ??= []).add(m);
+    _msgCall[m.id] = callId;
+    for (var i = 0; i < deliveries; i++) {
+      _emit(host, 'chat.message', conv, ChatHintMessage(m, callId: callId));
+      _emit(customer, 'chat.message', conv, ChatHintMessage(m, callId: callId));
+    }
+    return m;
+  }
+
   /// Normal-Chat visibility: not a session message of a live call.
   bool _inChat(ChatMessage m) {
     final call = _msgCall[m.id];
@@ -81,8 +122,15 @@ final class FakeChatServer {
     return null;
   }
 
-  void _emit(String to, String type, String conv) {
-    if (!realtimeDown) _hints.add((to: to, type: type, conv: conv));
+  void _emit(String to, String type, String conv, [ChatHintMessage? msg]) {
+    if (!realtimeDown) {
+      _hints.add((
+        to: to,
+        type: type,
+        conv: conv,
+        msg: hintsWithoutMessages ? null : msg,
+      ));
+    }
   }
 
   Future<void> dispose() => _hints.close();
@@ -148,6 +196,8 @@ final class _UserRepo implements ChatRepository {
     required PageRequest page,
     String? callId,
   }) async {
+    final gate = _s.listGate;
+    if (gate != null) await gate.future;
     final peer = _s._peer(conversationId, _me);
     if (peer == null) return const Err(NotFoundFailure());
     final peerRead = _s._readAt['$conversationId|$peer'];
@@ -161,6 +211,7 @@ final class _UserRepo implements ChatRepository {
             body: m.body,
             sentAt: m.sentAt,
             context: m.context,
+            isGift: m.isGift,
             readByPeer:
                 m.senderId == _me &&
                 peerRead != null &&
@@ -204,7 +255,12 @@ final class _UserRepo implements ChatRepository {
     if (callId != null) _s._msgCall[m.id] = callId;
     _s._replay['$_me|${idempotencyKey.value}'] = m;
     _s._readAt['$conversationId|$_me'] = m.sentAt;
-    _s._emit(peer, 'chat.message', conversationId);
+    _s._emit(
+      peer,
+      'chat.message',
+      conversationId,
+      ChatHintMessage(m, callId: callId),
+    );
     if (_s.loseNextSendResponse) {
       _s.loseNextSendResponse = false;
       return const Err(NetworkFailure());
@@ -241,6 +297,11 @@ final class _UserRepo implements ChatRepository {
   Stream<String> readHints() => _for('chat.read');
 
   @override
+  Stream<ChatHintMessage> chatHintMessages() => _s._hints.stream
+      .where((h) => h.to == _me && h.type == 'chat.message' && h.msg != null)
+      .map((h) => h.msg!);
+
+  @override
   Future<Result<MessagingPrivacy>> getMessagingPrivacy() async =>
       const Success(MessagingPrivacy(whoCanMessage: 'everyone'));
 
@@ -270,6 +331,7 @@ ConversationCubit cubitFor(
     listConversations: ListConversations(repo),
     watchHints: WatchChatHints(repo),
     watchReadHints: WatchReadHints(repo),
+    watchHintMessages: WatchChatHintMessages(repo),
     currentUserId: GetCurrentUserId(repo),
     conversationId: conversationId ?? newConversationId,
     peerUserId: peerUserId,

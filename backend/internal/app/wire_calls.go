@@ -32,7 +32,7 @@ func BuildCalls(env wiring.Env) *calls.Service {
 		// In-call session chat joins normal Chat when the call ends (by
 		// phase, server-side); this only nudges open Chat screens.
 		sessions := chat.NewService(chat.Deps{
-			Repo:           postgres.ChatRepo{Pool: env.Pool, MessageContext: env.Config.ChatMessageContextEnabled},
+			Repo:           postgres.ChatRepo{Pool: env.Pool, MessageContext: env.Config.ChatMessageContextEnabled, Gifts: env.Config.GiftsEnabled},
 			Realtime:       env.Realtime,
 			MessageContext: env.Config.ChatMessageContextEnabled,
 		})

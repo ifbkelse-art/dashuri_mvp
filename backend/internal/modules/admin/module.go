@@ -18,6 +18,8 @@ type Deps struct {
 	Rules          economy.Rules
 	Clock          clock.Clock
 	PayoutsEnabled bool // PAYOUTS_ENABLED (R3-7)
+	// Console is the read model for the admin web console (nil → 503).
+	Console ConsoleRepository
 }
 
 // Reconciliation is the raw result of a reconciliation run.

@@ -14,7 +14,7 @@ func wireChat(env wiring.Env) *chat.Service {
 	d := chat.Deps{Realtime: env.Realtime, Photos: profilePhotoStorage(env),
 		MessageContext: env.Config.ChatMessageContextEnabled} // EXPERIMENT: unified/in-call chat
 	if env.Pool != nil {
-		d.Repo = postgres.ChatRepo{Pool: env.Pool, MessageContext: env.Config.ChatMessageContextEnabled}
+		d.Repo = postgres.ChatRepo{Pool: env.Pool, MessageContext: env.Config.ChatMessageContextEnabled, Gifts: env.Config.GiftsEnabled}
 		notifier := wireNotifier(env)
 		d.Push = func(ctx context.Context, recipientID, conversationID string) {
 			// Data-light push: no message text leaves the server in a push.

@@ -34,6 +34,8 @@ abstract final class RoutePaths {
       '/wallet/checkout/:productId'; // W03/W04 (Play sheet or Cashfree)
   static const paymentResult = '/wallet/payment/:orderId'; // W05–W07
   static const transactions = '/wallet/transactions'; // W08
+  static const giftsSent =
+      '/wallet/gifts'; // customer gift history (2026-11-26)
   static const transactionDetail = '/wallet/transactions/:entryId'; // W09
   static const editProfile = '/me/edit'; // S02
   static const settings = '/settings'; // S03
@@ -59,6 +61,8 @@ abstract final class RoutePaths {
   static const hostAgreement = '/host/agreement'; // H06
   static const hostProfileSetup = '/host/profile-setup'; // H09
   static const hostRate = '/host/rate'; // H10
+  static const hostVerifiedHost =
+      '/host/verified-host'; // Verified Host (2026-11-23)
 
   // Host shell tabs (FL06).
   static const hostDashboard = '/host'; // H11–H13
@@ -72,8 +76,12 @@ abstract final class RoutePaths {
   static const hostPayoutMethod = '/host/payout-method'; // H20
   static const hostSettings = '/host/settings'; // H24
 
+  // Gifts received (2026-11-26); the summary lives on Host Home.
+  static const hostGifts = '/host/gifts'; // received gifts history
+
   // EXPERIMENT — Dashuri Reels (registered only when DASHURI_REELS_ENABLED).
   static const reels = '/reels'; // customer-shell tab: vertical feed
+  static const hostReels = '/host/reels'; // host-shell tab: the same feed
   static const reelDetail = '/reels/watch/:reelId'; // one reel
   static const reelCreator =
       '/reels/creators/:userId'; // creator profile ("me" = own)

@@ -81,8 +81,9 @@ func (r CallsRepo) Peers(ctx context.Context, ids []string) (map[string]calls.Pe
 		return out, nil
 	}
 	rows, err := r.Pool.Query(ctx, `
-		select a.id, coalesce(p.display_name, '')
+		select a.id, coalesce(p.display_name, ''), coalesce(h.verification_status = 'verified', false)
 		  from identity.accounts a left join identity.profiles p on p.user_id = a.id
+		  left join hosting.hosts h on h.user_id = a.id
 		 where a.id = any($1::uuid[])`, ids)
 	if err != nil {
 		return nil, err
@@ -90,7 +91,7 @@ func (r CallsRepo) Peers(ctx context.Context, ids []string) (map[string]calls.Pe
 	defer rows.Close()
 	for rows.Next() {
 		var p calls.Peer
-		if err := rows.Scan(&p.UserID, &p.DisplayName); err != nil {
+		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.IsVerified); err != nil {
 			return nil, err
 		}
 		out[p.UserID] = p
@@ -161,15 +162,20 @@ func (t callsTx) LockCall(id string) (calls.Call, error) {
 func (t callsTx) LockHost(hostID string) (calls.HostForCall, error) {
 	var h calls.HostForCall
 	err := t.tx.QueryRow(t.ctx, `
-		select h.state, h.is_available, h.rate_per_minute, a.status, a.age_eligible
+		select h.state, h.is_available, h.rate_per_minute, a.status, a.age_eligible,
+		       h.verification_status = 'verified', `+idLifetimeXP("h.user_id")+`
 		  from hosting.hosts h join identity.accounts a on a.id = h.user_id
 		 where h.user_id = $1 for update of h`, hostID).
-		Scan(&h.State, &h.Available, &h.RatePerMinute, &h.AccountStatus, &h.AgeEligible)
+		Scan(&h.State, &h.Available, &h.RatePerMinute, &h.AccountStatus, &h.AgeEligible, &h.Verified, &h.LifetimeXP)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return h, nil
 	}
 	h.Exists = err == nil
 	return h, err
+}
+
+func (t callsTx) CapHostRate(hostID string, from, to int64, reason string) error {
+	return capHostRate(t.ctx, t.tx, hostID, from, to, "system:calls", reason)
 }
 
 func (t callsTx) Blocked(a, b string) (bool, error) { return callsBlockedEitherWay(t.ctx, t.tx, a, b) }

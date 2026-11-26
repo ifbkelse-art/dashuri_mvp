@@ -42,6 +42,17 @@ func (r SafetyRepo) CreateReport(ctx context.Context, n safety.NewReport) (safet
 			n.ReporterID, nullIfEmptyTarget(n.TargetID), n.Category, n.CallID, n.Details, n.Priority).Scan(&rec.ReportId, &rec.Status); err != nil {
 			return err
 		}
+		if n.ArrivalPhotoID != nil && n.TargetID != "" {
+			// Linked only when the photo is the reported host's own; the
+			// purge job keeps a reported photo while the report is open.
+			if _, err := tx.Exec(ctx, `
+				update safety.reports set arrival_photo_id = ap.id
+				  from hosting.arrival_photos ap
+				 where safety.reports.id = $1 and ap.id = $2::uuid and ap.host_id = $3::uuid`,
+				rec.ReportId, *n.ArrivalPhotoID, n.TargetID); err != nil {
+				return err
+			}
+		}
 		return idAudit(ctx, tx, n.ReporterID, "safety.report_created", rec.ReportId, map[string]any{
 			"category": n.Category, "priority": n.Priority, "with_call": n.CallID != nil,
 		})

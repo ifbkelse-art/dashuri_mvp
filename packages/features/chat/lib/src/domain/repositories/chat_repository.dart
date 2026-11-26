@@ -50,4 +50,9 @@ abstract interface class ChatRepository {
 
   /// Conversation ids from `chat.read` hints (the peer read my messages).
   Stream<String> readHints();
+
+  /// Messages carried inside `chat.message` hints (servers since
+  /// 2026-11-23), so a new message shows without a second request. Hints
+  /// without a message add nothing here; [chatHints] still fires for them.
+  Stream<ChatHintMessage> chatHintMessages();
 }

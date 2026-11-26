@@ -26,6 +26,7 @@ final class ChatBubble extends Equatable {
     this.status = BubbleStatus.sent,
     this.serverId,
     this.context = MessageContext.chat,
+    this.isGift = false,
   });
 
   factory ChatBubble.fromMessage(ChatMessage m, {required String? myUserId}) =>
@@ -36,6 +37,7 @@ final class ChatBubble extends Equatable {
         sentAt: m.sentAt,
         mine: m.senderId == myUserId,
         context: m.context,
+        isGift: m.isGift,
       );
 
   /// Server id for sent messages; the idempotency key for local ones.
@@ -49,6 +51,9 @@ final class ChatBubble extends Equatable {
   /// Sent from the inbox or during a video call (metadata only).
   final MessageContext context;
 
+  /// A server-written gift line (shown as a centred event, not a bubble).
+  final bool isGift;
+
   ChatBubble withStatus(BubbleStatus s) => ChatBubble(
     localId: localId,
     serverId: serverId,
@@ -57,6 +62,7 @@ final class ChatBubble extends Equatable {
     mine: mine,
     status: s,
     context: context,
+    isGift: isGift,
   );
 
   @override
@@ -68,6 +74,7 @@ final class ChatBubble extends Equatable {
     mine,
     status,
     context,
+    isGift,
   ];
 }
 
@@ -78,6 +85,7 @@ final class ConversationState extends Equatable {
     this.peerUserId,
     this.peerName,
     this.peerPhotoUrl,
+    this.peerIsVerified = false,
     this.bubbles = const [],
     this.olderCursor,
     this.loadingOlder = false,
@@ -97,6 +105,9 @@ final class ConversationState extends Equatable {
   final String? peerUserId;
   final String? peerName;
   final String? peerPhotoUrl;
+
+  /// The peer is an ACTIVE Verified Host (badge in the header).
+  final bool peerIsVerified;
 
   /// Oldest first.
   final List<ChatBubble> bubbles;
@@ -145,6 +156,7 @@ final class ConversationState extends Equatable {
     String? peerUserId,
     String? peerName,
     String? peerPhotoUrl,
+    bool? peerIsVerified,
     List<ChatBubble>? bubbles,
     String? Function()? olderCursor,
     bool? loadingOlder,
@@ -161,6 +173,7 @@ final class ConversationState extends Equatable {
     peerUserId: peerUserId ?? this.peerUserId,
     peerName: peerName ?? this.peerName,
     peerPhotoUrl: peerPhotoUrl ?? this.peerPhotoUrl,
+    peerIsVerified: peerIsVerified ?? this.peerIsVerified,
     bubbles: bubbles ?? this.bubbles,
     olderCursor: olderCursor != null ? olderCursor() : this.olderCursor,
     loadingOlder: loadingOlder ?? this.loadingOlder,
@@ -180,6 +193,7 @@ final class ConversationState extends Equatable {
     peerUserId,
     peerName,
     peerPhotoUrl,
+    peerIsVerified,
     bubbles,
     olderCursor,
     loadingOlder,

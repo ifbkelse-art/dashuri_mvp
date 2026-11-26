@@ -47,6 +47,28 @@ func (s *Service) repo() (Repository, error) {
 
 func (s *Service) providerReady() bool { return s.deps.Provider != nil && s.deps.Provider.Configured() }
 
+// providerFor returns the configured provider that stores reels of the
+// given provider name (the upload provider or a legacy one), or nil.
+func (s *Service) providerFor(name string) VideoProvider {
+	for _, p := range append([]VideoProvider{s.deps.Provider}, s.deps.Legacy...) {
+		if p != nil && p.Name() == name && p.Configured() {
+			return p
+		}
+	}
+	return nil
+}
+
+// providerNamed is providerFor without the Configured check (webhooks
+// answer 503 rather than 404 for a known but unconfigured provider).
+func (s *Service) providerNamed(name string) VideoProvider {
+	for _, p := range append([]VideoProvider{s.deps.Provider}, s.deps.Legacy...) {
+		if p != nil && p.Name() == name {
+			return p
+		}
+	}
+	return nil
+}
+
 // gate: every Reels endpoint is 18+ (same rule as discovery and calls).
 func gate(p auth.Principal) error {
 	if !p.AgeEligible {
@@ -80,11 +102,15 @@ func gateWrite(p auth.Principal) error {
 // Config: GET /v1/reels/config — lets the app hide upload when the provider
 // is not configured instead of failing after the user records a video.
 func (s *Service) Config() ReelsConfig {
-	return ReelsConfig{
+	cfg := ReelsConfig{
 		Enabled: s.deps.Enabled, UploadsAvailable: s.deps.Enabled && s.deps.Repo != nil && s.providerReady(),
 		MinDurationMs: MinDurationMs, MaxDurationMs: MaxDurationMs, MaxCaption: MaxCaptionRunes,
-		DailyUploadLimit: DailyUploadLimit, MaxUploadBytes: MaxUploadBytes,
+		DailyUploadLimit: DailyUploadLimit, MaxUploadBytes: MaxUploadBytes, UploadContentTypes: UploadContentTypes,
 	}
+	if s.deps.Provider != nil {
+		cfg.VideoProvider = s.deps.Provider.Name()
+	}
+	return cfg
 }
 
 // ---------------------------------------------------------------- mapping
@@ -137,13 +163,16 @@ func (s *Service) toReels(ctx context.Context, viewerID string, rows []VideoRow,
 			reel.RejectionCode = r.RejectionCode
 		}
 		canWatch := r.Status == "published" || (mine && r.Status != "deleted") || review
-		if canWatch && r.PlaybackID != nil && s.providerReady() {
+		if prov := s.providerFor(r.Provider); canWatch && r.PlaybackID != nil && prov != nil {
 			ttl := PlaybackTTL
 			if review {
 				ttl = ReviewPlaybackTTL
 			}
-			if pb, err := s.deps.Provider.Playback(*r.PlaybackID, ttl); err == nil {
-				reel.Playback = &PlaybackInfo{HlsUrl: pb.HLSURL, ThumbnailUrl: pb.ThumbnailURL, ExpiresAt: pb.ExpiresAt}
+			if pb, err := prov.Playback(*r.PlaybackID, ttl); err == nil {
+				reel.Playback = &PlaybackInfo{Url: pb.URL, Format: pb.Format, ThumbnailUrl: pb.ThumbnailURL, ExpiresAt: pb.ExpiresAt}
+				if pb.Format == FormatHLS {
+					reel.Playback.HlsUrl = pb.URL // pre-R2 app builds read hls_url
+				}
 			} else {
 				slog.WarnContext(ctx, "reels playback signing failed", "err", err)
 			}
@@ -299,7 +328,18 @@ func (s *Service) CreateUpload(ctx context.Context, p auth.Principal, in CreateU
 		return UploadTicket{}, apperr.Unavailable("video_provider_not_configured", "video hosting is not configured on this server")
 	}
 	id := newUUID()
-	sess, err := s.deps.Provider.CreateUpload(ctx, id)
+	req := UploadRequest{Passthrough: id}
+	if in.SizeBytes != nil {
+		req.SizeBytes = *in.SizeBytes
+	}
+	if in.ContentType != nil {
+		req.ContentType = *in.ContentType
+	}
+	sess, err := s.deps.Provider.CreateUpload(ctx, req)
+	var me *MediaError
+	if errors.As(err, &me) { // the provider needs a declared size/type
+		return UploadTicket{}, validationError(map[string]string{me.Code: "required"})
+	}
 	if err != nil {
 		return UploadTicket{}, apperr.Unavailable("video_provider_unavailable", "the video provider did not accept the upload; try again")
 	}
@@ -323,7 +363,57 @@ func (s *Service) CreateUpload(ctx context.Context, p auth.Principal, in CreateU
 	if err != nil {
 		return UploadTicket{}, internal(err)
 	}
-	return UploadTicket{Reel: s.toReels(ctx, p.UserID, []VideoRow{row}, false)[0], UploadUrl: sess.URL, ExpiresAt: sess.ExpiresAt}, nil
+	headers := sess.Headers
+	if headers == nil {
+		headers = map[string]string{}
+	}
+	return UploadTicket{Reel: s.toReels(ctx, p.UserID, []VideoRow{row}, false)[0], UploadUrl: sess.URL, UploadHeaders: headers, ExpiresAt: sess.ExpiresAt}, nil
+}
+
+// CompleteUpload: POST /v1/reels/{id}/upload-complete — the creator says the
+// PUT finished. The server checks the storage itself (never trusts the
+// call) and moves awaiting_upload → processing so reels-process-media
+// picks it up on its next run. Idempotent; a missing file is 409 and the
+// reel stays awaiting_upload (the app may retry the PUT). Mux reels don't
+// need it (webhooks) but it is harmless for them.
+func (s *Service) CompleteUpload(ctx context.Context, p auth.Principal, id string) (Reel, error) {
+	if err := gateHost(p); err != nil {
+		return Reel{}, err
+	}
+	if !isUUID(id) {
+		return Reel{}, notFound()
+	}
+	repo, err := s.repo()
+	if err != nil {
+		return Reel{}, err
+	}
+	row, err := repo.Video(ctx, p.UserID, id)
+	if errors.Is(err, ErrNotFound) || (err == nil && (row.CreatorID != p.UserID || row.Status == "deleted")) {
+		return Reel{}, notFound()
+	}
+	if err != nil {
+		return Reel{}, internal(err)
+	}
+	if row.Status == "awaiting_upload" && row.ProviderUploadID != nil {
+		prov := s.providerFor(row.Provider)
+		if prov == nil {
+			return Reel{}, apperr.Unavailable("video_provider_not_configured", "video hosting is not configured on this server")
+		}
+		st, err := prov.UploadStatus(ctx, *row.ProviderUploadID)
+		if err != nil {
+			return Reel{}, apperr.Unavailable("video_provider_unavailable", "could not check the upload; try again")
+		}
+		if st.State != "asset_created" {
+			return Reel{}, apperr.Conflict("upload_not_received", "the video file has not arrived yet")
+		}
+		if err := repo.MarkProcessing(ctx, id, st.AssetID); err != nil {
+			return Reel{}, internal(err)
+		}
+		if row, err = repo.Video(ctx, p.UserID, id); err != nil {
+			return Reel{}, internal(err)
+		}
+	}
+	return s.toReels(ctx, p.UserID, []VideoRow{row}, false)[0], nil
 }
 
 // GetReel: GET /v1/reels/{id}. Others see published videos only; the

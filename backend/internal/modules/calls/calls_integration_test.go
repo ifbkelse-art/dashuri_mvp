@@ -20,6 +20,7 @@ import (
 	"dashuri/backend/internal/platform/apperr"
 	"dashuri/backend/internal/platform/auth"
 	"dashuri/backend/internal/platform/db"
+	"dashuri/backend/internal/testsupport/identitytest"
 	"dashuri/backend/internal/testsupport/pgtest"
 )
 
@@ -103,10 +104,12 @@ func (e env) host(t *testing.T, rate int64) string {
 	t.Helper()
 	id := pgtest.NewUser(t, e.admin, true, "customer", "host")
 	if _, err := e.admin.Exec(context.Background(), `insert into hosting.hosts
-		(user_id, state, kyc_state, rate_per_minute, is_available, last_heartbeat_at, free_call_opt_in)
-		values ($1, 'approved', 'approved', $2, true, now(), true)`, id, rate); err != nil {
+		(user_id, state, kyc_state, rate_per_minute, is_available, last_heartbeat_at, free_call_opt_in, verification_status)
+		values ($1, 'approved', 'approved', $2::bigint, true, now(), true, case when $2::bigint > 3000 then 'verified' else 'not_applied' end)`, id, rate); err != nil {
 		t.Fatal(err)
 	}
+	// Eligible for its price under the 2026-11-23 rules (level × 1,000).
+	identitytest.EligibleForRate(t, e.admin, id, rate)
 	return id
 }
 

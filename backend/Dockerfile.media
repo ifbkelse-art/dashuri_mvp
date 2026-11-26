@@ -1,0 +1,26 @@
+# Media worker image for the Reels pipeline (R2 + our own processing).
+# Same worker binary as backend/Dockerfile plus static ffmpeg/ffprobe, used
+# ONLY for the Cloud Run job `reels-process-media`. The API image stays
+# distroless without ffmpeg (smaller, less attack surface).
+#
+#   docker build -f Dockerfile.media -t dashuri-media-worker .
+#   docker run --rm --env-file .env dashuri-media-worker reels-process-media
+#
+# Not deployed. Cost notes: docs/reels/DASHURI_REELS_R2_MIGRATION.md §6.
+FROM golang:1.25 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/worker ./cmd/worker
+
+# Statically linked ffmpeg/ffprobe (pinned; includes libx264 and AAC).
+FROM mwader/static-ffmpeg:7.1 AS ffmpeg
+
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /app
+COPY --from=build /out/worker /app/worker
+COPY --from=ffmpeg /ffmpeg /ffprobe /usr/local/bin/
+ENV PATH=/usr/local/bin:/usr/bin:/bin TMPDIR=/tmp
+USER nonroot:nonroot
+ENTRYPOINT ["/app/worker"]

@@ -322,17 +322,17 @@ class _Info extends StatelessWidget {
                 tone: _availabilityTone(host),
                 dot: true,
               ),
-              FilledButton.icon(
-                onPressed: actions.onCallCta,
-                icon: Icon(
-                  host.isOnline ? Icons.videocam : Icons.person_outline,
+              // Only an online host gets a call button. The creator's name
+              // above already opens their profile, so offline hosts need no
+              // separate "View host profile" button.
+              if (host.isOnline)
+                FilledButton.icon(
+                  onPressed: actions.onCallCta,
+                  icon: const Icon(Icons.videocam),
+                  label: Text(
+                    'Video call · ${DashuriFormat.count(host.ratePerMinute)} Diamonds/min',
+                  ),
                 ),
-                label: Text(
-                  host.isOnline
-                      ? 'Video call · ${DashuriFormat.count(host.ratePerMinute)} Diamonds/min'
-                      : 'View host profile',
-                ),
-              ),
             ],
           ),
         ],

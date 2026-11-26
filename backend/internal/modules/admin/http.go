@@ -17,6 +17,7 @@ func Routes(mux *http.ServeMux, s *Service, mw routing.Stack) {
 	mux.Handle("POST /v1/admin/ledger/adjustments/{proposalId}/approve", mw.User(idempotency.Require(mw.Idempotency, auth.Require(s.handleApproveAdjustment, auth.RoleFinance, auth.RoleAdmin))))
 	mux.Handle("POST /v1/admin/ledger/adjustments/{proposalId}/reject", mw.User(idempotency.Require(mw.Idempotency, auth.Require(s.handleRejectAdjustment, auth.RoleFinance, auth.RoleAdmin))))
 	mux.Handle("POST /v1/admin/payout-cycles/{cycleId}/approve", mw.User(idempotency.Require(mw.Idempotency, auth.Require(s.handleApprovePayoutCycle, auth.RoleFinance))))
+	consoleRoutes(mux, s, mw)
 }
 
 func (s *Service) handleGetReconciliation(w http.ResponseWriter, r *http.Request) {

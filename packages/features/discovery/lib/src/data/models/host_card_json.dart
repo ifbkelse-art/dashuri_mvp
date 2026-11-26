@@ -22,7 +22,22 @@ HostCard hostCardFromJson(JsonMap json) => HostCard(
   city: cityFromJson(json['city']),
   age: (json['age'] as num?)?.toInt(),
   isVerified: json['is_verified'] as bool? ?? false,
+  arrivalPhoto: arrivalPhotoFromJson(json['arrival_photo']),
 );
+
+HostArrivalPhoto? arrivalPhotoFromJson(Object? json) {
+  if (json is! Map<String, Object?>) return null;
+  final url = json['url'], at = json['captured_at'];
+  if (url is! String || at is! String) return null;
+  final t = DateTime.tryParse(at);
+  return t == null
+      ? null
+      : HostArrivalPhoto(
+          url: url,
+          capturedAt: t.toUtc(),
+          id: json['photo_id'] as String?,
+        );
+}
 
 /// Host detail: HostCard + `bio` (+ optional `photo_urls`).
 HostProfile hostProfileFromJson(JsonMap json) => HostProfile(

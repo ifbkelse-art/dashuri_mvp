@@ -64,11 +64,9 @@ class HostProfileTabPage extends StatelessWidget {
                   runSpacing: DashuriTokens.space2,
                   alignment: WrapAlignment.center,
                   children: [
-                    if (host.kycApproved)
-                      const StatusTag(
-                        label: 'Verified host',
-                        tone: StatusTone.success,
-                      ),
+                    // The Verified Host badge is the premium status, not
+                    // the hosting KYC (2026-11-23).
+                    if (host.isVerified) const VerifiedHostBadge(),
                     StatusTag(
                       label: 'Level ${profile.level}',
                       tone: StatusTone.neutral,

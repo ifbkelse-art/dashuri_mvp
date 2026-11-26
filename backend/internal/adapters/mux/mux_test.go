@@ -46,7 +46,7 @@ func TestUnconfiguredWithoutCredentials(t *testing.T) {
 	if err != nil || c.Configured() {
 		t.Fatalf("empty config must be unconfigured without error: %v", err)
 	}
-	if _, err := c.CreateUpload(t.Context(), "x"); !errors.Is(err, reels.ErrProviderNotConfigured) {
+	if _, err := c.CreateUpload(t.Context(), reels.UploadRequest{Passthrough: "x"}); !errors.Is(err, reels.ErrProviderNotConfigured) {
 		t.Fatalf("got %v", err)
 	}
 	if _, err := c.Playback("p", time.Minute); !errors.Is(err, reels.ErrProviderNotConfigured) {
@@ -125,10 +125,10 @@ func TestSignedPlaybackTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(pb.HLSURL, "https://stream.mux.com/pb1.m3u8?token=") || !strings.HasPrefix(pb.ThumbnailURL, "https://image.mux.com/pb1/thumbnail.jpg?token=") {
-		t.Fatalf("urls: %s %s", pb.HLSURL, pb.ThumbnailURL)
+	if !strings.HasPrefix(pb.URL, "https://stream.mux.com/pb1.m3u8?token=") || !strings.HasPrefix(pb.ThumbnailURL, "https://image.mux.com/pb1/thumbnail.jpg?token=") {
+		t.Fatalf("urls: %s %s", pb.URL, pb.ThumbnailURL)
 	}
-	u, _ := url.Parse(pb.HLSURL)
+	u, _ := url.Parse(pb.URL)
 	tok, err := jwt.Parse(u.Query().Get("token"), func(tk *jwt.Token) (any, error) {
 		if tk.Header["kid"] != "kid1" {
 			return nil, errors.New("kid")
@@ -178,7 +178,7 @@ func TestRESTCalls(t *testing.T) {
 	defer srv.Close()
 	c, _ := New("id", "secret", "kid1", key, "whsec", srv.Client())
 	c.APIBase = srv.URL
-	up, err := c.CreateUpload(t.Context(), "video-1")
+	up, err := c.CreateUpload(t.Context(), reels.UploadRequest{Passthrough: "video-1"})
 	if err != nil || up.UploadID != "up1" || up.URL == "" {
 		t.Fatalf("upload %+v %v", up, err)
 	}

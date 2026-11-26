@@ -127,3 +127,20 @@ KYC vendor is unresolved: `POST /v1/host/kyc/sessions` uses the `KYCProvider` po
 
 `user:<id>`: `call.updated` (incoming ring for hosts), `chat.message` `{conversation_id}`, `wallet.updated`, `notification.created`.
 `call:<id>`: `call.updated`, `call.low_balance {seconds_remaining}`, `call.moderation_ended`.
+
+### 2.9 Verified Host and level pricing (2026-11-23, additive)
+
+Full rules: `docs/mvp/VERIFIED_HOST_AND_PRICING.md`, ADR-014.
+
+- `HostCard.is_verified` now means an **ACTIVE Verified Host**. It no longer means hosting KYC approved.
+- `GET /v1/discovery/hosts` gains `verification=all|verified|non_verified`.
+- `CallSession.peer` and `Conversation.peer` gain `is_verified`.
+- `HostStatus` gains the following. `max_rate_per_minute` is now the highest price this host may set **now**.
+  - `verification_status`, `is_verified`, `verification_note`;
+  - `level_max_rate_per_minute` (level × 1,000), `next_level_max_rate_per_minute`;
+  - `verified_rate_threshold` (3,000).
+- `PUT /v1/host/rate` errors:
+  - business rules: `rate_below_minimum`, `rate_outside_level_limits`, `verification_required_for_rate`;
+  - validation: `rate_per_minute: must_be_integer`.
+- New host endpoints: `GET /v1/host/verification`, `POST /v1/host/verification/evidence`, `POST /v1/host/verification/submissions` (Idempotency-Key).
+- New staff endpoints (moderator/admin): `GET /v1/admin/host-verifications`, `GET /v1/admin/hosts/{userId}/verification`, `POST /v1/admin/hosts/{userId}/verification/actions` (Idempotency-Key), `POST /v1/admin/hosts/{userId}/verification/evidence/{evidenceId}/access`.

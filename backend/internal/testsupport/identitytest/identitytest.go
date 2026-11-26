@@ -42,10 +42,29 @@ func Profile(t *testing.T, admin *pgxpool.Pool, userID, name string, languages [
 
 // Host makes the user an approved host. online sets is_available with a
 // fresh heartbeat.
+// The host is made eligible for rate under the 2026-11-23 pricing rules
+// (EligibleForRate).
 func Host(t *testing.T, admin *pgxpool.Pool, userID string, rate int64, online bool) {
 	t.Helper()
-	exec(t, admin, `insert into hosting.hosts (user_id, state, kyc_state, rate_per_minute, is_available, last_heartbeat_at, approved_at)
-		values ($1, 'approved', 'approved', $2, $3, case when $3 then now() end, now())`, userID, rate, online)
+	exec(t, admin, `insert into hosting.hosts (user_id, state, kyc_state, rate_per_minute, is_available, last_heartbeat_at, approved_at,
+		verification_status, verified_at)
+		values ($1, 'approved', 'approved', $2::bigint, $3, case when $3 then now() end, now(),
+		        case when $2::bigint > 3000 then 'verified' else 'not_applied' end, case when $2::bigint > 3000 then now() end)`, userID, rate, online)
+	EligibleForRate(t, admin, userID, rate)
+}
+
+// EligibleForRate gives a host the XP of the lowest level whose ceiling
+// (level × 1,000) covers rate, so fixtures priced above 1,000 D/min stay
+// valid under the pricing rules (call creation would otherwise cap them).
+// Rates above 3,000 also need verification_status = 'verified' on the row.
+func EligibleForRate(t *testing.T, admin *pgxpool.Pool, userID string, rate int64) {
+	t.Helper()
+	r := economy.Founder()
+	level := int((rate + r.LevelRateStep - 1) / r.LevelRateStep)
+	if level <= 1 {
+		return
+	}
+	XP(t, admin, userID, r.XPThresholds[level-1])
 }
 
 // Block inserts a block.

@@ -10,10 +10,11 @@ Migrations live in `supabase/migrations/` (Supabase CLI format) and are the only
 | `economy` | economy | rule_sets (append-only), diamond_packages |
 | `ledger` | ledger | accounts, balances, journal_entries, postings, diamond_reservations, xp_events, adjustment_proposals; view user_xp |
 | `commerce` | purchases | purchases, play_notifications |
-| `hosting` | hosts | hosts, kyc_sessions |
+| `hosting` | hosts | hosts, kyc_sessions, verification_applications, verification_evidence, online_sessions, arrival_photos (2026-11-26) |
+| `gifts` | gifts | catalogue (no deletes), price_changes (append-only), transactions (append-only) (2026-11-26) |
 | `freecall` | freecall | cards, host_daily_counts |
 | `calls` | calls | calls, media_events (append-only), settlements (append-only) |
-| `chat` | chat | conversations, messages |
+| `chat` | chat | conversations, messages (`kind` text/gift, `gift_transaction_id` unique), read_markers |
 | `safety` | safety / moderation | blocks, reports, enforcement_actions, appeals |
 | `moderation` | moderation | frame_checks, evidence |
 | `payouts` | payouts | beneficiaries, cycles, withdrawals |
@@ -60,7 +61,7 @@ The migrations create the service roles as NOLOGIN. LOGIN and passwords are set 
 
 ## Storage
 
-Private buckets: `profile-photos`, `moderation-evidence`. Uploads use signed upload URLs from `POST /v1/me/photos/upload-tickets`, and photos stay unlisted until moderated. Evidence is written only by the backend, encrypted at rest (Supabase default), with access logged in `audit.events` and retention set by legal advice.
+Private buckets: `profile-photos`, `moderation-evidence`, `host-arrival-photos` (optional per-session host selfie; validated and re-encoded by the API, purged by `purge-arrival-photos`; see `docs/host/HOST_HOME_SESSION_AND_ARRIVAL_PHOTO.md`), `host-verification-evidence` (Verified Host face video and ID images; signed URLs only, staff reads audited, purged by `purge-verification-evidence`; see `docs/mvp/VERIFIED_HOST_AND_PRICING.md`). Uploads use signed upload URLs from `POST /v1/me/photos/upload-tickets`, and photos stay unlisted until moderated. Evidence is written only by the backend, encrypted at rest (Supabase default), with access logged in `audit.events` and retention set by legal advice.
 
 ## Invariants enforced by the database
 
@@ -76,9 +77,16 @@ Private buckets: `profile-photos`, `moderation-evidence`. Uploads use signed upl
 | One active Diamond reservation per user | Partial unique index |
 | Purchase token credited once | `UNIQUE (purchase_token_hash)` |
 | Paid call rate 500–10,000 D/min; host rate in range | CHECK constraints |
+| Host rate above 3,000 D/min only for an active Verified Host | CHECK `rate_above_threshold_requires_verified` on `hosting.hosts` (the level ceiling, level × 1,000, is enforced by the API under the host row lock) |
+| One open Verified Host application per host; nobody decides their own | Partial unique index `one_open_verification_application`; CHECKs `reviewer_id <> host_id`, `decided_by <> host_id` |
 | Free calls ≤ 20 per host per day | CHECK on `freecall.host_daily_counts.count` |
 | One Free Call Card per phone and per device | UNIQUE `phone_hash`, `device_binding_hash` |
 | Manual adjustment needs two different people | CHECK `approved_by <> proposed_by` |
+| Available host ⇔ exactly one open online session | Trigger `hosting.sync_online_session` + partial unique index `online_sessions_one_open` |
+| One current arrival photo per session; JPEG only; ended photos never current again | Partial unique index `arrival_photos_one_current`; CHECKs; the trigger expires photos when the session ends |
+| A gift is charged once and never re-priced | `UNIQUE (sender_id, client_request_id)`, `UNIQUE (ledger_entry_id)`, CHECK split = price, append-only trigger on `gifts.transactions` |
+| One chat line per gift | `UNIQUE (gift_transaction_id)` on `chat.messages`; CHECK `kind = 'gift'` ⇔ gift id set, and only in a call session |
+| Gift price history kept; gifts never deleted | Append-only `gifts.price_changes`; delete trigger on `gifts.catalogue` |
 
 ## Migration organisation
 

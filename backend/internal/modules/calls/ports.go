@@ -81,6 +81,9 @@ type HostForCall struct {
 	RatePerMinute int64
 	AccountStatus string
 	AgeEligible   bool
+	// Pricing eligibility, read under the same lock (never from the client).
+	LifetimeXP int64
+	Verified   bool // ACTIVE Verified Host
 }
 
 // Reservation is a ledger.diamond_reservations row.
@@ -113,6 +116,8 @@ type Peer struct {
 	UserID      string  `json:"user_id"`
 	DisplayName string  `json:"display_name"`
 	PhotoURL    *string `json:"photo_url"`
+	// IsVerified: the peer is an ACTIVE Verified Host (badge on call screens).
+	IsVerified bool `json:"is_verified"`
 }
 
 // PeerPhotos resolves a signed URL of each user's first approved profile
@@ -149,6 +154,9 @@ type Repository interface {
 type Tx interface {
 	LockCall(id string) (Call, error)
 	LockHost(hostID string) (HostForCall, error)
+	// CapHostRate lowers the locked host's stored rate (audited
+	// host.rate_capped) when it exceeds current eligibility.
+	CapHostRate(hostID string, from, to int64, reason string) error
 	Blocked(a, b string) (bool, error)
 	InLiveCall(userID string) (bool, error)
 	// LockDiamonds locks the user's Diamond buckets (ascending account id)

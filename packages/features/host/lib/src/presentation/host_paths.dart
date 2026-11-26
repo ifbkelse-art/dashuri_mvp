@@ -14,6 +14,14 @@ abstract final class HostPaths {
   static const flowParam = 'flow';
   static const flowApply = 'apply';
 
+  /// Host Home query: `after=declined|missed|ended` shows a short notice
+  /// after a call ("You're still online").
+  static const afterParam = 'after';
+
+  /// Host Home after a call: the notice says how the call ended.
+  static String homeAfter(String how) =>
+      '${RoutePaths.hostDashboard}?$afterParam=$how';
+
   /// Query flag for viewing the host agreement without the accept action.
   static const viewParam = 'view';
 

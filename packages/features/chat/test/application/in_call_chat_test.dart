@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // EXPERIMENT — video-call session chat, client side. Each call has its own
 // session in the pair's one conversation; normal Chat gets it when the call
 // ends. Two users,
@@ -78,6 +80,44 @@ void main() {
     server.endCall(callId);
     await settle();
     expect(bodies(inbox), ['Can you hear me?']);
+  });
+
+  test('gift lines: shown once to both sides in the call, kept in normal '
+      'Chat after the call, in order with messages', () async {
+    final (c, h) = await bothInCall();
+    await c.send('Hello!');
+    await settle();
+    server.serverGift(
+      customer: customer,
+      host: host,
+      callId: callId,
+      body: '🌹 Asha sent Rose to Meera.',
+      deliveries: 3, // duplicate realtime delivery
+    );
+    await settle();
+    for (final side in [c, h]) {
+      expect(bodies(side), ['Hello!', '🌹 Asha sent Rose to Meera.']);
+      expect(side.state.bubbles.last.isGift, isTrue);
+    }
+    // Same in the hint-less fallback (a re-fetch must not duplicate it).
+    final conv = server.conversationOf(customer, host);
+    final inbox = cubitFor(
+      server,
+      host,
+      peerUserId: customer,
+      conversationId: conv,
+    );
+    addTearDown(inbox.close);
+    await inbox.start();
+    expect(
+      bodies(inbox),
+      isEmpty,
+      reason: 'session stays out of Chat while live',
+    );
+    server.endCall(callId);
+    await settle();
+    expect(bodies(inbox), ['Hello!', '🌹 Asha sent Rose to Meera.']);
+    expect(inbox.state.bubbles.where((b) => b.isGift), hasLength(1));
   });
 
   test('3+4: the session is isolated: normal-chat messages, even ones sent '
@@ -382,5 +422,60 @@ void main() {
     expect(mine.mine, isTrue);
     expect(theirs.mine, isFalse);
     expect(theirs.sentAt, mine.sentAt);
+  });
+
+  group('messages inside realtime hints', () {
+    test(
+      'a hinted message shows at once, before the API re-fetch returns',
+      () async {
+        final (c, h) = await bothInCall();
+        // Every message-list request now takes "forever" (slow network).
+        server.listGate = Completer<void>();
+        await c.send('Quick hello');
+        await settle();
+        expect(bodies(h), ['Quick hello'], reason: 'shown from the hint');
+        // The re-fetch then confirms it without a duplicate.
+        server.listGate!.complete();
+        server.listGate = null;
+        await settle();
+        expect(bodies(h), ['Quick hello']);
+      },
+    );
+
+    test('an open inbox does not show an in-call message during the call; '
+        'another call\'s panel does not either', () async {
+      final (c, _) = await bothInCall();
+      final conv = server.conversationOf(customer, host);
+      final hostInbox = cubitFor(
+        server,
+        host,
+        peerUserId: customer,
+        conversationId: conv,
+      );
+      addTearDown(hostInbox.close);
+      await hostInbox.start();
+      final otherCall = cubitFor(
+        server,
+        host,
+        peerUserId: customer,
+        callId: 'call-2',
+      );
+      addTearDown(otherCall.close);
+      await otherCall.start();
+
+      await c.send('Only for this call');
+      await settle();
+      expect(bodies(hostInbox), isEmpty);
+      expect(bodies(otherCall), isEmpty);
+    });
+
+    test('an older server (hint without the message) still delivers through '
+        'the re-fetch', () async {
+      server.hintsWithoutMessages = true;
+      final (c, h) = await bothInCall();
+      await c.send('Hello from an older server');
+      await settle();
+      expect(bodies(h), ['Hello from an older server']);
+    });
   });
 }

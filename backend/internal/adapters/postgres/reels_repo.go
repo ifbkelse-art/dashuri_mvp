@@ -196,11 +196,14 @@ func (r ReelsRepo) MarkReady(ctx context.Context, videoID string, a reels.AssetI
 	var status string
 	err := r.Pool.QueryRow(ctx, `update reels.videos set
 	     duration_ms = $2::int, aspect_ratio = nullif($3::text, ''), playback_id = nullif($4::text, ''),
+	     width = nullif($7::int, 0), height = nullif($8::int, 0), size_bytes = nullif($9::bigint, 0),
+	     video_storage_key = nullif($10::text, ''), thumbnail_storage_key = nullif($11::text, ''),
 	     status = case when status not in ('awaiting_upload','processing') then status
 	                   when $2::int < $5::int or $2::int > $6::int then 'failed' else 'pending_moderation' end,
 	     rejection_code = case when status in ('awaiting_upload','processing') and ($2::int < $5::int or $2::int > $6::int)
 	                   then 'duration_out_of_range' else rejection_code end
-	   where id = $1 returning status`, videoID, max(1, min(a.DurationMs, 61000)), a.AspectRatio, a.PlaybackID, minMs, maxMs).Scan(&status)
+	   where id = $1 returning status`, videoID, max(1, min(a.DurationMs, 61000)), a.AspectRatio, a.PlaybackID, minMs, maxMs,
+		a.Width, a.Height, a.SizeBytes, a.VideoKey, a.ThumbnailKey).Scan(&status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", reels.ErrNotFound
 	}
@@ -238,7 +241,7 @@ func (r ReelsRepo) StaleVideos(ctx context.Context, status string, olderThan tim
 
 func (r ReelsRepo) PurgeCandidates(ctx context.Context, now time.Time, limit int) ([]reels.VideoRow, error) {
 	// Account joins are not required here (deleted accounts must be purged too).
-	rows, err := r.Pool.Query(ctx, `select id, provider_asset_id from reels.videos
+	rows, err := r.Pool.Query(ctx, `select id, provider, provider_asset_id from reels.videos
 	   where media_purged_at is null and status in ('deleted','rejected','removed','failed')
 	     and (evidence_hold_until is null or evidence_hold_until <= $1)
 	     and (status in ('deleted','failed') or evidence_hold_until is not null)
@@ -251,7 +254,7 @@ func (r ReelsRepo) PurgeCandidates(ctx context.Context, now time.Time, limit int
 	var out []reels.VideoRow
 	for rows.Next() {
 		var v reels.VideoRow
-		if err := rows.Scan(&v.ID, &v.ProviderAssetID); err != nil {
+		if err := rows.Scan(&v.ID, &v.Provider, &v.ProviderAssetID); err != nil {
 			return nil, err
 		}
 		out = append(out, v)

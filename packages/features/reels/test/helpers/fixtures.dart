@@ -51,7 +51,7 @@ Reel reel(
   rejectionCode: rejection,
   createdAt: DateTime.utc(2026, 11, 22),
   playback: ReelPlayback(
-    hlsUrl: 'https://play.example/$id.m3u8',
+    url: 'https://play.example/$id/playback.mp4',
     thumbnailUrl: 'https://img.example/$id.jpg',
     expiresAt: DateTime.utc(2026, 11, 23),
   ),

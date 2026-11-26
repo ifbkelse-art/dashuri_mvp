@@ -2,17 +2,24 @@ import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
+import '../application/arrival_photo_cubit.dart';
 import '../application/host_application_cubit.dart';
 import '../application/host_calls_cubit.dart';
 import '../application/host_dashboard_cubit.dart';
 import '../application/host_earnings_cubit.dart';
+import '../application/host_gifts_cubit.dart';
 import '../application/host_payouts_cubit.dart';
 import '../application/host_profile_setup_cubit.dart';
 import '../application/host_profile_tab_cubit.dart';
 import '../application/host_rate_cubit.dart';
+import '../application/host_session_bloc.dart';
 import '../application/host_verification_cubit.dart';
 import '../application/host_withdraw_cubit.dart';
+import '../application/verified_host_cubit.dart';
+import '../di/host_module.dart';
+import '../domain/ports/arrival_camera.dart';
 import '../domain/ports/host_photo_picker.dart';
+import '../domain/ports/verification_media_picker.dart';
 import '../presentation/host_paths.dart';
 import '../presentation/pages/beans_explainer_page.dart';
 import '../presentation/pages/host_agreement_page.dart';
@@ -20,6 +27,7 @@ import '../presentation/pages/host_availability_page.dart';
 import '../presentation/pages/host_calls_page.dart';
 import '../presentation/pages/host_dashboard_page.dart';
 import '../presentation/pages/host_earnings_page.dart';
+import '../presentation/pages/host_gifts_page.dart';
 import '../presentation/pages/host_onboarding_page.dart';
 import '../presentation/pages/host_payout_history_page.dart';
 import '../presentation/pages/host_payout_method_page.dart';
@@ -29,6 +37,7 @@ import '../presentation/pages/host_rate_page.dart';
 import '../presentation/pages/host_settings_page.dart';
 import '../presentation/pages/host_verification_page.dart';
 import '../presentation/pages/host_withdraw_page.dart';
+import '../presentation/pages/verified_host_page.dart';
 
 /// Routes owned by the host feature.
 ///
@@ -57,10 +66,33 @@ final class HostRoutes implements TabFeatureRoutes {
   List<RouteBase> get tabRoutes => [
     GoRoute(
       path: RoutePaths.hostDashboard,
-      builder: (context, state) => BlocProvider(
-        create: (_) => _sl<HostDashboardCubit>()..load(),
-        child: const HostDashboardPage(),
-      ),
+      builder: (context, state) {
+        final arrival = _sl.isRegistered<ArrivalCamera>();
+        final gifts = _sl.isRegistered<HostGiftsEnabled>();
+        return MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (_) => _sl<HostDashboardCubit>()..load()),
+            // The online session (go online, duration, notices after a
+            // call, connection problems) lives on Host Home itself.
+            BlocProvider(
+              create: (_) => _sl<HostSessionBloc>()
+                ..add(
+                  HostSessionStarted(
+                    after: CallNotice.parse(
+                      state.uri.queryParameters[HostPaths.afterParam],
+                    ),
+                  ),
+                ),
+            ),
+            if (arrival) BlocProvider(create: (_) => _sl<ArrivalPhotoCubit>()),
+            if (gifts) BlocProvider(create: (_) => _sl<HostGiftsCubit>()),
+          ],
+          child: HostDashboardPage(
+            arrivalEnabled: arrival,
+            giftsEnabled: gifts,
+          ),
+        );
+      },
       routes: [
         GoRoute(
           path: 'availability',
@@ -144,6 +176,13 @@ final class HostRoutes implements TabFeatureRoutes {
       ),
     ),
     GoRoute(
+      path: RoutePaths.hostVerifiedHost,
+      builder: (context, state) => BlocProvider(
+        create: (_) => _sl<VerifiedHostCubit>()..load(),
+        child: VerifiedHostPage(picker: _optional<VerificationMediaPicker>()),
+      ),
+    ),
+    GoRoute(
       path: RoutePaths.hostWithdraw,
       builder: (context, state) => BlocProvider(
         create: (_) => _sl<HostWithdrawCubit>()..load(),
@@ -164,6 +203,13 @@ final class HostRoutes implements TabFeatureRoutes {
     GoRoute(
       path: RoutePaths.hostSettings,
       builder: (context, state) => const HostSettingsPage(),
+    ),
+    GoRoute(
+      path: RoutePaths.hostGifts,
+      builder: (context, state) => BlocProvider(
+        create: (_) => _sl<HostGiftsCubit>()..load(),
+        child: const HostGiftsPage(),
+      ),
     ),
   ];
 }

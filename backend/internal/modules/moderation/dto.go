@@ -12,6 +12,8 @@ type ModerationCase struct {
 	TargetUserId  string    `json:"target_user_id"`
 	CreatedAt     time.Time `json:"created_at"`
 	EvidenceCount int       `json:"evidence_count"`
+	// Details is the reporter's own text (staff-only queue; may be null).
+	Details *string `json:"details"`
 }
 
 type ModerationDecisionRequest struct {

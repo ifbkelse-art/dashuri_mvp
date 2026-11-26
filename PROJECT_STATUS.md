@@ -1,4 +1,4 @@
-# Dashuri MVP: project status (2026-11-22)
+# Dashuri MVP: project status (2026-11-23)
 
 **Working copy:** `~/Development/projects/dashuri_mvp`, with local git history of every step (`git log`).
 
@@ -29,10 +29,11 @@ Details and the API additions: `docs/mvp/MVP_DECISIONS_AND_CONTRACT.md`.
 | Location | Curated cities; nearest-city resolve; coordinates never stored | City picker (search / detect once) |
 | Safety | Reports (24 h call window), grievances, blocks, enforcement, appeals; nudity checks in the first 3 min (Sightengine); moderator queue and decisions | Age gate, report/block (V11–V13), blocked users, account status + appeal, safety-check chip |
 | Settings | Consents, messaging privacy, deletion (7-day grace + execution job), data export | S03–S10 |
-| Host | Application, manual KYC (moderator decision), availability + heartbeat, rate (level caps), earnings, withdrawals (503 while payouts are off) | H01–H25 |
+| Host | Application, manual KYC (moderator decision), availability + heartbeat, rate (500 to level × 1,000; above 3,000 only for an active Verified Host), earnings, withdrawals (503 while payouts are off) | H01–H25; price selector with the Verified Host CTA; dashboard Pricing card |
+| Verified Host (2026-11-23) | Separate premium status with a staff review workflow. Covers audit trail, private evidence bucket, purge job, price caps on revoke/suspend/level drop/call start, and DB CHECK. Discovery filter and ranking signal; `is_verified` on cards, call peer and chat peer | Badge everywhere a host appears; filter chips; application page (face video + ID). **Admin web app not built** (admin API only) |
 | Admin / finance | Reconciliation, dual-control adjustments (with conflict-of-interest checks), payout-cycle approval (disabled) | (no app UI, by design) |
 
-Scheduled jobs (12):
+Scheduled jobs (13):
 - settle-stale-calls
 - mark-offline-hosts
 - moderation-missing-frames
@@ -43,9 +44,93 @@ Scheduled jobs (12):
 - poll-voided-purchases
 - purge-expired-idempotency
 - execute-account-deletions
+- purge-verification-evidence (2026-11-23)
 - the remaining jobs listed by `go run ./cmd/worker`
 
+## Verified Host and level pricing (2026-11-23)
+
+Spec as built: `docs/mvp/VERIFIED_HOST_AND_PRICING.md`; decision: ADR-014; migration `20261123000300_verified_hosts_and_level_pricing.sql`.
+
+**Test results (2026-11-23):**
+- `scripts/validate.sh`: Dart format, analysis, dependency rules and all Flutter tests (21 packages, 1,259 tests) pass.
+- Go format, vet, `go test -race ./...` and the build pass.
+- Migrations and invariants pass: 17 invariants, 6 of them new.
+- Integration on real Postgres: `scripts/test-backend-integration.sh -race ./...` passes in all 31 packages.
+
+**Not yet applied to hosted environments.** The Supabase migration and the Cloud Run deploy wait for founder approval.
+
+**Behaviour changes:**
+- Existing prices above min(3,000, level × 1,000) are lowered by the migration, with audit rows.
+- `is_verified` now means Verified Host, not KYC approved.
+
+## Admin web console (2026-11-24)
+
+`apps/admin` (React + Vite + TypeScript) is the staff console that replaces hand-run SQL. It covers:
+- new-host activation, with the date of birth taken from the ID;
+- Verified Host review, with private evidence through audited 5-minute links;
+- photo review;
+- reports, nudity flags and appeals;
+- finance: reconciliation and two-person adjustments.
+
+Access is by role (`admin`, `moderator`, `finance`), and the server enforces it again. Setup, role grants and deployment: `apps/admin/README.md`.
+
+Backend additions, all additive:
+- **CORS:** allowed only for the origins in `ADMIN_ORIGINS` (off when empty; the mobile app is unaffected).
+- **Read-only staff views:** `GET /v1/admin/me`, `/users`, `/host-applications`, `/appeals`, `/ledger/adjustments`, `/audit`.
+- **Reports:** `details` added to the moderation queue.
+
+Tests:
+- 28 console tests;
+- 10 new Go unit tests (role matrix, CORS);
+- one new Postgres integration test that runs as `api_service`.
+
+Verified end to end against a local backend: approve and reject flows, the under-18 guard, the self-review and appeal-reviewer rules, and dual control. **Not deployed.** Firebase Hosting and a backend redeploy with `ADMIN_ORIGINS` are pending approval.
+
+## Host Home online session, arrival photo and virtual gifts (2026-11-26, revised 27 Nov)
+
+Built on `feat/calls-720p-and-app-icon`. **Uncommitted, not deployed.** The hosted migrations have not been applied. Everything new is behind flags that default to off; the online session on Host Home is client-only. The separate waiting room and its mini-games were removed on 27 Nov 2026.
+
+| Feature | Backend | App | Flags (default off) |
+|---|---|---|---|
+| Host Home online session | Online sessions: a trigger on `hosts.is_available`; `online_session` on `GET /v1/host` | Host Home: `HostSessionBloc` (explicit states), online duration, notices after a call, network banner, tip, safety reminders. No waiting room, no mini-games. | — |
+| Arrival photo | Private bucket. Ticket → upload → confirm (validate, re-encode, moderate). Expires on going offline. Purge job. Admin review. Discovery shows `arrival_photo`. Reports can reference it. | Optional prompt when going online (front camera only, preview, retake, skip). Card on Host Home. "Captured N minutes ago" on discovery cards and the profile, with Report photo. | `ARRIVAL_PHOTOS_ENABLED`, `DASHURI_ARRIVAL_PHOTOS_ENABLED`, `ARRIVAL_PHOTO_AUTO_APPROVE_UNSCANNED` |
+| Virtual gifts | `gifts` module. One atomic transaction: ledger `gift_send` + immutable gift + chat line. DB-level idempotency. Reservations protected. Admin catalogue with audited prices. Risk flags. | Gift control in place of camera-off (customer only), gift sheet, celebration queue/overlay (reduced motion, non-blocking), gift lines in chat, *Gifts sent* (wallet), *Gifts received* (host). | `GIFTS_ENABLED` (needs `CHAT_MESSAGE_CONTEXT_ENABLED`), `DASHURI_GIFTS_ENABLED` |
+
+**Financial boundary.** Gifts use the current versioned rule set (16,670 D → 10,000 Beans) with no gift-specific commission. **The 5:4 model is NOT activated** (still modelling-only).
+
+**Docs:**
+- `docs/gifts/VIRTUAL_GIFTS.md`
+- `docs/host/HOST_HOME_SESSION_AND_ARRIVAL_PHOTO.md`
+- ADR-015
+- the decision register (B-G1…B-G6)
+
+**Migrations:** `20261126000100_host_online_sessions_and_arrival_photos.sql`, `20261126000200_virtual_gifts.sql`. Activation order: migrations → backend → app.
+
+**Fix found during testing:** `postgres.AccountID` could fail with "no rows" when two transactions created the same ledger account concurrently. It now re-reads.
+
+**Test results (2026-11-26):**
+- Dart analysis (`--fatal-infos`): no issues. Dependency rules: OK.
+- `melos run test`: 21 packages, **1,363 tests, all passed**.
+- Go: `gofmt`, `go vet`, `go test -race ./...` and the build pass.
+- Migrations: **32 invariants pass** (15 new).
+- Go integration on real Postgres, as `api_service`, with `-race`: **all 35 packages pass**. That includes 13 new gift tests and 8 new arrival/session tests.
+- Admin console: 32 tests pass; typecheck clean.
+- `dart format --set-exit-if-changed` reports one file, `packages/features/purchases/test/data/purchases_data_test.dart`. It is unchanged from HEAD (pre-existing formatter drift), so it was left alone and `scripts/validate.sh` stops at its first step until that file is formatted.
+
+**Open founder decisions:**
+1. Activation.
+2. Gift conversion: confirm "same as calls".
+3. Whether promotional Diamonds can be gifted.
+4. Gift limits.
+5. Chargeback clawback of gift Beans.
+6. Play policy review.
+7. Sounds and artwork.
+8. Arrival-photo moderation path and retention.
+9. System camera vs an in-app camera plugin.
+
 ## Partially complete (by design or blocked externally)
+
+- **Verified Host review UI:** no admin web app. Reviewers use the admin API (`/v1/admin/host-verifications`, `/v1/admin/hosts/{id}/verification/*`). Evidence retention (90 days) and the consent text need legal review.
 
 - **Payouts:** withdrawals are recorded, but payouts are off (`PAYOUTS_ENABLED=false`, founder R3-7). There is no payout-provider adapter, because no provider has been chosen.
 - **KYC:** manual moderator review. A vendor adapter is needed later.

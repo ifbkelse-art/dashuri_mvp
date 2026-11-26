@@ -49,10 +49,12 @@ class ConversationCubit extends Cubit<ConversationState> {
     Conversation? known,
     DateTime Function()? now,
     WatchReadHints? watchReadHints,
+    WatchChatHintMessages? watchHintMessages,
     this.callId,
     Duration? pollInterval,
     bool visible = true,
   }) : _list = listMessages,
+       _watchHintMessages = watchHintMessages,
        _watchReadHints = watchReadHints,
        _pollInterval = pollInterval,
        _visible = visible,
@@ -76,6 +78,7 @@ class ConversationCubit extends Cubit<ConversationState> {
            peerUserId: known?.peerUserId ?? peerUserId,
            peerName: known?.peerDisplayName ?? peerName,
            peerPhotoUrl: known?.peerPhotoUrl,
+           peerIsVerified: known?.peerIsVerified ?? false,
          ),
        );
 
@@ -90,6 +93,8 @@ class ConversationCubit extends Cubit<ConversationState> {
   final Conversation? _known;
   final DateTime Function() _now;
   final WatchReadHints? _watchReadHints;
+  final WatchChatHintMessages? _watchHintMessages;
+  StreamSubscription<ChatHintMessage>? _hintMessages;
   final Duration? _pollInterval;
 
   /// The call this conversation is open in (in-call panel); null in the inbox.
@@ -147,6 +152,7 @@ class ConversationCubit extends Cubit<ConversationState> {
                   ? null
                   : value.peerDisplayName,
               peerPhotoUrl: value.peerPhotoUrl,
+              peerIsVerified: value.peerIsVerified,
             ),
           );
       }
@@ -158,6 +164,13 @@ class ConversationCubit extends Cubit<ConversationState> {
     _hints ??= _watchHints(
       const NoInput(),
     ).where((id) => id == state.conversationId).listen((_) => _refreshNewest());
+    // A hint that carries the message shows it immediately; the id hint
+    // below still re-fetches, which only confirms it (deduplicated by id).
+    _hintMessages ??= _watchHintMessages
+        ?.call(const NoInput())
+        .where((h) => h.message.conversationId == state.conversationId)
+        .where(_belongsHere)
+        .listen((h) => _onHintMessage(h.message));
     _readHints ??= _watchReadHints
         ?.call(const NoInput())
         .where((id) => id == state.conversationId)
@@ -213,6 +226,7 @@ class ConversationCubit extends Cubit<ConversationState> {
               peerUserId: c.peerUserId,
               peerName: c.peerDisplayName,
               peerPhotoUrl: c.peerPhotoUrl,
+              peerIsVerified: c.peerIsVerified,
             ),
           );
         }
@@ -252,6 +266,21 @@ class ConversationCubit extends Cubit<ConversationState> {
       ChatBubble.fromMessage(m, myUserId: _myUserId),
   ];
 
+  /// Same scope as the list endpoint: an in-call panel shows only its own
+  /// call's messages; the inbox shows a call's messages only after the call
+  /// ended (they then arrive through the re-fetch).
+  bool _belongsHere(ChatHintMessage h) => callId == null
+      ? h.message.context == MessageContext.chat
+      : h.callId == callId && h.message.context == MessageContext.call;
+
+  void _onHintMessage(ChatMessage m) {
+    final id = state.conversationId;
+    if (isClosed || id == null || state.status != ConversationStatus.ready) {
+      return;
+    }
+    if (_merge([m]) > 0 && _visible) unawaited(_markRead(id));
+  }
+
   /// A hint arrived: fetch the newest page and merge unseen messages.
   Future<void> _refreshNewest() async {
     final id = state.conversationId;
@@ -283,7 +312,13 @@ class ConversationCubit extends Cubit<ConversationState> {
     final readUpTo = _readUpTo(incoming);
     if (fresh.isEmpty) {
       if (readUpTo != state.peerReadUpTo) {
-        emit(state.copyWith(peerReadUpTo: readUpTo));
+        // A read receipt must not wipe a send error still on screen.
+        emit(
+          state.copyWith(
+            peerReadUpTo: readUpTo,
+            sendFailure: state.sendFailure,
+          ),
+        );
       }
       return 0;
     }
@@ -294,6 +329,8 @@ class ConversationCubit extends Cubit<ConversationState> {
       state.copyWith(
         bubbles: merged,
         peerReadUpTo: readUpTo,
+        // Incoming messages must not wipe a send error still on screen.
+        sendFailure: state.sendFailure,
         unseenCount: _visible ? 0 : state.unseenCount + fromPeer.length,
         latestUnseen: _visible || fromPeer.isEmpty ? null : () => fromPeer.last,
       ),
@@ -451,6 +488,7 @@ class ConversationCubit extends Cubit<ConversationState> {
   Future<void> close() async {
     _poll?.cancel();
     await _readHints?.cancel();
+    await _hintMessages?.cancel();
     await _hints?.cancel();
     return super.close();
   }

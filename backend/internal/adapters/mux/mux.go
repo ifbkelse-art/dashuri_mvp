@@ -176,7 +176,8 @@ func (a assetObj) info() reels.AssetInfo {
 	return out
 }
 
-func (c *Client) CreateUpload(ctx context.Context, passthrough string) (reels.UploadSession, error) {
+func (c *Client) CreateUpload(ctx context.Context, req reels.UploadRequest) (reels.UploadSession, error) {
+	passthrough := req.Passthrough
 	body := map[string]any{
 		"cors_origin": c.CORSOrigin,
 		"timeout":     int(UploadTimeout.Seconds()),
@@ -257,7 +258,8 @@ func (c *Client) Playback(playbackID string, ttl time.Duration) (reels.Playback,
 		return reels.Playback{}, err
 	}
 	return reels.Playback{
-		HLSURL:       StreamBase + "/" + playbackID + ".m3u8?token=" + vt,
+		URL:          StreamBase + "/" + playbackID + ".m3u8?token=" + vt,
+		Format:       reels.FormatHLS,
 		ThumbnailURL: ImageBase + "/" + playbackID + "/thumbnail.jpg?token=" + tt,
 		ExpiresAt:    exp,
 	}, nil

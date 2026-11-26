@@ -9,7 +9,14 @@ import '../domain/usecases/set_rate.dart';
 
 enum HostRateStatus { loading, loadFailed, ready, saving, saved }
 
-enum RateError { belowMinimum, abovePlatformMaximum, aboveLevelLimit }
+enum RateError {
+  belowMinimum,
+  abovePlatformMaximum,
+  aboveLevelLimit,
+
+  /// Above 3,000 D/min without an active Verified Host status.
+  requiresVerification,
+}
 
 final class HostRateState extends Equatable {
   const HostRateState({
@@ -28,7 +35,8 @@ final class HostRateState extends Equatable {
   final RateError? error;
   final Failure? failure;
 
-  /// Upper bound for this host: the level cap within the platform range.
+  /// Upper bound for this host now: the level cap, and 3,000 unless an
+  /// active Verified Host (server-provided `max_rate_per_minute`).
   int get limit => (host?.maxRatePerMinute ?? BeanRules.maxRate).clamp(
     BeanRules.minRate,
     BeanRules.maxRate,
@@ -37,6 +45,15 @@ final class HostRateState extends Equatable {
     BeanRules.minRate,
     BeanRules.maxRate,
   );
+
+  /// The level's own ceiling (level × 1,000).
+  int get levelLimit =>
+      (host?.levelMaxRatePerMinute ?? limit).clamp(limit, BeanRules.maxRate);
+  int get verifiedThreshold => host?.verifiedRateThreshold ?? 3000;
+  bool get isVerified => host?.isVerified ?? false;
+
+  /// Show "Become a Verified Host" (non-verified hosts only).
+  bool get showVerificationCta => host != null && !isVerified;
   int get beansPerMinute => BeanRules.beansPerMinute(rate);
   bool get isDirty => host != null && rate != host!.ratePerMinute;
 
@@ -44,8 +61,9 @@ final class HostRateState extends Equatable {
   List<Object?> get props => [status, host, rate, error, failure];
 }
 
-/// H10: choose a rate within 500–10,000 Diamonds/min and the level cap
-/// (PUT /v1/host/rate). Applies from the next call.
+/// H10: choose an integer rate (PUT /v1/host/rate). Founder rules
+/// 2026-11-23: minimum 500; maximum level × 1,000; above 3,000 only for an
+/// active Verified Host. Applies from the next call.
 final class HostRateCubit extends Cubit<HostRateState> {
   HostRateCubit(this._getHostStatus, this._setRate)
     : super(const HostRateState());
@@ -53,16 +71,31 @@ final class HostRateCubit extends Cubit<HostRateState> {
   final GetHostStatus _getHostStatus;
   final SetRate _setRate;
 
+  /// Client-side check for instant feedback only; the server decides.
   static RateError? validate(
     int rate, {
     required int floor,
     required int limit,
+    int? levelLimit,
+    int verifiedThreshold = 3000,
   }) {
     if (rate < BeanRules.minRate || rate < floor) return RateError.belowMinimum;
     if (rate > BeanRules.maxRate) return RateError.abovePlatformMaximum;
-    if (rate > limit) return RateError.aboveLevelLimit;
+    if (rate > limit) {
+      return rate > verifiedThreshold && rate <= (levelLimit ?? limit)
+          ? RateError.requiresVerification
+          : RateError.aboveLevelLimit;
+    }
     return null;
   }
+
+  RateError? _check(int rate) => validate(
+    rate,
+    floor: state.floor,
+    limit: state.limit,
+    levelLimit: state.levelLimit,
+    verifiedThreshold: state.verifiedThreshold,
+  );
 
   Future<void> load() async {
     emit(const HostRateState());
@@ -88,7 +121,7 @@ final class HostRateCubit extends Cubit<HostRateState> {
         status: HostRateStatus.ready,
         host: state.host,
         rate: rate,
-        error: validate(rate, floor: state.floor, limit: state.limit),
+        error: _check(rate),
       ),
     );
   }
@@ -110,7 +143,7 @@ final class HostRateCubit extends Cubit<HostRateState> {
   Future<void> save() async {
     final host = state.host;
     if (host == null || state.status == HostRateStatus.saving) return;
-    final error = validate(state.rate, floor: state.floor, limit: state.limit);
+    final error = _check(state.rate);
     if (error != null) {
       emit(
         HostRateState(
@@ -144,6 +177,25 @@ final class HostRateCubit extends Cubit<HostRateState> {
           rate: state.rate,
           error: RateError.aboveLevelLimit,
           failure: const BusinessRuleFailure(code: 'rate_outside_level_limits'),
+        ),
+      Err(
+        failure: BusinessRuleFailure(code: 'verification_required_for_rate'),
+      ) =>
+        HostRateState(
+          status: HostRateStatus.ready,
+          host: host,
+          rate: state.rate,
+          error: RateError.requiresVerification,
+          failure: const BusinessRuleFailure(
+            code: 'verification_required_for_rate',
+          ),
+        ),
+      Err(failure: BusinessRuleFailure(code: 'rate_below_minimum')) =>
+        HostRateState(
+          status: HostRateStatus.ready,
+          host: host,
+          rate: state.rate,
+          error: RateError.belowMinimum,
         ),
       Err(failure: ValidationFailure()) => HostRateState(
         status: HostRateStatus.ready,

@@ -18,6 +18,7 @@ class ReportUser
             String? callId,
             String? details,
             IdempotencyKey idempotencyKey,
+            String? arrivalPhotoId,
           })
         > {
   const ReportUser(this._repository);
@@ -32,6 +33,7 @@ class ReportUser
       String? callId,
       String? details,
       IdempotencyKey idempotencyKey,
+      String? arrivalPhotoId,
     })
     input,
   ) => _repository.reportUser(
@@ -40,5 +42,6 @@ class ReportUser
     callId: input.callId,
     details: input.details,
     idempotencyKey: input.idempotencyKey,
+    arrivalPhotoId: input.arrivalPhotoId,
   );
 }

@@ -90,7 +90,10 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
   registerAuthFeature(sl);
   sl
     ..registerLazySingleton<PhotoPicker>(DevicePhotoPicker.new)
-    ..registerLazySingleton<HostPhotoPicker>(DeviceHostPhotoPicker.new);
+    ..registerLazySingleton<HostPhotoPicker>(DeviceHostPhotoPicker.new)
+    ..registerLazySingleton<VerificationMediaPicker>(
+      DeviceVerificationMediaPicker.new,
+    );
   registerProfileFeature(sl);
   registerDiscoveryFeature(sl);
   registerFreeCallFeature(sl);
@@ -115,6 +118,21 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
   // default off). Same conversation as the inbox; see docs/chat.
   if (config.inCallChatEnabled) {
     sl.registerLazySingleton<InCallChat>(() => FeatureChatInCallChat(sl));
+  }
+
+  // Virtual gifts (DASHURI_GIFTS_ENABLED, default off; docs/gifts). The call
+  // screen, Host Home and the wallet look these up.
+  if (config.giftsEnabled) {
+    registerVideoCallGifts(sl);
+    sl
+      ..registerSingleton<HostGiftsEnabled>(const HostGiftsEnabled())
+      ..registerSingleton<WalletGiftsEnabled>(const WalletGiftsEnabled());
+  }
+
+  // Optional arrival photo when going online (DASHURI_ARRIVAL_PHOTOS_ENABLED,
+  // default off; docs/host). Camera only — never the gallery.
+  if (config.arrivalPhotosEnabled) {
+    sl.registerLazySingleton<ArrivalCamera>(DeviceArrivalCamera.new);
   }
 
   // UI/UX pass: after host approval, "Go to host home" re-reads the account

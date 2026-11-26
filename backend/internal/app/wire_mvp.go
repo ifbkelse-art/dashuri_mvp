@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	"dashuri/backend/internal/modules/gifts"
 	"dashuri/backend/internal/modules/location"
 	"dashuri/backend/internal/modules/reels"
 	"dashuri/backend/internal/platform/routing"
@@ -15,4 +16,5 @@ func mountMVPModules(mux *http.ServeMux, env wiring.Env, stack routing.Stack) {
 	_, _, _ = mux, env, stack
 	location.Routes(mux, wireLocation(env), stack) // BE-identity
 	reels.Routes(mux, BuildReels(env), stack)      // EXPERIMENT: Dashuri Reels (REELS_ENABLED)
+	gifts.Routes(mux, wireGifts(env), stack)       // Virtual gifts (GIFTS_ENABLED)
 }

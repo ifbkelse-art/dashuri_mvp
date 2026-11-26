@@ -82,3 +82,43 @@ func TestMissingKeyRejected(t *testing.T) {
 		t.Fatal("expected ErrMissingKey")
 	}
 }
+
+func TestGiftSendIsBalancedAndKeyedPerGift(t *testing.T) {
+	e, err := GiftSend(GiftCharge{GiftTransactionID: "g1", CallID: "c1", CustomerID: "u1", HostID: "h1", GiftID: "rose",
+		FromPromotional: 500, FromPurchased: 1000, HostBeans: 899, RuleSetVersion: "v1", At: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if e.IdempotencyKey != "gift_send:g1" || e.Type != EntryGiftSend || e.Reference != "g1" {
+		t.Fatalf("bad entry %+v", e)
+	}
+	var diamonds, beans int64
+	for _, p := range e.Postings {
+		if p.Account.UserID == "u1" {
+			diamonds += p.Amount
+		}
+		if p.Account.UserID == "h1" {
+			beans += p.Amount
+		}
+	}
+	if diamonds != -1500 || beans != 899 {
+		t.Fatalf("customer %d, host %d", diamonds, beans)
+	}
+}
+
+func TestGiftSendRejectsInvalid(t *testing.T) {
+	for _, c := range []GiftCharge{
+		{GiftTransactionID: "g", CustomerID: "u", HostID: "h"},                                         // nothing charged
+		{GiftTransactionID: "g", CustomerID: "u", HostID: "u", FromPurchased: 10},                      // self gift
+		{GiftTransactionID: "", CustomerID: "u", HostID: "h", FromPurchased: 10},                       // no id
+		{GiftTransactionID: "g", CustomerID: "u", HostID: "h", FromPurchased: 10, HostBeans: -1},       // negative beans
+		{GiftTransactionID: "g", CustomerID: "u", HostID: "h", FromPromotional: -5, FromPurchased: 10}, // negative split
+	} {
+		if _, err := GiftSend(c); !errors.Is(err, ErrInvalidGiftCharge) {
+			t.Fatalf("%+v: want ErrInvalidGiftCharge, got %v", c, err)
+		}
+	}
+}

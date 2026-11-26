@@ -97,6 +97,11 @@ func Describe(entryType, currency string, amount int64) string {
 			return "Call earnings (on hold for 7 days)"
 		}
 		return "Video call"
+	case ledger.EntryGiftSend:
+		if currency == string(ledger.Bean) {
+			return "Gift received (on hold for 7 days)"
+		}
+		return "Gift sent"
 	case ledger.EntryFreeCallCompensation:
 		return "Free Call Card earnings (on hold for 7 days)"
 	case ledger.EntryBeanRelease:

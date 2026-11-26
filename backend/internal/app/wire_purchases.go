@@ -23,7 +23,7 @@ func NewPurchasesService(env wiring.Env) *purchases.Service {
 		CashfreeEnabled: cfg.CashfreeEnabled, CashfreeReturnURL: cfg.CashfreeReturnURL,
 	}
 	if env.Pool != nil {
-		d.Repo = postgres.PurchasesRepo{Pool: env.Pool, Tx: env.Tx}
+		d.Repo = postgres.PurchasesRepo{Pool: env.Pool, Tx: env.Tx, Rules: env.Rules}
 	}
 	if env.Realtime != nil {
 		d.Events = env.Realtime

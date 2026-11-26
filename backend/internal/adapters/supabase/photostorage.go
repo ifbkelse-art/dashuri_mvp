@@ -181,3 +181,82 @@ func escapePath(p string) string {
 	}
 	return strings.Join(parts, "/")
 }
+
+// ErrObjectNotFound means the object does not exist (never uploaded).
+var ErrObjectNotFound = errors.New("supabase storage: object not found")
+
+// ErrObjectTooLarge means the object exceeds the caller's byte limit.
+var ErrObjectTooLarge = errors.New("supabase storage: object too large")
+
+// Download reads one object with the server key, refusing objects larger
+// than maxBytes. GET {SUPABASE_URL}/storage/v1/object/{bucket}/{path}
+func (s PhotoStorage) Download(ctx context.Context, path string, maxBytes int64) ([]byte, error) {
+	if !s.Configured() {
+		return nil, ErrStorageNotConfigured
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	endpoint := s.storageBase() + "/object/" + url.PathEscape(s.Bucket) + "/" + escapePath(path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("apikey", s.APIKey)
+	req.Header.Set("Authorization", "Bearer "+s.APIKey)
+	res, err := s.client().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("supabase storage: %w", err)
+	}
+	defer res.Body.Close()
+	switch {
+	case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusBadRequest:
+		// Storage answers 400 "Object not found" for missing objects.
+		return nil, ErrObjectNotFound
+	case res.StatusCode >= 300:
+		return nil, fmt.Errorf("supabase storage: status %d", res.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(res.Body, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, ErrObjectTooLarge
+	}
+	return data, nil
+}
+
+// Put writes (overwrites) one object with the server key.
+// PUT {SUPABASE_URL}/storage/v1/object/{bucket}/{path} with x-upsert.
+func (s PhotoStorage) Put(ctx context.Context, path, contentType string, data []byte) error {
+	if !s.Configured() {
+		return ErrStorageNotConfigured
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	endpoint := s.storageBase() + "/object/" + url.PathEscape(s.Bucket) + "/" + escapePath(path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("apikey", s.APIKey)
+	req.Header.Set("Authorization", "Bearer "+s.APIKey)
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("x-upsert", "true")
+	res, err := s.client().Do(req)
+	if err != nil {
+		return fmt.Errorf("supabase storage: %w", err)
+	}
+	defer res.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
+	if res.StatusCode >= 300 {
+		return fmt.Errorf("supabase storage: status %d", res.StatusCode)
+	}
+	return nil
+}
+
+func (s PhotoStorage) client() *http.Client {
+	if s.Client == nil {
+		return http.DefaultClient
+	}
+	return s.Client
+}

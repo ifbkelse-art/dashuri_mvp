@@ -5,6 +5,8 @@ import 'package:get_it/get_it.dart';
 import '../application/call_bloc.dart';
 import '../application/call_history_cubit.dart';
 import '../application/call_summary_cubit.dart';
+import '../application/gift_celebration_cubit.dart';
+import '../application/gift_sheet_bloc.dart';
 import '../application/pre_call_cubit.dart';
 import '../di/video_call_module.dart';
 import '../presentation/in_call_chat.dart';
@@ -60,15 +62,27 @@ final class VideoCallRoutes implements FeatureRoutes {
         final callId = state.pathParameters['callId']!;
         final incoming = state.uri.queryParameters['incoming'] == '1';
         final kit = _sl<CallMediaKit>();
-        return BlocProvider(
-          create: (_) =>
-              createCallBloc(_sl, kit)
-                ..add(CallAttachRequested(callId, incoming: incoming)),
-          child: CallPage(
-            views: kit.views,
-            // EXPERIMENT: in-call chat, when the app registered it.
-            chat: _sl.isRegistered<InCallChat>() ? _sl<InCallChat>() : null,
-          ),
+        // Virtual gifts, when the app registered them (DASHURI_GIFTS_ENABLED).
+        final gifts = _sl.isRegistered<VideoCallGifts>();
+        final page = CallPage(
+          views: kit.views,
+          // EXPERIMENT: in-call chat, when the app registered it.
+          chat: _sl.isRegistered<InCallChat>() ? _sl<InCallChat>() : null,
+          giftsEnabled: gifts,
+        );
+        return MultiBlocProvider(
+          providers: [
+            BlocProvider(
+              create: (_) =>
+                  createCallBloc(_sl, kit)
+                    ..add(CallAttachRequested(callId, incoming: incoming)),
+            ),
+            if (gifts) ...[
+              BlocProvider(create: (_) => _sl<GiftSheetBloc>()),
+              BlocProvider(create: (_) => _sl<GiftCelebrationCubit>()),
+            ],
+          ],
+          child: page,
         );
       },
     ),

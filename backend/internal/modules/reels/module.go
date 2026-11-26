@@ -35,6 +35,7 @@ const (
 	EvidenceHold        = 90 * 24 * time.Hour
 	AttributionWindow   = 30 // minutes from a reel CTA click to a call start
 	ModerationGiveUp    = 30 * time.Minute
+	ProcessingGiveUp    = 2 * time.Hour // transient processing errors, then failed
 )
 
 // Moderation thresholds on frame maxima (docs/reels/DASHURI_REELS_SAFETY_AND_MODERATION.md).
@@ -51,9 +52,14 @@ var DefaultThresholds = Thresholds{RejectSexual: 0.80, ReviewSexual: 0.20, Revie
 // Deps are the module's ports. Repo is nil without a database; Provider and
 // Classifier may be unconfigured (explicit 503 / fail-closed review).
 type Deps struct {
-	Enabled       bool
-	Repo          Repository
-	Provider      VideoProvider
+	Enabled bool
+	Repo    Repository
+	// Provider receives new uploads (REELS_VIDEO_PROVIDER, default r2).
+	Provider VideoProvider
+	// Legacy providers still serve, moderate and purge reels stored with
+	// them (reels.videos.provider) while uploads go to Provider. This is
+	// how Mux stays available during the move to R2.
+	Legacy        []VideoProvider
 	Classifier    FrameClassifier
 	Photos        PhotoSigner
 	Clock         clock.Clock

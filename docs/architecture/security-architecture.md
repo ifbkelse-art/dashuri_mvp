@@ -15,6 +15,9 @@ The architecture supports these controls; it does **not** by itself make Dashuri
 - Every service method receives `auth.Principal` and checks ownership (a participant of the call, the owner of the withdrawal, …).
 - Role gates use `auth.Require`.
 - The database is a second line: client roles have no grants or policies on domain schemas; service roles cannot update or delete ledger history.
+- **Verified Host and pricing:**
+  - Only moderators and admins change a verification status, and never on their own account (service check plus DB CHECKs).
+  - Price eligibility (level, verification) is read server-side under the host row lock; client-sent level or verification fields are rejected as unknown fields.
 
 ## Secrets
 
@@ -59,6 +62,7 @@ See `financial-ledger-design.md`:
 | Blocking | `safety.blocks`; enforced in discovery, calls, chat, profiles | |
 | Review and enforcement | `/v1/admin/moderation/*`; `safety.enforcement_actions`; audit log | |
 | Evidence | Private bucket, references in `moderation.evidence`, retention from legal advice, access audited | PRO-REVIEW |
+| Verified Host evidence | Face video + ID images in the private `host-verification-evidence` bucket. Signed upload. Staff read through a 5-minute signed URL, audited before issue. Never in public APIs. Purged 90 days after a final decision. No biometric templates (ADR-014) | PRO-REVIEW (retention, consent text) |
 | Appeals | `/v1/appeals`, decided by a different reviewer | |
 | Takedown timelines | IT Rules 2026 amendment (reported: 2 h for intimate imagery on complaint) → on-call moderation | PRO-REVIEW |
 | Child sexual abuse material | Mandatory reporting path, separate from ordinary moderation; Play Child Safety Standards | PRO-REVIEW |
@@ -67,7 +71,11 @@ See `financial-ledger-design.md`:
 
 ## Privacy (DPDP)
 
-- **Minimisation:** the phone number stays in Supabase Auth; the database stores only a hash for the Free Call Card; KYC documents stay with the vendor; Play purchase tokens are stored only as hashes.
+- **Minimisation:**
+  - The phone number stays in Supabase Auth; the database stores only a hash for the Free Call Card.
+  - KYC documents stay with the vendor.
+  - Play purchase tokens are stored only as hashes.
+  - Verified Host evidence is stored as a private object with metadata only, deleted on schedule, and never processed into a face template.
 - **Consent** (`identity.consents`) gates analytics and marketing.
 - **Rights:** deletion (anonymise where law or tax requires retention), data export.
 - **Logs** exclude personal data (list in `platform/logging`).

@@ -77,7 +77,17 @@ func TestHostLifecycleKycAndEarnings(t *testing.T) {
 	if _, err := svc.SetRate(ctx, p, hosts.SetRateRequest{RatePerMinute: 12000}); callstest.Rule(err) != "rate_outside_level_limits" {
 		t.Fatalf("rate cap: %v", err)
 	}
-	if st, err := svc.SetRate(ctx, p, hosts.SetRateRequest{RatePerMinute: 3000}); err != nil || st.RatePerMinute != 3000 {
+	// Pricing rules 2026-11-23: level 1 tops out at 1,000; level 3 at 3,000.
+	if _, err := svc.SetRate(ctx, p, hosts.SetRateRequest{RatePerMinute: 3000}); callstest.Rule(err) != "rate_outside_level_limits" {
+		t.Fatalf("level 1 at 3,000: %v", err)
+	}
+	if st, err := svc.SetRate(ctx, p, hosts.SetRateRequest{RatePerMinute: 1000}); err != nil || st.RatePerMinute != 1000 {
+		t.Fatalf("%+v %v", st, err)
+	}
+	if _, err := admin.Exec(ctx, `insert into ledger.xp_events (user_id, source_type, source_id, xp_delta) values ($1, 'purchase', gen_random_uuid()::text, 100000)`, u); err != nil {
+		t.Fatal(err)
+	}
+	if st, err := svc.SetRate(ctx, p, hosts.SetRateRequest{RatePerMinute: 3000}); err != nil || st.RatePerMinute != 3000 || st.Level != 3 {
 		t.Fatalf("%+v %v", st, err)
 	}
 	if st, err := svc.SetFreeCallOptIn(ctx, p, hosts.SetFreeCallOptInRequest{OptIn: true}); err != nil || !st.FreeCallOptIn {

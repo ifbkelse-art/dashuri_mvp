@@ -14,6 +14,7 @@ func NewAdminService(env wiring.Env) *admin.Service {
 	d := admin.Deps{Rules: env.Rules, Clock: env.Clock, PayoutsEnabled: env.Config.PayoutsEnabled}
 	if env.Pool != nil {
 		d.Repo = postgres.AdminRepo{Pool: env.Pool, Tx: env.Tx}
+		d.Console = postgres.AdminConsoleRepo{Pool: env.Pool}
 	}
 	return admin.NewService(d)
 }

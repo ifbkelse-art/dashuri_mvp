@@ -15,48 +15,48 @@ ReelPlayerFactory? _player() {
   return sl.isRegistered<ReelPlayerFactory>() ? sl<ReelPlayerFactory>() : null;
 }
 
-String _child(String path) => path.substring(RoutePaths.reels.length + 1);
-
 /// EXPERIMENT — Reels routes. The app adds these (and the Reels tab) only
-/// when DASHURI_REELS_ENABLED is true. The feed, a single reel and creator
-/// profiles stay inside the tab; upload is full-screen.
+/// when DASHURI_REELS_ENABLED is true. Only the feed lives inside the tabs;
+/// a single reel, creator profiles and upload are full-screen pages with no
+/// tab bar (back returns to the feed).
 final class ReelsRoutes implements TabFeatureRoutes {
   const ReelsRoutes();
 
+  /// The feed is a tab of both shells: customers watch from Discover's
+  /// neighbour, and hosts watch while they wait online ([RoutePaths.hostReels]).
   @override
   List<RouteBase> get tabRoutes => [
-    GoRoute(
-      path: RoutePaths.reels,
-      builder: (context, state) => BlocProvider(
-        create: (_) => GetIt.instance<ReelsFeedCubit>()..load(),
-        child: ReelsFeedPage(player: _player()),
+    for (final path in [RoutePaths.reels, RoutePaths.hostReels])
+      GoRoute(
+        path: path,
+        builder: (context, state) => BlocProvider(
+          create: (_) => GetIt.instance<ReelsFeedCubit>()..load(),
+          child: ReelsFeedPage(player: _player()),
+        ),
       ),
-      routes: [
-        GoRoute(
-          path: _child(RoutePaths.reelDetail),
-          builder: (context, state) => BlocProvider(
-            create: (_) =>
-                GetIt.instance<ReelsFeedCubit>()
-                  ..openSingle(state.pathParameters['reelId']!),
-            child: ReelsFeedPage(player: _player(), single: true),
-          ),
-        ),
-        GoRoute(
-          path: _child(RoutePaths.reelCreator),
-          builder: (context, state) {
-            final id = state.pathParameters['userId']!;
-            return BlocProvider(
-              create: (_) => GetIt.instance<CreatorProfileCubit>()..load(id),
-              child: CreatorProfilePage(userId: id),
-            );
-          },
-        ),
-      ],
-    ),
   ];
 
   @override
   List<RouteBase> get routes => [
+    GoRoute(
+      path: RoutePaths.reelDetail,
+      builder: (context, state) => BlocProvider(
+        create: (_) =>
+            GetIt.instance<ReelsFeedCubit>()
+              ..openSingle(state.pathParameters['reelId']!),
+        child: ReelsFeedPage(player: _player(), single: true),
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.reelCreator,
+      builder: (context, state) {
+        final id = state.pathParameters['userId']!;
+        return BlocProvider(
+          create: (_) => GetIt.instance<CreatorProfileCubit>()..load(id),
+          child: CreatorProfilePage(userId: id),
+        );
+      },
+    ),
     GoRoute(
       path: RoutePaths.reelMine,
       builder: (context, state) => BlocProvider(

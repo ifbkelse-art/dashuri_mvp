@@ -38,16 +38,29 @@ void main() {
     });
     tearDown(() => presence.dispose());
 
-    Widget dashboard([Widget page = const HostDashboardPage()]) => BlocProvider(
-      create: (_) => HostDashboardCubit(
-        getStatus,
-        setAvailability: setAvailability,
-        setFreeCallOptIn: setOptIn,
-        getMyProfile: getProfile,
-        presence: presence,
-      )..load(),
-      child: page,
-    );
+    Widget dashboard([Widget page = const HostDashboardPage()]) =>
+        MultiBlocProvider(
+          providers: [
+            BlocProvider(
+              create: (_) => HostDashboardCubit(
+                getStatus,
+                setAvailability: setAvailability,
+                setFreeCallOptIn: setOptIn,
+                getMyProfile: getProfile,
+                presence: presence,
+              )..load(),
+            ),
+            // Host Home also owns the online session.
+            BlocProvider(
+              create: (_) => HostSessionBloc(
+                getStatus: getStatus,
+                setAvailability: setAvailability,
+                presence: presence,
+              )..add(const HostSessionStarted()),
+            ),
+          ],
+          child: page,
+        );
 
     for (final MapEntry(key: name, value: size) in testSizes.entries) {
       testWidgets('offline home renders at $name', (tester) async {
@@ -66,6 +79,10 @@ void main() {
         () => setAvailability(true),
       ).thenAnswer((_) async => Success(approvedOnline));
       await pumpHostPage(tester, dashboard(), textScale: 1.3);
+      // The server now reports the host online (Home re-reads status).
+      when(
+        () => getStatus(any()),
+      ).thenAnswer((_) async => Success(approvedOnline));
       await tester.tap(find.text('Go online'));
       await tester.pumpAndSettle();
       expect(find.text("You're online"), findsOneWidget);
@@ -233,6 +250,25 @@ void main() {
       child: HostProfileTabPage(modeSwitch: modeSwitch),
     );
 
+    testWidgets('an active Verified Host shows the badge', (tester) async {
+      when(() => getStatus(any())).thenAnswer(
+        (_) async => const Success(
+          HostStatus(
+            state: HostStates.approved,
+            kycState: KycStates.approved,
+            isAvailable: false,
+            ratePerMinute: 4000,
+            minRatePerMinute: 500,
+            maxRatePerMinute: 4000,
+            freeCallOptIn: true,
+            verificationStatus: 'verified',
+          ),
+        ),
+      );
+      await pumpHostPage(tester, page(modeSwitch: HostModeSwitch(() async {})));
+      expect(find.text('Verified Host'), findsOneWidget);
+    });
+
     for (final MapEntry(key: name, value: size) in testSizes.entries) {
       testWidgets('profile tab renders at $name', (tester) async {
         await pumpHostPage(
@@ -240,7 +276,8 @@ void main() {
           page(modeSwitch: HostModeSwitch(() async {})),
           size: size,
         );
-        expect(find.text('Verified host'), findsOneWidget);
+        // A KYC-approved host is NOT a Verified Host (2026-11-23).
+        expect(find.text('Verified Host'), findsNothing);
         expect(find.text('Level 4'), findsOneWidget);
         expect(find.text('Switch to customer mode'), findsOneWidget);
       });

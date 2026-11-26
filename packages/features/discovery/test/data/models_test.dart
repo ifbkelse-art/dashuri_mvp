@@ -56,6 +56,23 @@ void main() {
     );
   });
 
+  test('verification filter (2026-11-23): All is the default and not sent', () {
+    expect(
+      const DiscoveryFilter().toQuery().containsKey('verification'),
+      isFalse,
+    );
+    const v = DiscoveryFilter(verification: DiscoveryVerification.verified);
+    expect(v.toQuery()['verification'], 'verified');
+    expect(v.activeCount, 1);
+    expect(v.hasFilters, isTrue);
+    expect(
+      const DiscoveryFilter(
+        verification: DiscoveryVerification.nonVerified,
+      ).toQuery()['verification'],
+      'non_verified',
+    );
+  });
+
   group('cityFromPickerResult', () {
     test('accepts a map', () {
       expect(

@@ -27,6 +27,13 @@ func init() {
 		}),
 	})
 	Register(Job{
+		Name: "reels-process-media", Schedule: "every 5 min", // each run is a container start: keep idle cost low
+		Doc: "Validates and transcodes R2 uploads with ffmpeg (720p MP4, poster, moderation stills). Runs in the media worker image (Dockerfile.media); elsewhere it is a no-op retry.",
+		Run: reelsJob("processed", func(ctx context.Context, env wiring.Env) (int, error) {
+			return app.BuildReels(env).ProcessMedia(ctx, 3) // ≈ 20–60 s CPU each; keep runs short
+		}),
+	})
+	Register(Job{
 		Name: "reels-purge-media", Schedule: "hourly",
 		Doc: "Deletes provider media of deleted/rejected/removed reels after any 90-day evidence hold.",
 		Run: reelsJob("purged", func(ctx context.Context, env wiring.Env) (int, error) {

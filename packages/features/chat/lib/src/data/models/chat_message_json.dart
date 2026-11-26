@@ -14,4 +14,5 @@ ChatMessage chatMessageFromJson(JsonMap json) => ChatMessage(
       ? MessageContext.call
       : MessageContext.chat,
   readByPeer: json['read_by_peer'] == true,
+  isGift: json['kind'] == 'gift',
 );

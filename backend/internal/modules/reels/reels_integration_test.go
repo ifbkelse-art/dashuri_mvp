@@ -35,7 +35,8 @@ type fakeProvider struct {
 
 func (p *fakeProvider) Name() string     { return "fake" }
 func (p *fakeProvider) Configured() bool { return true }
-func (p *fakeProvider) CreateUpload(_ context.Context, pass string) (reels.UploadSession, error) {
+func (p *fakeProvider) CreateUpload(_ context.Context, req reels.UploadRequest) (reels.UploadSession, error) {
+	pass := req.Passthrough
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.n++
@@ -48,7 +49,7 @@ func (p *fakeProvider) Asset(context.Context, string) (reels.AssetInfo, error) {
 	return reels.AssetInfo{}, reels.ErrAssetNotFound
 }
 func (p *fakeProvider) Playback(id string, ttl time.Duration) (reels.Playback, error) {
-	return reels.Playback{HLSURL: "https://play.example/" + id + ".m3u8", ThumbnailURL: "https://img.example/" + id, ExpiresAt: time.Now().Add(ttl)}, nil
+	return reels.Playback{URL: "https://play.example/" + id + ".m3u8", Format: reels.FormatHLS, ThumbnailURL: "https://img.example/" + id, ExpiresAt: time.Now().Add(ttl)}, nil
 }
 func (p *fakeProvider) FrameURLs(id string, ms int, iv, _ time.Duration) ([]string, error) {
 	return []string{"https://img.example/" + id + "?t=0", "https://img.example/" + id + "?t=2"}, nil

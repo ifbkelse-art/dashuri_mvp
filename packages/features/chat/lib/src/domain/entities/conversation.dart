@@ -12,12 +12,16 @@ final class Conversation extends Equatable {
     required this.updatedAt,
     this.peerPhotoUrl,
     this.lastMessage,
+    this.peerIsVerified = false,
   });
 
   final String id;
   final String peerUserId;
   final String peerDisplayName;
   final String? peerPhotoUrl;
+
+  /// The peer is an ACTIVE Verified Host (badge only).
+  final bool peerIsVerified;
   final String? lastMessagePreview;
 
   /// Full last message (MVP contract); lets the inbox show "You: …".
@@ -31,6 +35,7 @@ final class Conversation extends Equatable {
     peerUserId,
     peerDisplayName,
     peerPhotoUrl,
+    peerIsVerified,
     lastMessagePreview,
     lastMessage,
     unreadCount,

@@ -27,10 +27,12 @@ void main() {
       RoutePaths.hostVerification,
       RoutePaths.hostProfileSetup,
       RoutePaths.hostRate,
+      RoutePaths.hostVerifiedHost,
       RoutePaths.hostWithdraw,
       RoutePaths.hostPayoutHistory,
       RoutePaths.hostPayoutMethod,
       RoutePaths.hostSettings,
+      RoutePaths.hostGifts,
     });
   });
 
@@ -45,6 +47,12 @@ void main() {
       final withdrawals = MockListWithdrawals();
       final calls = MockListHostCalls();
       final heartbeat = MockSendHeartbeat();
+      final verificationRepo = _MockVerificationRepo();
+      when(verificationRepo.getVerification).thenAnswer(
+        (_) async => const Success(
+          HostVerification(status: 'not_applied', canSubmit: true),
+        ),
+      );
       when(
         () => status(any()),
       ).thenAnswer((_) async => const Success(approvedOffline));
@@ -82,6 +90,21 @@ void main() {
           ),
           dispose: (c) => c.dispose(),
         )
+        ..registerSingleton<HostVerificationRepository>(verificationRepo)
+        ..registerFactory<GetReceivedGifts>(() {
+          final m = _MockReceivedGifts();
+          when(() => m(any())).thenAnswer(
+            (_) async => const Success(Page<ReceivedGift>(items: [])),
+          );
+          return m;
+        })
+        ..registerFactory<GetReceivedGiftSummary>(() {
+          final m = _MockGiftSummary();
+          when(
+            () => m(any()),
+          ).thenAnswer((_) async => const Success(ReceivedGiftSummary.empty));
+          return m;
+        })
         ..registerSingleton<HostModeSwitch>(
           HostModeSwitch(() async => switched = true),
         );
@@ -103,10 +126,12 @@ void main() {
       HostPaths.inApplication(RoutePaths.hostProfileSetup):
           HostProfileSetupPage,
       HostPaths.inApplication(RoutePaths.hostRate): HostRatePage,
+      RoutePaths.hostVerifiedHost: VerifiedHostPage,
       RoutePaths.hostWithdraw: HostWithdrawPage,
       RoutePaths.hostPayoutHistory: HostPayoutHistoryPage,
       RoutePaths.hostPayoutMethod: HostPayoutMethodPage,
       RoutePaths.hostSettings: HostSettingsPage,
+      RoutePaths.hostGifts: HostGiftsPage,
     };
 
     for (final MapEntry(key: path, value: type) in cases.entries) {
@@ -164,11 +189,27 @@ void _registerCubits(GetIt sl) {
     ..registerFactory(() => HostVerificationCubit(sl(), sl()))
     ..registerFactory(() => HostProfileSetupCubit(sl(), sl(), sl()))
     ..registerFactory(() => HostRateCubit(sl(), sl()))
+    ..registerFactory(() => VerifiedHostCubit(sl()))
     ..registerFactory(() => HostEarningsCubit(sl()))
     ..registerFactory(() => HostWithdrawCubit(sl(), sl()))
     ..registerFactory(() => HostPayoutsCubit(sl()))
     ..registerFactory(() => HostCallsCubit(sl()))
     ..registerFactory(
       () => HostProfileTabCubit(sl(), sl(), sl(), sl<HostPresenceController>()),
-    );
+    )
+    ..registerFactory(
+      () => HostSessionBloc(
+        getStatus: sl(),
+        setAvailability: sl(),
+        presence: sl<HostPresenceController>(),
+      ),
+    )
+    ..registerFactory(() => HostGiftsCubit(sl(), sl()));
 }
+
+class _MockReceivedGifts extends Mock implements GetReceivedGifts {}
+
+class _MockGiftSummary extends Mock implements GetReceivedGiftSummary {}
+
+class _MockVerificationRepo extends Mock
+    implements HostVerificationRepository {}

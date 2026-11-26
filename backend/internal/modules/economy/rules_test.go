@@ -63,20 +63,91 @@ func TestXPAndLevels(t *testing.T) {
 	}
 }
 
-func TestRateValidation(t *testing.T) {
+// Founder spec 2026-11-23: min 500 for every host; max = level × 1,000;
+// above 3,000 needs an active Verified Host; integers only.
+func TestPricingEveryLevel(t *testing.T) {
 	r := Founder()
-	if err := r.ValidateRate(499, 1); err == nil {
-		t.Fatal("below platform minimum accepted")
+	for level := 1; level <= 10; level++ {
+		levelMax := int64(level) * 1000
+		nonVerifiedMax := min(levelMax, 3000)
+		if got := r.LevelMaxRate(level); got != levelMax {
+			t.Fatalf("L%d level max %d, want %d", level, got, levelMax)
+		}
+		if got := r.EligibleMaxRate(level, true); got != levelMax {
+			t.Fatalf("L%d verified max %d, want %d", level, got, levelMax)
+		}
+		if got := r.EligibleMaxRate(level, false); got != nonVerifiedMax {
+			t.Fatalf("L%d non-verified max %d, want %d", level, got, nonVerifiedMax)
+		}
+		for _, verified := range []bool{false, true} {
+			eligible := r.EligibleMaxRate(level, verified)
+			if err := r.CheckRate(499, level, verified); err != ErrRateBelowMinimum {
+				t.Fatalf("L%d v=%v 499: %v", level, verified, err)
+			}
+			if err := r.CheckRate(500, level, verified); err != nil {
+				t.Fatalf("L%d v=%v 500: %v", level, verified, err)
+			}
+			if err := r.CheckRate(eligible, level, verified); err != nil {
+				t.Fatalf("L%d v=%v max %d: %v", level, verified, eligible, err)
+			}
+			want := ErrRateAboveLevelMax
+			if !verified && levelMax > 3000 {
+				want = ErrRateRequiresVerification
+			}
+			if err := r.CheckRate(eligible+1, level, verified); err != want {
+				t.Fatalf("L%d v=%v max+1: %v, want %v", level, verified, err, want)
+			}
+			if err := r.CheckRate(levelMax+1, level, verified); err != ErrRateAboveLevelMax {
+				t.Fatalf("L%d v=%v level max+1: %v", level, verified, err)
+			}
+		}
 	}
-	if err := r.ValidateRate(10000, 1); err != nil {
-		t.Fatal("platform max rejected without a ladder")
+}
+
+func TestPricingVerifiedThresholdBoundary(t *testing.T) {
+	r := Founder()
+	for level := 3; level <= 10; level++ {
+		if err := r.CheckRate(3000, level, false); err != nil {
+			t.Fatalf("L%d 3,000 non-verified: %v", level, err)
+		}
 	}
-	r.LevelRateCaps = []int64{1000, 1500}
-	if err := r.ValidateRate(1200, 1); err == nil {
-		t.Fatal("level cap not applied")
+	for level := 4; level <= 10; level++ {
+		if err := r.CheckRate(3001, level, false); err != ErrRateRequiresVerification {
+			t.Fatalf("L%d 3,001 non-verified: %v", level, err)
+		}
+		if err := r.CheckRate(3001, level, true); err != nil {
+			t.Fatalf("L%d 3,001 verified: %v", level, err)
+		}
 	}
-	if err := r.ValidateRate(1500, 9); err != nil {
-		t.Fatal("highest configured cap should apply above ladder length")
+	// Level 3 tops out at 3,000 even when verified.
+	if err := r.CheckRate(3001, 3, true); err != ErrRateAboveLevelMax {
+		t.Fatalf("L3 3,001 verified: %v", err)
+	}
+	// Out-of-range levels are clamped to the ladder.
+	if r.LevelMaxRate(0) != 1000 || r.LevelMaxRate(11) != 10000 {
+		t.Fatalf("clamp %d %d", r.LevelMaxRate(0), r.LevelMaxRate(11))
+	}
+}
+
+func TestCapRate(t *testing.T) {
+	r := Founder()
+	cases := []struct {
+		rate     int64
+		level    int
+		verified bool
+		want     int64
+	}{
+		{9000, 10, false, 3000}, // revocation: capped to 3,000
+		{9000, 10, true, 9000},  // still verified: untouched
+		{9000, 6, true, 6000},   // level drop: capped to the new level max
+		{9000, 2, false, 2000},  // revoked and dropped to level 2
+		{2500, 10, true, 2500},  // approval / level-up never raises a price
+		{500, 1, false, 500},
+	}
+	for _, c := range cases {
+		if got := r.CapRate(c.rate, c.level, c.verified); got != c.want {
+			t.Fatalf("CapRate(%d, L%d, %v) = %d, want %d", c.rate, c.level, c.verified, got, c.want)
+		}
 	}
 }
 

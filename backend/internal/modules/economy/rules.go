@@ -23,11 +23,15 @@ type Rules struct {
 	PaisePerBeanNumerator   int64
 	PaisePerBeanDenominator int64
 
-	// Host rates in Diamonds per minute (S2: 500–10,000). LevelRateCaps[i]
-	// is the max rate at level i+1; nil until the ladder is decided.
-	MinRatePerMinute int64
-	MaxRatePerMinute int64
-	LevelRateCaps    []int64
+	// Host rates in Diamonds per minute, integers only (founder spec
+	// 2026-11-23): every host may charge at least MinRatePerMinute; the
+	// maximum is level × LevelRateStep (levels 1–10, so 1,000–10,000), never
+	// above MaxRatePerMinute; a rate above VerifiedRateThreshold requires an
+	// ACTIVE Verified Host status. See EligibleMaxRate.
+	MinRatePerMinute      int64
+	MaxRatePerMinute      int64
+	LevelRateStep         int64
+	VerifiedRateThreshold int64
 
 	// XP = XPDiamondWeight × Diamonds purchased + XPBeanWeight × Beans earned (R3-3, S8).
 	XPDiamondWeight int64
@@ -58,14 +62,15 @@ type Rules struct {
 // UNRESOLVED are proposals and must be confirmed before launch.
 func Founder() Rules {
 	return Rules{
-		Version:                  "2026-11-17-founder",
+		Version:                  "2026-11-23-verified-pricing",
 		BeansNumerator:           10000,
 		DiamondsDenominator:      16670,
 		PaisePerBeanNumerator:    1,
 		PaisePerBeanDenominator:  2,
 		MinRatePerMinute:         500,
 		MaxRatePerMinute:         10000,
-		LevelRateCaps:            nil, // UNRESOLVED
+		LevelRateStep:            1000,
+		VerifiedRateThreshold:    3000,
 		XPDiamondWeight:          8,
 		XPBeanWeight:             1,
 		XPThresholds:             []int64{0, 32000, 100000, 250000, 600000, 1500000, 3500000, 8000000, 18000000, 40000000}, // UNRESOLVED (P12)
@@ -83,8 +88,7 @@ func Founder() Rules {
 }
 
 var (
-	ErrRateOutOfRange = errors.New("rate_outside_level_limits")
-	ErrOverflow       = errors.New("amount_overflow")
+	ErrOverflow = errors.New("amount_overflow")
 )
 
 // BeansForDiamonds converts Diamonds spent to Beans earned, rounding DOWN.
@@ -153,22 +157,49 @@ func (r Rules) LevelForXP(xp int64) int {
 	return level
 }
 
-// MaxRateForLevel applies the level ladder if one is configured, always
-// within the platform range.
-func (r Rules) MaxRateForLevel(level int) int64 {
-	maxRate := r.MaxRatePerMinute
-	if len(r.LevelRateCaps) > 0 {
-		i := min(max(level, 1), len(r.LevelRateCaps)) - 1
-		maxRate = min(maxRate, r.LevelRateCaps[i])
-	}
-	return max(maxRate, r.MinRatePerMinute)
+// LevelMaxRate is the level's own ceiling (level × LevelRateStep), within
+// the platform range. Levels outside 1..len(XPThresholds) are clamped.
+func (r Rules) LevelMaxRate(level int) int64 {
+	level = min(max(level, 1), max(len(r.XPThresholds), 1))
+	return max(min(int64(level)*r.LevelRateStep, r.MaxRatePerMinute), r.MinRatePerMinute)
 }
 
-// ValidateRate checks a host's chosen rate against the platform range and
-// the host's level cap (S2).
-func (r Rules) ValidateRate(ratePerMinute int64, level int) error {
-	if ratePerMinute < r.MinRatePerMinute || ratePerMinute > r.MaxRateForLevel(level) {
-		return ErrRateOutOfRange
+// EligibleMaxRate is the highest rate a host may charge: the level ceiling,
+// further capped at VerifiedRateThreshold unless the host is an ACTIVE
+// Verified Host. It never drops below the platform minimum.
+func (r Rules) EligibleMaxRate(level int, verified bool) int64 {
+	m := r.LevelMaxRate(level)
+	if !verified {
+		m = min(m, r.VerifiedRateThreshold)
+	}
+	return max(m, r.MinRatePerMinute)
+}
+
+// Rate validation failures (the API maps them to distinct error codes).
+var (
+	ErrRateBelowMinimum         = errors.New("rate_below_minimum")
+	ErrRateAboveLevelMax        = errors.New("rate_above_level_max")
+	ErrRateRequiresVerification = errors.New("rate_requires_verification")
+)
+
+// CheckRate validates a host's chosen integer rate against the pricing
+// rules. The order of checks decides the error: below the minimum, above the
+// level's ceiling, then above the non-verified threshold.
+func (r Rules) CheckRate(ratePerMinute int64, level int, verified bool) error {
+	switch {
+	case ratePerMinute < r.MinRatePerMinute:
+		return ErrRateBelowMinimum
+	case ratePerMinute > r.LevelMaxRate(level):
+		return ErrRateAboveLevelMax
+	case ratePerMinute > r.EligibleMaxRate(level, verified):
+		return ErrRateRequiresVerification
 	}
 	return nil
+}
+
+// CapRate returns the stored rate clamped to the host's current
+// eligibility. Used on verification revocation/suspension, on a level drop
+// and before a new call; approvals and level-ups never raise a rate.
+func (r Rules) CapRate(ratePerMinute int64, level int, verified bool) int64 {
+	return max(min(ratePerMinute, r.EligibleMaxRate(level, verified)), r.MinRatePerMinute)
 }

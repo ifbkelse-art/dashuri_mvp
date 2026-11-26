@@ -105,6 +105,17 @@ Existing code behaviour that is **not** a founder decision is preserved until de
 
 ---
 
+### B-G. Virtual gifts (added 2026-11-26; built behind GIFTS_ENABLED, off)
+
+| ID | Pri | Decision | Current build | Status |
+|---|---|---|---|---|
+| B-G1 | P0 | Activate gifts in production | Off (backend + app flags) | **Open** |
+| B-G2 | P0 | Gift host earnings rule | Same versioned rule set as calls (today 16,670 D → 10,000 B); no gift commission; 5:4 NOT active | **Open** (confirm; if B-01 is approved, gifts follow the new rule set from its effective date) |
+| B-G3 | P1 | May promotional Diamonds be gifted? | Yes, promotional first (like calls), flagged `promotional_diamonds` | **Open** |
+| B-G4 | P1 | Limits | 6 per call per minute; 1,000,000 D per sender per 24 h; risk flags only above that | **Open** (engineering proposal) |
+| B-G5 | P0 | Chargeback clawback of gift Beans | No automated path (same gap as calls: `BeanClawback` has no caller) | **Open** — must close before real money |
+| B-G6 | P0 | Play policy on paid gifts that become creator earnings | Not reviewed | **Open** — joins C-01 |
+
 ## C. Blocked (external evidence, legal/accounting advice, technical proof)
 
 | ID | Pri | Question | Why it blocks | Evidence / source required | Who | Blocks payments? | Blocks payouts? |
@@ -127,6 +138,8 @@ Existing code behaviour that is **not** a founder decision is preserved until de
 ---
 
 ## Change log
+
+- **v4.2 (26 Nov):** added B-G1…B-G6 (virtual gifts, built behind a flag). No financial rule changed; 5:4 remains modelling-only.
 
 - **v4.1 (24 Nov):** founder decisions A-5…A-8 recorded; B-01 kept modelling-only. Then A-9…A-12 (withdrawals, reserve, no promos at launch, payout hold at submission) and A-13…A-16 (split levels, caller gates, caller price display, default rate 1,000) and A-17…A-20 (Diamond lots, idempotency fix, Supabase Pro at launch, DLT SMS) and A-21…A-24 (Cloud Run min 0, lean budget, deletion unchanged pending legal advice, engage advisers). **Only B-01 (implement 5:4) remains open in category B.**
 - **v4 (24 Nov):** three-category register; new B-03…B-08, B-12 (refund reserve), B-23 (idempotency fingerprint), C-01 (Play compensated-arrangement policy), C-12; corrected code facts (no host clawback today; key-only idempotency).

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"dashuri/backend/internal/modules/economy"
 	"dashuri/backend/internal/platform/apperr"
 	"dashuri/backend/internal/platform/auth"
 	"dashuri/backend/internal/platform/clock"
@@ -62,6 +63,8 @@ func mapErr(err error) error {
 		return apperr.BusinessRule("in_call", "finish your current call first")
 	case errors.Is(err, ErrNoKycSession):
 		return apperr.BusinessRule("kyc_not_started", "the host has not started verification")
+	case errors.Is(err, ErrNoApplication):
+		return apperr.BusinessRule("verification_not_applied", "the host has no verification application")
 	}
 	if apperr.As(err) != nil {
 		return err
@@ -82,14 +85,28 @@ func (s *Service) status(ctx context.Context, userID string) (HostStatus, error)
 	level := r.LevelForXP(xp)
 	out := HostStatus{
 		State: "not_applied", KycState: "not_started", RatePerMinute: r.MinRatePerMinute,
-		MinRatePerMinute: r.MinRatePerMinute, MaxRatePerMinute: r.MaxRateForLevel(level), Level: level,
+		MinRatePerMinute: r.MinRatePerMinute, MaxRatePerMinute: r.EligibleMaxRate(level, false), Level: level,
+		LevelMaxRatePerMinute: r.LevelMaxRate(level), VerifiedRateThreshold: r.VerifiedRateThreshold,
+		VerificationStatus: VerificationNotApplied,
+	}
+	if level < len(r.XPThresholds) {
+		next := r.LevelMaxRate(level + 1)
+		out.NextLevelMaxRatePerMinute = &next
 	}
 	if !h.Exists {
 		return out, nil
 	}
-	out.State, out.KycState, out.IsAvailable, out.FreeCallOptIn, out.RatePerMinute =
-		h.State, h.KycState, h.IsAvailable, h.FreeCallOptIn, h.RatePerMinute
+	verified := h.VerificationStatus == VerificationVerified
+	out.State, out.KycState, out.IsAvailable, out.FreeCallOptIn = h.State, h.KycState, h.IsAvailable, h.FreeCallOptIn
 	out.KycRejectionReason = h.KycRejectionReason
+	if h.OnlineSessionID != nil && h.OnlineSince != nil && h.IsAvailable {
+		out.OnlineSession = &OnlineSessionView{Id: *h.OnlineSessionID, StartedAt: *h.OnlineSince}
+	}
+	out.VerificationStatus, out.IsVerified, out.VerificationNote = h.VerificationStatus, verified, h.VerificationNote
+	out.MaxRatePerMinute = r.EligibleMaxRate(level, verified)
+	// The price customers pay on the next call: the stored rate, capped to
+	// current eligibility (call creation persists the same cap).
+	out.RatePerMinute = r.CapRate(h.RatePerMinute, level, verified)
 	today, err := s.deps.Repo.Today(ctx, userID, DayStartIST(s.deps.Clock.Now()))
 	if err != nil {
 		return HostStatus{}, mapErr(err)
@@ -192,22 +209,39 @@ func (s *Service) SendHeartbeat(ctx context.Context, p auth.Principal) error {
 	return mapErr(s.deps.Repo.Heartbeat(ctx, p.UserID, s.deps.Clock.Now()))
 }
 
-// SetRate: PUT /v1/host/rate — within 500–10,000 and the level cap; applies to the next call.
+// SetRate: PUT /v1/host/rate. The Go API is the authoritative validator:
+// the host's level and Verified Host status are read under the host row lock
+// in the same transaction as the write, never taken from the client. The new
+// rate applies to the next call; live calls keep their snapshotted rate.
 func (s *Service) SetRate(ctx context.Context, p auth.Principal, in SetRateRequest) (HostStatus, error) {
 	if err := s.approvedHost(ctx, p); err != nil {
 		return HostStatus{}, err
 	}
-	xp, err := s.deps.Repo.LifetimeXP(ctx, p.UserID)
+	r := s.deps.Rules
+	err := s.deps.Repo.UpdateRate(ctx, p.UserID, func(ps PricingState) (int64, error) {
+		if !ps.Exists || ps.State != "approved" {
+			return 0, apperr.BusinessRule("host_not_approved", "hosting is not approved yet")
+		}
+		return in.RatePerMinute, rateError(r.CheckRate(in.RatePerMinute, r.LevelForXP(ps.LifetimeXP), ps.Verified()))
+	})
 	if err != nil {
 		return HostStatus{}, mapErr(err)
 	}
-	if err := s.deps.Rules.ValidateRate(in.RatePerMinute, s.deps.Rules.LevelForXP(xp)); err != nil {
-		return HostStatus{}, apperr.BusinessRule("rate_outside_level_limits", "rate is outside your level's limits")
-	}
-	if err := s.deps.Repo.SetRate(ctx, p.UserID, in.RatePerMinute); err != nil {
-		return HostStatus{}, mapErr(err)
-	}
 	return s.status(ctx, p.UserID)
+}
+
+// rateError maps a pricing-rule failure to its API error.
+func rateError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, economy.ErrRateBelowMinimum):
+		return apperr.BusinessRule("rate_below_minimum", "the minimum price is 500 Diamonds/minute")
+	case errors.Is(err, economy.ErrRateRequiresVerification):
+		return apperr.BusinessRule("verification_required_for_rate", "prices above 3,000 Diamonds/minute need an active Verified Host status")
+	default:
+		return apperr.BusinessRule("rate_outside_level_limits", "rate is outside your level's limits")
+	}
 }
 
 // SetFreeCallOptIn: PUT /v1/host/free-call-opt-in.

@@ -99,6 +99,16 @@ func (s *Service) RequestCall(ctx context.Context, p auth.Principal, in CallRequ
 		if !h.Exists || h.State != "approved" || h.AccountStatus != "active" || !h.AgeEligible || !h.Available {
 			return apperr.BusinessRule("host_unavailable", "the host is not available")
 		}
+		// Price authority: the stored price must be within the host's current
+		// eligibility (level max; 3,000 unless an active Verified Host). A
+		// revocation or level drop that was not yet applied is applied here,
+		// under the host row lock, before the rate is snapshotted.
+		if capped := r.CapRate(h.RatePerMinute, r.LevelForXP(h.LifetimeXP), h.Verified); capped < h.RatePerMinute {
+			if err := tx.CapHostRate(in.HostUserId, h.RatePerMinute, capped, "call_start_eligibility"); err != nil {
+				return err
+			}
+			h.RatePerMinute = capped
+		}
 		if blocked, err := tx.Blocked(p.UserID, in.HostUserId); err != nil {
 			return err
 		} else if blocked {
