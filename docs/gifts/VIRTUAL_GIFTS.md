@@ -135,8 +135,22 @@ A timeout followed by a retry with the same key returns the stored gift. Concurr
   - after a reconnect, only gifts younger than 20 s are celebrated;
   - with more than 5 gifts waiting, each celebration is shortened to 1.5 s; nothing is dropped;
   - the overlay is transparent and `IgnorePointer`, and sits between the top bar and the controls, so call, report and chat stay usable;
-  - higher tiers get more particles, plus a glow (epic and above) and rings (legendary and above);
-  - particles are drawn with one cached glyph and one painter: no images, no per-particle layers;
+  - **each gift has its own five-second choreography** (27 Nov 2026, `gift_choreography.dart`), chosen by the server's `animation_asset` (then gift id; unknown gifts get a tier default):
+
+    | Gift | Hero | Effects |
+    |---|---|---|
+    | Rose | pop and float | falling rose petals, sparkles, soft red glow |
+    | Teddy Bear | drops in and bounces | rising hearts, sparkles, pink glow |
+    | Watch | pop | sweeping second-hand ring, gold sparkles |
+    | Gold Ring | spins in | gold dust burst, sparkles |
+    | Diamond Ring | spins in | soft light rays, ice-white sparkles |
+    | Sports Car | drives in, parks, drives out | speed lines, confetti |
+    | Crown | descends and settles | light rays, gold dust, sparkles |
+    | Yacht | bobs | waves, sparkles, sunset glow |
+    | Rocket | rumbles, then launches | exhaust trail, firework bursts |
+    | Castle | pop | fireworks, confetti, sparkles |
+
+  - every effect is drawn with plain shapes by one painter (no images, no per-particle layers), at most 40 particles per gift for low-end phones; tests check each gift is distinct, within budget, and paints through all 5 s;
   - with *Remove animations* turned on, only a static banner shows;
   - the screen reader announces each gift, and the host feels a haptic.
 - **Sound.** Sound assets are optional catalogue data. The app has no audio dependency yet, so no sound is played (see §9).

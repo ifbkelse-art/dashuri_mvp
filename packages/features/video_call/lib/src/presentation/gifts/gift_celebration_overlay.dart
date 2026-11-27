@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../application/gift_celebration_cubit.dart';
 import '../../domain/entities/gift.dart';
+import 'gift_choreography.dart';
 import 'gift_visuals.dart';
 
 /// Transparent, non-blocking gift celebration over the call video.
@@ -102,22 +102,9 @@ class _CelebrationState extends State<_Celebration>
     duration: widget.duration,
   )..forward();
 
-  late final List<_Particle> _particles = _seedParticles();
-
-  List<_Particle> _seedParticles() {
-    if (widget.reducedMotion) return const [];
-    final r = math.Random(widget.gift.giftTransactionId.hashCode);
-    return List.generate(
-      giftParticleCount(widget.gift.tier),
-      (_) => _Particle(
-        x: r.nextDouble(),
-        delay: r.nextDouble() * .35,
-        speed: .55 + r.nextDouble() * .45,
-        wobble: (r.nextDouble() - .5) * .12,
-        scale: .6 + r.nextDouble() * .7,
-      ),
-    );
-  }
+  /// Distinct choreography per gift (server animation asset), so a Rose
+  /// and a Castle never look alike.
+  late final GiftChoreography _choreo = choreographyFor(widget.gift);
 
   @override
   void dispose() {
@@ -154,21 +141,17 @@ class _CelebrationState extends State<_Celebration>
                     if (!widget.reducedMotion)
                       CustomPaint(
                         key: const Key('gift-particles'),
-                        painter: _ParticlePainter(
-                          emoji: widget.gift.emoji,
-                          particles: _particles,
+                        painter: GiftFxPainter(
+                          choreo: _choreo,
                           t: t,
-                          glow: giftHasGlow(widget.gift.tier) ? accent : null,
-                          rings: giftHasRings(widget.gift.tier) ? accent : null,
+                          seed: widget.gift.giftTransactionId.hashCode,
                         ),
                       ),
-                    Align(
-                      alignment: const Alignment(0, -.1),
-                      child: _Hero(
-                        emoji: widget.gift.emoji,
-                        t: t,
-                        reduced: widget.reducedMotion,
-                      ),
+                    _Hero(
+                      emoji: widget.gift.emoji,
+                      motion: _choreo.hero,
+                      t: t,
+                      reduced: widget.reducedMotion,
                     ),
                     Align(
                       alignment: const Alignment(0, .85),
@@ -192,26 +175,42 @@ class _CelebrationState extends State<_Celebration>
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.emoji, required this.t, required this.reduced});
+  const _Hero({
+    required this.emoji,
+    required this.motion,
+    required this.t,
+    required this.reduced,
+  });
 
   final String emoji;
+  final HeroMotion motion;
   final double t;
   final bool reduced;
 
   @override
   Widget build(BuildContext context) {
-    // A short elastic pop, then a gentle float.
-    final pop = reduced
-        ? 1.0
-        : t < .18
-        ? Curves.elasticOut.transform((t / .18).clamp(0, 1))
-        : 1 + .04 * math.sin(t * math.pi * 6);
-    return Transform.scale(
-      scale: pop,
-      child: Text(
-        emoji,
-        style: const TextStyle(fontSize: 88),
-        textScaler: TextScaler.noScaling,
+    final pose = reduced
+        ? (offset: Offset.zero, scale: 1.0, spinX: 1.0)
+        : heroPose(motion, t);
+    return LayoutBuilder(
+      builder: (context, c) => Align(
+        alignment: Alignment(
+          (pose.offset.dx * 2).clamp(-1.6, 1.6),
+          (-.1 + pose.offset.dy * 2).clamp(-1.6, 1.6),
+        ),
+        child: Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.diagonal3Values(
+            pose.scale * pose.spinX,
+            pose.scale,
+            1,
+          ),
+          child: Text(
+            emoji,
+            style: const TextStyle(fontSize: 88),
+            textScaler: TextScaler.noScaling,
+          ),
+        ),
       ),
     );
   }
@@ -281,89 +280,4 @@ class _Banner extends StatelessWidget {
       ),
     ),
   );
-}
-
-final class _Particle {
-  const _Particle({
-    required this.x,
-    required this.delay,
-    required this.speed,
-    required this.wobble,
-    required this.scale,
-  });
-
-  final double x, delay, speed, wobble, scale;
-}
-
-/// Draws every particle with ONE cached emoji glyph (no per-particle
-/// layers), plus an optional tier glow and expanding rings.
-class _ParticlePainter extends CustomPainter {
-  _ParticlePainter({
-    required this.emoji,
-    required this.particles,
-    required this.t,
-    this.glow,
-    this.rings,
-  });
-
-  final String emoji;
-  final List<_Particle> particles;
-  final double t;
-  final Color? glow;
-  final Color? rings;
-
-  static final Map<String, TextPainter> _glyphs = {};
-
-  TextPainter get _glyph => _glyphs.putIfAbsent(
-    emoji,
-    () => TextPainter(
-      text: TextSpan(text: emoji, style: const TextStyle(fontSize: 30)),
-      textDirection: TextDirection.ltr,
-    )..layout(),
-  );
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height * .45);
-    if (glow != null) {
-      final r = size.shortestSide * (.35 + .05 * math.sin(t * math.pi * 4));
-      canvas.drawCircle(
-        center,
-        r,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [glow!.withValues(alpha: .35), glow!.withValues(alpha: 0)],
-          ).createShader(Rect.fromCircle(center: center, radius: r)),
-      );
-    }
-    if (rings != null) {
-      for (var i = 0; i < 3; i++) {
-        final p = ((t * 1.6) + i / 3) % 1;
-        canvas.drawCircle(
-          center,
-          size.shortestSide * (.1 + .45 * p),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2
-            ..color = rings!.withValues(alpha: (1 - p) * .6),
-        );
-      }
-    }
-    final glyph = _glyph;
-    for (final p in particles) {
-      final local = ((t - p.delay) / (1 - p.delay)).clamp(0.0, 1.0);
-      if (local <= 0) continue;
-      final y = size.height * (1 - local * p.speed * 1.1);
-      final x = size.width * (p.x + p.wobble * math.sin(local * math.pi * 3));
-      canvas
-        ..save()
-        ..translate(x, y)
-        ..scale(p.scale * (1 - local * .3));
-      glyph.paint(canvas, Offset(-glyph.width / 2, -glyph.height / 2));
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ParticlePainter old) => old.t != t || old.emoji != emoji;
 }
