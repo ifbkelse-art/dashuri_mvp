@@ -11,7 +11,11 @@ import '../widgets/host_widgets.dart';
 
 /// H14 earnings (RoutePaths.hostEarnings, Earnings tab).
 class HostEarningsPage extends StatelessWidget {
-  const HostEarningsPage({super.key});
+  const HostEarningsPage({super.key, this.payoutsEnabled = true});
+
+  /// False while withdrawals are not open: no Withdraw button, and the
+  /// balance is "available" rather than "withdrawable".
+  final bool payoutsEnabled;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -39,7 +43,10 @@ class HostEarningsPage extends StatelessWidget {
                 title,
                 HostCardGrid(
                   children: [
-                    _BalanceCard(earnings: state.earnings!),
+                    _BalanceCard(
+                      earnings: state.earnings!,
+                      payoutsEnabled: payoutsEnabled,
+                    ),
                     _PendingCard(earnings: state.earnings!),
                     _Links(),
                   ],
@@ -54,7 +61,9 @@ class HostEarningsPage extends StatelessWidget {
 }
 
 class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.earnings});
+  const _BalanceCard({required this.earnings, required this.payoutsEnabled});
+
+  final bool payoutsEnabled;
 
   final HostEarnings earnings;
 
@@ -99,7 +108,7 @@ class _BalanceCard extends StatelessWidget {
           child: Row(
             children: [
               split(
-                'WITHDRAWABLE',
+                payoutsEnabled ? 'WITHDRAWABLE' : 'AVAILABLE',
                 earnings.availableInrPaise,
                 earnings.beansAvailable,
               ),
@@ -109,19 +118,58 @@ class _BalanceCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: DashuriTokens.space4),
-        FilledButton(
-          onPressed: () => context.push(RoutePaths.hostWithdraw),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(DashuriTokens.buttonHeight),
-            backgroundColor: BeansHeroCard.goldLight,
-            foregroundColor: BeansHeroCard.background,
+        if (payoutsEnabled)
+          FilledButton(
+            onPressed: () => context.push(RoutePaths.hostWithdraw),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(DashuriTokens.buttonHeight),
+              backgroundColor: BeansHeroCard.goldLight,
+              foregroundColor: BeansHeroCard.background,
+            ),
+            child: Text(
+              earnings.canWithdraw
+                  ? 'Withdraw ${DashuriFormat.rupees(earnings.availableInrPaise)}'
+                  : 'Withdraw',
+            ),
+          )
+        else
+          // Payouts are not open: say so here, before the host fills in a
+          // form the server would refuse (Phase 9 honesty fix).
+          Semantics(
+            container: true,
+            child: InkWell(
+              onTap: () => context.push(RoutePaths.hostWithdraw),
+              borderRadius: BorderRadius.circular(DashuriTokens.radiusMedium),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: DashuriTokens.space2,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule_rounded,
+                      size: 20,
+                      color: BeansHeroCard.goldLight,
+                    ),
+                    const SizedBox(width: DashuriTokens.space3),
+                    Expanded(
+                      child: Text(
+                        "Withdrawals aren't open yet. Your Beans are safe and "
+                        "keep adding up; we'll tell you when you can withdraw.",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: .85),
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white70,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          child: Text(
-            earnings.canWithdraw
-                ? 'Withdraw ${DashuriFormat.rupees(earnings.availableInrPaise)}'
-                : 'Withdraw',
-          ),
-        ),
       ],
     );
   }

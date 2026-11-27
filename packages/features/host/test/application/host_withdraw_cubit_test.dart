@@ -34,6 +34,23 @@ void main() {
     verify: (c) => expect(c.state.amountPaise, 62150),
   );
 
+  // Phase 9: with payouts off the page says so at once (H21), instead of an
+  // amount form the server refuses after submit.
+  blocTest<HostWithdrawCubit, HostWithdrawState>(
+    'payouts off: load goes straight to "not available yet"',
+    build: () => HostWithdrawCubit(getEarnings, request, payoutsEnabled: false),
+    act: (c) => c.load(),
+    expect: () => [
+      const HostWithdrawState(),
+      HostWithdrawState(
+        phase: WithdrawPhase.payoutsDisabled,
+        earnings: sampleEarnings,
+        beans: sampleEarnings.beansAvailable,
+      ),
+    ],
+    verify: (_) => verifyNever(() => request(any())),
+  );
+
   blocTest<HostWithdrawCubit, HostWithdrawState>(
     'load below the minimum shows H25',
     setUp: () => when(

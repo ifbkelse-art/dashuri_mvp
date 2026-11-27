@@ -85,8 +85,15 @@ final class HostWithdrawState extends Equatable {
 /// (POST /v1/host/withdrawals). One idempotency key per confirmed intent,
 /// reused when the same request is retried.
 final class HostWithdrawCubit extends Cubit<HostWithdrawState> {
-  HostWithdrawCubit(this._getEarnings, this._requestWithdrawal)
-    : super(const HostWithdrawState());
+  HostWithdrawCubit(
+    this._getEarnings,
+    this._requestWithdrawal, {
+    this.payoutsEnabled = true,
+  }) : super(const HostWithdrawState());
+
+  /// False while withdrawals are not open: the page shows that at once
+  /// (H21) instead of an amount form the server would refuse.
+  final bool payoutsEnabled;
 
   final GetEarnings _getEarnings;
   final RequestWithdrawal _requestWithdrawal;
@@ -101,7 +108,9 @@ final class HostWithdrawCubit extends Cubit<HostWithdrawState> {
       case Success(:final value):
         emit(
           HostWithdrawState(
-            phase: value.canWithdraw
+            phase: !payoutsEnabled
+                ? WithdrawPhase.payoutsDisabled
+                : value.canWithdraw
                 ? WithdrawPhase.editing
                 : WithdrawPhase.belowMinimum,
             earnings: value,

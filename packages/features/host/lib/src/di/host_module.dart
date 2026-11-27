@@ -137,7 +137,11 @@ void registerHostFeature(GetIt sl) {
       () => HostEarningsCubit(sl<GetEarnings>()),
     )
     ..registerFactory<HostWithdrawCubit>(
-      () => HostWithdrawCubit(sl<GetEarnings>(), sl<RequestWithdrawal>()),
+      () => HostWithdrawCubit(
+        sl<GetEarnings>(),
+        sl<RequestWithdrawal>(),
+        payoutsEnabled: sl.isRegistered<HostPayoutsEnabled>(),
+      ),
     )
     ..registerFactory<HostPayoutsCubit>(
       () => HostPayoutsCubit(sl<ListWithdrawals>()),
@@ -200,6 +204,13 @@ void registerHostFeature(GetIt sl) {
 
 /// Registered by the app when DASHURI_GIFTS_ENABLED: Host Home shows
 /// received gifts and the gift history page is reachable.
+/// Registered by the app when DASHURI_PAYOUTS_ENABLED: withdrawals are open.
+/// Without it, Earnings and Withdraw say up front that withdrawals are not
+/// available yet (the server refuses them anyway while PAYOUTS_ENABLED=false).
+final class HostPayoutsEnabled {
+  const HostPayoutsEnabled();
+}
+
 final class HostGiftsEnabled {
   const HostGiftsEnabled();
 }

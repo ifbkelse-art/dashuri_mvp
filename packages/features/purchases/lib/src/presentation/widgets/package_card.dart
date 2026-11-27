@@ -75,10 +75,14 @@ class PackageCard extends StatelessWidget {
                 ),
               ),
               if (hint != null)
+                // Two lines: "≈ 22 min with Ananya" was cut to "with An…"
+                // in the two-column grid (Phase 9).
                 Text(
                   hint!,
-                  style: theme.textTheme.bodySmall,
-                  maxLines: 1,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               const SizedBox(height: DashuriTokens.space2),

@@ -237,7 +237,9 @@ void main() {
             find.textContaining('about 5 min of talk time'),
             findsOneWidget,
           );
-          await t.tap(find.text('Video call'));
+          // Phase 9: the button carries the server rate.
+          expect(find.text('Video call · 2,400 / min'), findsOneWidget);
+          await t.tap(find.textContaining('Video call'));
           await t.pump();
           await t.pump(const Duration(milliseconds: 500));
           expect(find.text('route:/hosts/a/call'), findsOneWidget);

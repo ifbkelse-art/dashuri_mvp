@@ -211,6 +211,11 @@ class CallControlsBar extends StatelessWidget {
     return (size, gap, n * size + (n - 1) * gap <= avail);
   }
 
+  /// End call (the last control) gets one extra gap before it, so it stands
+  /// apart from the rest, but only when that still fits in one row.
+  static bool separateLast(int n, double size, double gap, double width) =>
+      n > 1 && n * size + n * gap <= width - 2 * _pad;
+
   @override
   Widget build(BuildContext context) => Center(
     child: ConstrainedBox(
@@ -218,6 +223,7 @@ class CallControlsBar extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, c) {
           final (size, gap, oneRow) = layoutFor(children.length, c.maxWidth);
+          final apart = separateLast(children.length, size, gap, c.maxWidth);
           final sized = [
             for (final child in children)
               SizedBox.square(dimension: size, child: child),
@@ -234,7 +240,12 @@ class CallControlsBar extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         for (final (i, w) in sized.indexed) ...[
-                          if (i > 0) SizedBox(width: gap),
+                          if (i > 0)
+                            SizedBox(
+                              width: apart && i == sized.length - 1
+                                  ? gap * 2
+                                  : gap,
+                            ),
                           w,
                         ],
                       ],

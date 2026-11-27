@@ -131,6 +131,12 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
       ..registerSingleton<WalletGiftsEnabled>(const WalletGiftsEnabled());
   }
 
+  // Host withdrawals (DASHURI_PAYOUTS_ENABLED, default off): without it the
+  // app says up front that withdrawals are not open yet (Phase 9).
+  if (config.payoutsEnabled) {
+    sl.registerSingleton<HostPayoutsEnabled>(const HostPayoutsEnabled());
+  }
+
   // Optional arrival photo when going online (DASHURI_ARRIVAL_PHOTOS_ENABLED,
   // default off; docs/host). Camera only — never the gallery.
   if (config.arrivalPhotosEnabled) {

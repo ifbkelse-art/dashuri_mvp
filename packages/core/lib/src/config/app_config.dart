@@ -19,6 +19,7 @@ final class AppConfig extends Equatable {
     this.inCallChatEnabled = false,
     this.giftsEnabled = false,
     this.arrivalPhotosEnabled = false,
+    this.payoutsEnabled = false,
   });
 
   /// Reads `--dart-define` values. Missing values are empty strings;
@@ -44,6 +45,7 @@ final class AppConfig extends Equatable {
     arrivalPhotosEnabled: const bool.fromEnvironment(
       'DASHURI_ARRIVAL_PHOTOS_ENABLED',
     ),
+    payoutsEnabled: const bool.fromEnvironment('DASHURI_PAYOUTS_ENABLED'),
   );
 
   final AppEnvironment environment;
@@ -79,6 +81,12 @@ final class AppConfig extends Equatable {
   /// Host Home skips the photo step. Needs ARRIVAL_PHOTOS_ENABLED.
   final bool arrivalPhotosEnabled;
 
+  /// Host withdrawals are open. Off by default (payouts are off on the
+  /// server too): the app then says so up front instead of offering a
+  /// Withdraw button that the server refuses. The server stays the
+  /// authority (PAYOUTS_ENABLED); turn both on together.
+  final bool payoutsEnabled;
+
   /// Names of missing required values; empty when the config is usable.
   List<String> validate() => [
     if (apiBaseUrl.toString().isEmpty) 'DASHURI_API_BASE_URL',
@@ -98,5 +106,6 @@ final class AppConfig extends Equatable {
     inCallChatEnabled,
     giftsEnabled,
     arrivalPhotosEnabled,
+    payoutsEnabled,
   ];
 }

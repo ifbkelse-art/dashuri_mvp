@@ -329,7 +329,8 @@ class _Details extends StatelessWidget {
               ),
             StatusTag(label: status, tone: tone, dot: true),
             StatusTag(label: 'Level ${host.level}', tone: StatusTone.neutral),
-            if (host.isVerified) const VerifiedHostBadge(),
+            // Verified is shown once, next to the name (Phase 9: it was
+            // also repeated here as a chip).
           ],
         ),
         if (host.arrivalPhoto != null &&
@@ -415,8 +416,10 @@ class _Actions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, icon, enabled) = switch (host.status) {
+      // The rate is on the button itself (Phase 9): the customer sees what
+      // a minute costs at the moment they decide. Server value, unchanged.
       HostAvailability.available => (
-        'Video call',
+        'Video call · ${DashuriFormat.count(host.ratePerMinute)} / min',
         Icons.videocam_rounded,
         true,
       ),

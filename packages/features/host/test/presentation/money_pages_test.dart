@@ -44,6 +44,36 @@ void main() {
       expect(find.text('stub:/host/withdraw'), findsOneWidget);
     });
 
+    // Phase 9 honesty fix: while withdrawals are not open there is no
+    // Withdraw button and the balance is "available", not "withdrawable".
+    testWidgets('payouts off: no Withdraw button, says so up front', (
+      tester,
+    ) async {
+      when(
+        () => getEarnings(any()),
+      ).thenAnswer((_) async => Success(sampleEarnings));
+      await pumpHostPage(
+        tester,
+        BlocProvider(
+          create: (_) => HostEarningsCubit(getEarnings)..load(),
+          child: const HostEarningsPage(payoutsEnabled: false),
+        ),
+        size: phone,
+      );
+      expect(find.textContaining('Withdraw ₹'), findsNothing);
+      expect(find.text('WITHDRAWABLE'), findsNothing);
+      expect(find.text('AVAILABLE'), findsOneWidget);
+      expect(
+        find.textContaining("Withdrawals aren't open yet"),
+        findsOneWidget,
+      );
+      // Amounts are unchanged.
+      expect(find.text('₹621.50'), findsOneWidget);
+      await tester.tap(find.textContaining("Withdrawals aren't open yet"));
+      await tester.pumpAndSettle();
+      expect(find.text('stub:/host/withdraw'), findsOneWidget);
+    });
+
     for (final size in [phone, tablet]) {
       testWidgets('error at $size', (tester) async {
         when(

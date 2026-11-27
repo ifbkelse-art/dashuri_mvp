@@ -580,7 +580,15 @@ class _CallCanvas extends StatelessWidget {
                         : .35))
                 .clamp(0.0, double.infinity);
         final controls = CallControlsBar(
+          // Report first and End last: the two most consequential controls
+          // are as far apart as possible (End is not confirmed, because
+          // billing is per second; Report asks to confirm). Phase 9.
           children: [
+            RoundControl(
+              icon: Icons.flag_rounded,
+              label: 'Report',
+              onPressed: onReport,
+            ),
             RoundControl(
               icon: state.microphoneOn
                   ? Icons.mic_rounded
@@ -612,11 +620,6 @@ class _CallCanvas extends StatelessWidget {
                   onPressed: () => onChatOpen(!chatOpen),
                 ),
               ),
-            RoundControl(
-              icon: Icons.flag_rounded,
-              label: 'Report',
-              onPressed: onReport,
-            ),
             RoundControl(
               icon: Icons.call_end_rounded,
               label: state.status == CallUiStatus.ringing

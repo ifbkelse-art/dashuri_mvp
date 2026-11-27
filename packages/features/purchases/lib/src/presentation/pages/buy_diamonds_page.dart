@@ -194,19 +194,35 @@ class _BalanceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(DashuriTokens.radiusPill),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text('Current balance', style: theme.textTheme.bodyMedium),
-          ),
-          CurrencyAmount.diamonds(balance),
-        ],
+    // A plain labelled row: the filled grey pill read as a disabled field.
+    return Semantics(
+      container: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: DashuriTokens.space2),
+        child: Row(
+          children: [
+            Icon(
+              Icons.account_balance_wallet_outlined,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: DashuriTokens.space2),
+            Expanded(
+              child: Text(
+                'Current balance',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            CurrencyAmount.diamonds(
+              balance,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

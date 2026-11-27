@@ -365,4 +365,13 @@ void main() {
     expect(size320, 48);
     expect(row320, isFalse); // wraps to a second row instead of shrinking
   });
+
+  // Phase 9: End call stands apart from the other controls when there is
+  // room, and the one-row guarantee above is never traded for it.
+  test('controls bar: End call gets extra space only when it fits', () {
+    expect(CallControlsBar.separateLast(5, 56, 12, 440), isTrue);
+    final (s6, g6, _) = CallControlsBar.layoutFor(6, 336);
+    expect(CallControlsBar.separateLast(6, s6, g6, 336), isFalse);
+    expect(CallControlsBar.separateLast(1, 56, 12, 440), isFalse);
+  });
 }

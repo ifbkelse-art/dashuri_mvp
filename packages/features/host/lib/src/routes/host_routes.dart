@@ -117,7 +117,9 @@ final class HostRoutes implements TabFeatureRoutes {
       path: RoutePaths.hostEarnings,
       builder: (context, state) => BlocProvider(
         create: (_) => _sl<HostEarningsCubit>()..load(),
-        child: const HostEarningsPage(),
+        child: HostEarningsPage(
+          payoutsEnabled: _sl.isRegistered<HostPayoutsEnabled>(),
+        ),
       ),
       routes: [
         GoRoute(
