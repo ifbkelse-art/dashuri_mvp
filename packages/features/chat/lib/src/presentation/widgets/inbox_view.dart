@@ -185,19 +185,31 @@ class _InboxRow extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Flexible(
-                          child: Text(
-                            name,
-                            style: theme.textTheme.titleSmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        // Expanded (not Flexible + Spacer): two flex-1 siblings
+                        // split the free width, which left the time floating
+                        // mid-row at a different x for every name length.
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  style: theme.textTheme.titleSmall,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (c.peerIsVerified) ...[
+                                const SizedBox(width: DashuriTokens.space1),
+                                const VerifiedHostBadge(
+                                  compact: true,
+                                  size: 16,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        if (c.peerIsVerified) ...[
-                          const SizedBox(width: DashuriTokens.space1),
-                          const VerifiedHostBadge(compact: true, size: 16),
-                        ],
-                        const Spacer(),
+                        const SizedBox(width: DashuriTokens.space2),
                         Text(
                           ChatFormat.listTime(c.updatedAt),
                           style: theme.textTheme.labelSmall?.copyWith(
