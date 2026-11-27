@@ -185,7 +185,7 @@ class HostGridCard extends StatelessWidget {
                             fit: BoxFit.scaleDown,
                             child: CurrencyAmount.diamonds(
                               host.ratePerMinute,
-                              suffix: ' /min',
+                              suffix: ' / min',
                               style: theme.textTheme.labelLarge?.copyWith(
                                 color: Colors.white,
                               ),

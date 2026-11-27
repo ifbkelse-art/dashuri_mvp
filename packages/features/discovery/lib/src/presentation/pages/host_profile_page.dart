@@ -1,3 +1,4 @@
+import 'package:dashuri_core/dashuri_core.dart';
 import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:flutter/material.dart';
@@ -24,9 +25,16 @@ class HostProfilePage extends StatelessWidget {
           ),
           HostProfileFailed(:final failure) => Scaffold(
             appBar: AppBar(),
+            // A profile that is gone (or hidden by a block) cannot come back
+            // with a retry: no dead-end "Try again" there (Phase 9).
             body: ErrorStateView(
+              title: failure is NotFoundFailure
+                  ? 'Profile not available'
+                  : "Couldn't load this profile",
               message: discoveryFailureMessage(failure),
-              onRetry: () => context.read<HostProfileCubit>().load(userId),
+              onRetry: failure is NotFoundFailure
+                  ? null
+                  : () => context.read<HostProfileCubit>().load(userId),
             ),
           ),
           HostProfileLoaded() => _Loaded(state: s),

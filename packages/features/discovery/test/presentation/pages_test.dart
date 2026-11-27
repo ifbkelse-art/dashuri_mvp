@@ -165,6 +165,7 @@ void main() {
             200,
             scrollable: _vertical,
           );
+          expect(find.text("Couldn't load hosts"), findsOneWidget);
           await t.tap(find.text('Try again'));
           verify(g.load).called(1);
         });
@@ -285,6 +286,14 @@ void main() {
             find.text('This profile is no longer available.'),
             findsOneWidget,
           );
+          expect(find.text('Profile not available'), findsOneWidget);
+          expect(find.text('Try again'), findsNothing);
+        });
+
+        testWidgets('a network error can be retried', (t) async {
+          await pump(t, const HostProfileFailed(NetworkFailure()));
+          expect(find.text("Couldn't load this profile"), findsOneWidget);
+          expect(find.text('Try again'), findsOneWidget);
         });
       });
     });

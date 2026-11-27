@@ -395,6 +395,7 @@ class _Grid extends StatelessWidget {
       case DiscoveryStateFailed(:final failure):
         return SliverToBoxAdapter(
           child: ErrorStateView(
+            title: "Couldn't load hosts",
             message: discoveryFailureMessage(failure),
             onRetry: cubit.load,
           ),
