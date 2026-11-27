@@ -38,6 +38,7 @@ CallSession callSessionFromJson(JsonMap json) => CallSession(
   startedAt: _date(json['started_at']),
   moderationWindowEndsAt: _date(json['moderation_window_ends_at']),
   beansEarned: _int(json['beans_earned']),
+  giftBeansEarned: _int(json['gift_beans_earned']),
   createdAt: _date(json['created_at']),
 );
 

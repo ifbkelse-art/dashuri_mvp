@@ -501,8 +501,14 @@ func toSession(c Call, viewer string, peers map[string]Peer) CallSession {
 	if c.DiamondsCharged != nil {
 		out.DiamondsCharged = *c.DiamondsCharged
 	}
-	if role == "receiver" {
-		out.BeansEarned = c.BeansEarned
+	if role == "receiver" && c.BeansEarned != nil {
+		// Total for the host = call settlement + gifts received during the call.
+		total := *c.BeansEarned + c.GiftBeansEarned
+		out.BeansEarned = &total
+		if c.GiftBeansEarned > 0 {
+			g := c.GiftBeansEarned
+			out.GiftBeansEarned = &g
+		}
 	}
 	if pr, ok := peers[peerID]; ok {
 		out.Peer = &pr

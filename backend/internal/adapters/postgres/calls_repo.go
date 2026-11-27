@@ -24,14 +24,15 @@ var _ calls.Repository = CallsRepo{}
 const callsColumns = `id, caller_id, receiver_id, phase, rate_per_minute, is_free_call, coalesce(provider_call_id, ''),
 	rule_set_version, end_reason, billed_seconds, diamonds_charged, created_at, accepted_at, connected_at, ended_at,
 	moderation_window_ends_at, last_event_at, low_balance_notified_at, free_call_compensated,
-	(select st.beans_earned from calls.settlements st where st.call_id = id)`
+	(select st.beans_earned from calls.settlements st where st.call_id = id),
+	(select coalesce(sum(t.host_beans), 0) from gifts.transactions t where t.call_id = calls.calls.id)`
 
 func callsScanOne(row pgx.Row) (calls.Call, error) {
 	var c calls.Call
 	var phase string
 	err := row.Scan(&c.ID, &c.CallerID, &c.ReceiverID, &phase, &c.RatePerMinute, &c.IsFreeCall, &c.ProviderCallID,
 		&c.RuleSetVersion, &c.EndReason, &c.BilledSeconds, &c.DiamondsCharged, &c.CreatedAt, &c.AcceptedAt, &c.ConnectedAt,
-		&c.EndedAt, &c.ModerationWindowEndsAt, &c.LastEventAt, &c.LowBalanceNotifiedAt, &c.FreeCallCompensated, &c.BeansEarned)
+		&c.EndedAt, &c.ModerationWindowEndsAt, &c.LastEventAt, &c.LowBalanceNotifiedAt, &c.FreeCallCompensated, &c.BeansEarned, &c.GiftBeansEarned)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, calls.ErrNotFound
 	}

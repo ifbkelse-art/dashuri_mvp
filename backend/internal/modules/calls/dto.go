@@ -37,8 +37,11 @@ type CallSession struct {
 	ModerationWindowEndsAt *time.Time `json:"moderation_window_ends_at"`
 	CreatedAt              time.Time  `json:"created_at"`
 	EndedAt                *time.Time `json:"ended_at"`
-	// BeansEarned is shown to the host (receiver) only, from the settlement.
+	// BeansEarned is shown to the host (receiver) only: everything the host
+	// earned on this call, i.e. the settlement plus gifts (nil until settled).
 	BeansEarned *int64 `json:"beans_earned,omitempty"`
+	// GiftBeansEarned is the gift part of BeansEarned (host only; omitted when 0).
+	GiftBeansEarned *int64 `json:"gift_beans_earned,omitempty"`
 }
 
 type EndCallRequest struct {

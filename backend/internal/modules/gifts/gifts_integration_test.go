@@ -524,6 +524,39 @@ func TestGiftBeansFollowTheHold(t *testing.T) {
 	e.ledgerBalanced()
 }
 
+// The host's call summary reports everything earned on the call: the
+// call settlement plus the Beans from gifts sent during it. (Regression:
+// the first version of the SQL compared against the gift row's own id.)
+func TestCallRowCarriesGiftBeans(t *testing.T) {
+	e := setup(t)
+	repo := postgres.CallsRepo{Pool: e.api, Tx: db.TxManager{Pool: e.api}}
+
+	before, err := repo.GetCall(e.ctx, e.call)
+	if err != nil || before.GiftBeansEarned != 0 {
+		t.Fatalf("no gifts yet: %+v %v", before.GiftBeansEarned, err)
+	}
+
+	var want int64
+	for _, g := range []string{"rose", "teddy"} {
+		res, err := e.send(e.pc, e.call, g, e.host, pgtest.UUID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res
+	}
+	if err := e.admin.QueryRow(e.ctx, `select coalesce(sum(host_beans),0) from gifts.transactions where call_id = $1`, e.call).Scan(&want); err != nil || want <= 0 {
+		t.Fatalf("expected gift beans in the ledger: %d %v", want, err)
+	}
+
+	got, err := repo.GetCall(e.ctx, e.call)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GiftBeansEarned != want {
+		t.Fatalf("GiftBeansEarned = %d, want %d", got.GiftBeansEarned, want)
+	}
+}
+
 func TestDisabledFlagRefuses(t *testing.T) {
 	e := setup(t)
 	off := gifts.NewService(gifts.Deps{Repo: postgres.GiftsRepo{Pool: e.api}, Rules: e.rules})

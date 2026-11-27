@@ -38,6 +38,20 @@ void main() {
     expect(s.beansEarned, 1200);
   });
 
+  test('gift Beans on the call (28 Nov): total plus the gift part', () {
+    final s = callSessionFromJson({
+      ...base,
+      'beans_earned': 4035,
+      'gift_beans_earned': 3898,
+    });
+    expect(s.beansEarned, 4035);
+    expect(s.giftBeansEarned, 3898);
+    expect(
+      callSessionFromJson({...base, 'beans_earned': 137}).giftBeansEarned,
+      isNull,
+    );
+  });
+
   test('peer Verified Host flag (2026-11-23), absent means false', () {
     final verified = callSessionFromJson({
       ...base,

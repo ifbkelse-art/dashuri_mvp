@@ -73,6 +73,7 @@ CallSession session({
   DateTime? moderationEnds,
   String? endReason,
   int? beans,
+  int? giftBeans,
   int billed = 0,
   int charged = 0,
 }) => CallSession(
@@ -89,6 +90,7 @@ CallSession session({
   startedAt: startedAt,
   moderationWindowEndsAt: moderationEnds,
   beansEarned: beans,
+  giftBeansEarned: giftBeans,
 );
 
 Widget _echo(BuildContext _, GoRouterState s) =>

@@ -222,6 +222,15 @@ class _Content extends StatelessWidget {
                 style: theme.textTheme.headlineSmall,
               ),
             ),
+            if ((s.giftBeansEarned ?? 0) > 0) ...[
+              const SizedBox(height: DashuriTokens.space1),
+              Text(
+                'Call ${DashuriFormat.count(s.beansEarned! - s.giftBeansEarned!)}'
+                ' · Gifts ${DashuriFormat.count(s.giftBeansEarned!)}',
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
           ] else
             Text(
               s.isFreeCall

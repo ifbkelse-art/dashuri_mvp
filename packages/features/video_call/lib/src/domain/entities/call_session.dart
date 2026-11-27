@@ -60,6 +60,7 @@ final class CallSession extends Equatable {
     this.startedAt,
     this.moderationWindowEndsAt,
     this.beansEarned,
+    this.giftBeansEarned,
     this.createdAt,
   });
 
@@ -84,8 +85,12 @@ final class CallSession extends Equatable {
   /// End of the automated safety-check window (S7, D-09).
   final DateTime? moderationWindowEndsAt;
 
-  /// Beans credited to the host for this call, when the server reports it.
+  /// Everything the host earned on this call (call time plus gifts), in
+  /// Beans, when the server reports it.
   final int? beansEarned;
+
+  /// The gift part of [beansEarned]; null when no gift was received.
+  final int? giftBeansEarned;
 
   /// When the call was requested.
   final DateTime? createdAt;
@@ -113,6 +118,7 @@ final class CallSession extends Equatable {
     startedAt: startedAt,
     moderationWindowEndsAt: moderationWindowEndsAt,
     beansEarned: beansEarned,
+    giftBeansEarned: giftBeansEarned,
     createdAt: createdAt,
   );
 
@@ -131,6 +137,7 @@ final class CallSession extends Equatable {
     startedAt,
     moderationWindowEndsAt,
     beansEarned,
+    giftBeansEarned,
     createdAt,
   ];
 }

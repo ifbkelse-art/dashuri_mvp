@@ -481,6 +481,36 @@ void main() {
           expect(find.text('YOU EARNED'), findsOneWidget);
         });
 
+        testWidgets('V18 host sees call and gift Beans split', (t) async {
+          await pump(
+            t,
+            CallSummaryLoaded(
+              session(
+                role: CallRole.receiver,
+                phase: CallPhase.ended,
+                beans: 4035,
+                giftBeans: 3898,
+              ),
+            ),
+          );
+          expect(find.textContaining('4,035'), findsOneWidget);
+          expect(find.text('Call 137 · Gifts 3,898'), findsOneWidget);
+        });
+
+        testWidgets('V18 host without gifts shows no split', (t) async {
+          await pump(
+            t,
+            CallSummaryLoaded(
+              session(
+                role: CallRole.receiver,
+                phase: CallPhase.ended,
+                beans: 137,
+              ),
+            ),
+          );
+          expect(find.textContaining('Gifts'), findsNothing);
+        });
+
         testWidgets('error', (t) async {
           await pump(t, const CallSummaryFailed(NetworkFailure()));
           expect(find.text('Try again'), findsOneWidget);
