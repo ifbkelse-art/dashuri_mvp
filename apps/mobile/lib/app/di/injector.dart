@@ -22,6 +22,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../experience/app_experience_controller.dart';
 import '../platform/device_photo_pickers.dart';
 import '../platform/device_video_picker.dart';
+import '../platform/in_app_arrival_camera.dart';
+import '../router/app_router.dart' show appNavigatorKey;
 import 'in_call_chat_adapter.dart';
 import 'unconfigured_backend.dart';
 
@@ -132,7 +134,10 @@ Future<void> configureDependencies(AppConfig config, AppLogger logger) async {
   // Optional arrival photo when going online (DASHURI_ARRIVAL_PHOTOS_ENABLED,
   // default off; docs/host). Camera only — never the gallery.
   if (config.arrivalPhotosEnabled) {
-    sl.registerLazySingleton<ArrivalCamera>(DeviceArrivalCamera.new);
+    // In-app front camera (2026-11-27), not the external camera app.
+    sl.registerLazySingleton<ArrivalCamera>(
+      () => InAppArrivalCamera(() => appNavigatorKey.currentState),
+    );
   }
 
   // UI/UX pass: after host approval, "Go to host home" re-reads the account

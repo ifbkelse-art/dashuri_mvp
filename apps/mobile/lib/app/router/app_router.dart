@@ -42,6 +42,10 @@ List<FeatureRoutes> appFeatures({
   if (reelsEnabled) const ReelsRoutes(),
 ];
 
+/// The root navigator. App-level device flows that need a full-screen route
+/// outside any feature (the in-app arrival camera) push with it.
+final appNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
 /// Composes every feature's routes into one GoRouter with the onboarding
 /// guard and the customer and host shells.
 GoRouter buildRouter({
@@ -66,6 +70,7 @@ GoRouter buildRouter({
     isHostShellLocation: composed.isHostShellLocation,
   );
   return GoRouter(
+    navigatorKey: appNavigatorKey,
     initialLocation: initialLocation,
     refreshListenable: guard,
     redirect: (context, state) => guard.redirect(state),

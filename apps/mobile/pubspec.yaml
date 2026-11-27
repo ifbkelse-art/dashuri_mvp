@@ -10,6 +10,7 @@ environment:
 
 dependencies:
   bloc: ^9.0.0
+  camera: ^0.12.2
   dashuri_core:
     path: ../../packages/core
   dashuri_design_system:
@@ -55,6 +56,7 @@ dependencies:
   flutter_bloc: ^9.1.1
   get_it: ^9.2.1
   image_picker: ^1.2.4
+  permission_handler: ^12.0.3
   shared_preferences: ^2.5.3
 
 dev_dependencies:

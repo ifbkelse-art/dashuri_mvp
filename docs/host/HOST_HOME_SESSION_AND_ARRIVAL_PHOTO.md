@@ -4,7 +4,7 @@ Status: **built 2026-11-26, not deployed.** Revised 27 Nov 2026: the separate wa
 
 - **Online session on Host Home.** Client-only, so it has no flag. It reads the new `online_session` field when the server provides one.
 - **Arrival photo.** Backend flag `ARRIVAL_PHOTOS_ENABLED`; app flag `DASHURI_ARRIVAL_PHOTOS_ENABLED`. Both default off.
-- **Unscanned photos.** Backend flag `ARRIVAL_PHOTO_AUTO_APPROVE_UNSCANNED` (default off) is a founder decision (§3.4).
+- **Unscanned photos.** Backend flag `ARRIVAL_PHOTO_AUTO_APPROVE_UNSCANNED` (default off) is a founder decision (§3.4). **Since 27 Nov 2026 the server refuses to start with it in production**, so no arrival photo is shown to customers without a classifier or staff decision. Staff also can't decide their own photo (`self_review`).
 
 Decision record: [ADR-015](../architecture/decisions/ADR-015-virtual-gifts-and-arrival-photos.md).
 
@@ -72,7 +72,7 @@ The layout is tested at phone, foldable, tablet and desktop sizes with 1.3× tex
 ### 3.1 Flow
 
 1. The host taps **Go online**, and Host Home shows "Add an arrival photo?" with **Capture photo** and **Skip**.
-2. **Capture** opens the front camera (`ArrivalCamera` port → `image_picker` with `ImageSource.camera`). It is **never the gallery**. There are no filters, and the image is a JPEG of at most 1440 px at quality 85.
+2. **Capture** opens the **in-app front camera** (27 Nov 2026: `ArrivalCamera` port → `InAppArrivalCamera`, `apps/mobile/lib/app/platform/in_app_arrival_camera.dart`, `camera` plugin, CameraX). It is a full-screen page with a live preview and a shutter. It is **never the gallery**, applies no filters, and takes a 720p JPEG (well under the 2 MiB server limit).
 3. **Preview** offers **Retake** and **Use photo**.
 4. **Use photo** or **Skip** → the host goes online, and that creates the session.
 5. The confirmed photo then uploads to that session: ticket → signed PUT → confirm.
@@ -81,7 +81,15 @@ The layout is tested at phone, foldable, tablet and desktop sizes with 1.3× tex
 
 6. **Skip never blocks or delays going online, and never affects ranking.** Discovery does not sort or filter by it.
 
-Because `image_picker`'s camera source on Android opens the system camera activity, the camera screen itself is the system one. Prompt, preview, retake and confirm are in-app. A fully in-app camera would need the `camera` plugin; that is listed in §5.
+The whole flow is in-app: prompt → camera → preview → Retake / Use photo → upload to the current online session (the existing server validation, re-encode and moderation apply unchanged).
+
+- **Permission:** the plugin asks.
+  - A denial explains why and offers *Try again*.
+  - A permanent denial offers *Open settings*.
+  - A device without a front camera says so.
+  - Every problem screen offers *Not now*. Skipping never blocks going online.
+- **Lifecycle:** the camera is released when the app goes to the background and reopened on return (also after granting access in Settings). It is always released when the page closes or a photo is taken.
+- **Tests:** `apps/mobile/test/platform/in_app_arrival_camera_test.dart` (8, fake camera session).
 
 ### 3.2 Server rules
 
@@ -122,5 +130,5 @@ It is never labelled "Live", "Live video", "Verified identity" or "current appea
 
 1. Moderation path: a paid classifier for every photo, staff review (the current default), or auto-approve unscanned photos.
 2. Retention windows: 24 h after a session, 7 days after a rejection.
-3. Whether to build a fully in-app camera (`camera` plugin) instead of the system camera activity.
+3. ~~Whether to build a fully in-app camera.~~ Decided 27 Nov 2026: built (`camera` plugin).
 4. Activation: both flags and the migration, in order (migration → backend → app).

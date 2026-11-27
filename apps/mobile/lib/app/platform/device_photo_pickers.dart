@@ -96,31 +96,3 @@ final class DeviceVerificationMediaPicker
     );
   }
 }
-
-/// Arrival photo (2026-11-26): ONE new front-camera photo, taken in the
-/// flow. Camera only — the gallery is never offered and no earlier photo can
-/// be reused. No filters or face effects are applied; `imageQuality` makes
-/// the picker re-encode to a compact JPEG, and the server re-encodes again
-/// (dropping metadata) and validates it.
-final class DeviceArrivalCamera implements host.ArrivalCamera {
-  DeviceArrivalCamera([ImagePicker? picker])
-    : _picker = picker ?? ImagePicker();
-  final ImagePicker _picker;
-
-  @override
-  Future<host.PickedPhoto?> capture() async {
-    final file = await _picker.pickImage(
-      source: ImageSource.camera,
-      preferredCameraDevice: CameraDevice.front,
-      maxWidth: 1440,
-      maxHeight: 1440,
-      imageQuality: 85,
-      requestFullMetadata: false,
-    );
-    if (file == null) return null;
-    return host.PickedPhoto(
-      bytes: await file.readAsBytes(),
-      contentType: 'image/jpeg',
-    );
-  }
-}
