@@ -212,6 +212,7 @@ class _HostDashboardPageState extends State<HostDashboardPage> {
               HostDashboardStateInitial() ||
               HostDashboardStateLoading() => const LoadingView(),
               HostDashboardStateFailed(:final failure) => ErrorStateView(
+                title: "Couldn't load Host Home",
                 message: hostFailureMessage(failure),
                 onRetry: cubit.load,
               ),

@@ -29,6 +29,7 @@ class HostWithdrawPage extends StatelessWidget {
             WithdrawPhase.loading => (const LoadingView(), null),
             WithdrawPhase.loadFailed => (
               ErrorStateView(
+                title: "Couldn't load your balance",
                 message: hostFailureMessage(state.failure!),
                 onRetry: cubit.load,
               ),

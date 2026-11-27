@@ -31,6 +31,7 @@ class HostAvailabilityPage extends StatelessWidget {
           HostDashboardStateInitial() ||
           HostDashboardStateLoading() => const LoadingView(),
           HostDashboardStateFailed(:final failure) => ErrorStateView(
+            title: "Couldn't load your availability",
             message: hostFailureMessage(failure),
             onRetry: cubit.load,
           ),

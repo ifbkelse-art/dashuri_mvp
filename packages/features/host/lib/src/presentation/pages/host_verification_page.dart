@@ -72,6 +72,7 @@ class _HostVerificationPageState extends State<HostVerificationPage> {
       } else if (state.status == HostVerificationStatus.loadFailed ||
           host == null) {
         body = ErrorStateView(
+          title: "Couldn't load your verification",
           message: hostFailureMessage(
             state.failure ?? const UnexpectedFailure(),
           ),

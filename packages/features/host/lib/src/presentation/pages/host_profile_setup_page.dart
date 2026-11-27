@@ -62,6 +62,7 @@ class HostProfileSetupPage extends StatelessWidget {
           HostProfileSetupStatus.loadFailed => Scaffold(
             appBar: AppBar(),
             body: ErrorStateView(
+              title: "Couldn't load your profile",
               message: hostFailureMessage(state.failure!),
               onRetry: context.read<HostProfileSetupCubit>().load,
             ),

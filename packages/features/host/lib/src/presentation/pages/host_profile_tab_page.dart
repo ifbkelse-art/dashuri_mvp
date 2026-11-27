@@ -36,6 +36,7 @@ class HostProfileTabPage extends StatelessWidget {
           }
           if (state.status == HostProfileTabStatus.failed) {
             return ErrorStateView(
+              title: "Couldn't load your profile",
               message: hostFailureMessage(state.failure!),
               onRetry: cubit.load,
             );

@@ -36,6 +36,7 @@ class VerifiedHostPage extends StatelessWidget {
             body: switch (state.status) {
               VerifiedHostStatus.loading => const LoadingView(),
               VerifiedHostStatus.loadFailed => ErrorStateView(
+                title: "Couldn't load Verified Host",
                 message: hostFailureMessage(state.failure!),
                 onRetry: cubit.load,
               ),

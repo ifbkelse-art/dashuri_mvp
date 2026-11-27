@@ -18,6 +18,7 @@ class HostGiftsPage extends StatelessWidget {
       builder: (context, s) => switch (s) {
         HostGiftsLoading() => const LoadingView(),
         HostGiftsFailed(:final failure) => ErrorStateView(
+          title: "Couldn't load your gifts",
           message: hostFailureMessage(failure),
           onRetry: context.read<HostGiftsCubit>().load,
         ),

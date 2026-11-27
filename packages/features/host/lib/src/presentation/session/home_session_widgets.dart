@@ -34,6 +34,7 @@ class HomeAvailabilityCard extends StatelessWidget {
     ),
     HostSessionLoadFailed(:final failure) => HostCard(
       child: ErrorStateView(
+        title: "Couldn't load your online status",
         message: hostFailureMessage(failure),
         onRetry: () =>
             context.read<HostSessionBloc>().add(const HostSessionStarted()),
@@ -267,14 +268,8 @@ class _OnlineCard extends StatelessWidget {
                 label: Text('${DashuriFormat.count(host.ratePerMinute)} / min'),
               ),
               if (host.isVerified) const VerifiedHostBadge(),
-              Chip(
-                avatar: const Icon(Icons.card_giftcard_rounded, size: 16),
-                label: Text(
-                  dashboard.data.freeCallOptIn
-                      ? 'Free calls on'
-                      : 'Free calls off',
-                ),
-              ),
+              // No "Free calls on/off" chip: the Free Call Card switch below
+              // shows (and changes) the same setting (Phase 9).
             ],
           ),
           const SizedBox(height: DashuriTokens.space5),

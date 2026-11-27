@@ -38,6 +38,7 @@ class HostOnboardingPage extends StatelessWidget {
           body = const LoadingView();
         case HostApplicationStatus.loadFailed:
           body = ErrorStateView(
+            title: "Couldn't load your application",
             message: hostFailureMessage(state.failure!),
             onRetry: cubit.load,
           );

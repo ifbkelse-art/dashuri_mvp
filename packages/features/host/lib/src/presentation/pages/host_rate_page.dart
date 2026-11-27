@@ -61,6 +61,7 @@ class HostRatePage extends StatelessWidget {
             body: switch (state.status) {
               HostRateStatus.loading => const LoadingView(),
               HostRateStatus.loadFailed => ErrorStateView(
+                title: "Couldn't load your rate",
                 message: hostFailureMessage(state.failure!),
                 onRetry: cubit.load,
               ),

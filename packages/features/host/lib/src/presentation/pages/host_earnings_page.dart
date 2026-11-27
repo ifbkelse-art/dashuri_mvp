@@ -34,6 +34,7 @@ class HostEarningsPage extends StatelessWidget {
           return switch (state.status) {
             HostEarningsStatus.loading => const LoadingView(),
             HostEarningsStatus.failed => ErrorStateView(
+              title: "Couldn't load your earnings",
               message: hostFailureMessage(state.failure!),
               onRetry: cubit.load,
             ),

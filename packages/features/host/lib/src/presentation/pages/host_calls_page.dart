@@ -61,6 +61,7 @@ class HostCallsPage extends StatelessWidget {
               );
             case PagedStatus.failed:
               content = ErrorStateView(
+                title: "Couldn't load your calls",
                 message: hostFailureMessage(list.failure!),
                 onRetry: cubit.load,
               );

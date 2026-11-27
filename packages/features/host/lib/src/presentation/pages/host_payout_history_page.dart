@@ -29,6 +29,7 @@ class HostPayoutHistoryPage extends StatelessWidget {
         return switch (state.status) {
           PagedStatus.loading => const SkeletonList(avatar: false),
           PagedStatus.failed => ErrorStateView(
+            title: "Couldn't load payout history",
             message: hostFailureMessage(state.failure!),
             onRetry: cubit.load,
           ),
