@@ -9,6 +9,9 @@ abstract final class HostPaths {
   /// H15, child of [RoutePaths.hostEarnings].
   static const beansExplainer = '${RoutePaths.hostEarnings}/beans';
 
+  /// Beans history, child of [RoutePaths.hostEarnings].
+  static const beansHistory = '${RoutePaths.hostEarnings}/history';
+
   /// Query flag marking a page as part of the application flow (FL04):
   /// saving continues to the next step instead of returning.
   static const flowParam = 'flow';

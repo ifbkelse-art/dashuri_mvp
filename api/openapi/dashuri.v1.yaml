@@ -730,6 +730,82 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /v1/host/beans/history:
+    get:
+      operationId: listHostBeansHistory
+      tags:
+        - host
+      summary: "Every Bean movement of this host (earnings, releases, withdrawals, reversals), newest first, with a running balance."
+      x-required-roles:
+        - host
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, calls, gifts, released, withdrawals, other]
+            default: all
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BeanHistoryItem"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+  /v1/host/beans/summary:
+    get:
+      operationId: getHostBeansSummary
+      tags:
+        - host
+      summary: "Balance split, lifetime earnings by source and recent totals for the host's Beans."
+      x-required-roles:
+        - host
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BeanSummary"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
   /v1/host/withdrawals:
     post:
       operationId: requestWithdrawal
@@ -5434,6 +5510,65 @@ components:
             - string
             - "null"
           format: date-time
+    BeanHistoryItem:
+      type: object
+      description: One Bean-affecting ledger entry of the host. `beans` is the change to the Beans balance (on hold + available); it is 0 for pure moves between buckets, which report `moved_beans` instead. The balance_after of the newest item equals the current balance.
+      required: [id, occurred_at, type, title, beans, balance_after]
+      properties:
+        id: {type: string, format: uuid}
+        occurred_at: {type: string, format: date-time}
+        type:
+          type: string
+          enum: [call, free_call, gift, release, withdrawal, payout_paid, payout_failed, reversal, adjustment, other]
+        title: {type: string}
+        subtitle: {type: [string, "null"]}
+        beans: {type: integer, format: int64}
+        moved_beans: {type: integer, format: int64}
+        balance_after: {type: integer, format: int64}
+        status:
+          type: string
+          description: Earnings only. on_hold until the 7-day hold ends, then released.
+          enum: [on_hold, released]
+        releases_at: {type: string, format: date-time}
+        released_at: {type: string, format: date-time}
+        call_id: {type: string, format: uuid}
+        peer_name: {type: string}
+    BeanSummary:
+      type: object
+      required:
+        - balance_beans
+        - beans_on_hold
+        - beans_available
+        - beans_pending_payout
+        - lifetime_earned
+        - from_calls
+        - from_gifts
+        - from_free_calls
+        - call_count
+        - gift_count
+        - reversed
+        - paid_out
+        - adjustments
+        - earned_today
+        - earned_7_days
+        - earned_30_days
+      properties:
+        balance_beans: {type: integer, format: int64}
+        beans_on_hold: {type: integer, format: int64}
+        beans_available: {type: integer, format: int64}
+        beans_pending_payout: {type: integer, format: int64}
+        lifetime_earned: {type: integer, format: int64}
+        from_calls: {type: integer, format: int64}
+        from_gifts: {type: integer, format: int64}
+        from_free_calls: {type: integer, format: int64}
+        call_count: {type: integer, format: int64}
+        gift_count: {type: integer, format: int64}
+        reversed: {type: integer, format: int64}
+        paid_out: {type: integer, format: int64}
+        adjustments: {type: integer, format: int64}
+        earned_today: {type: integer, format: int64}
+        earned_7_days: {type: integer, format: int64}
+        earned_30_days: {type: integer, format: int64}
     WithdrawalRequest:
       type: object
       additionalProperties: false

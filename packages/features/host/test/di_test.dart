@@ -29,6 +29,7 @@ void main() {
       expect(sl<HostWithdrawCubit>(), isA<HostWithdrawCubit>());
       expect(sl<HostPayoutsCubit>(), isA<HostPayoutsCubit>());
       expect(sl<HostCallsCubit>(), isA<HostCallsCubit>());
+      expect(sl<HostBeansHistoryCubit>(), isA<HostBeansHistoryCubit>());
       expect(sl<HostProfileTabCubit>(), isA<HostProfileTabCubit>());
       expect(
         identical(sl<HostPresenceController>(), sl<HostPresenceController>()),

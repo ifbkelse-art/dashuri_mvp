@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -95,6 +96,124 @@ func (r WalletRepo) Entries(ctx context.Context, userID, cursor string, limit in
 		next = EncodeCursor(last.OccurredAt, last.EntryID)
 	}
 	return out, next, nil
+}
+
+// uuidText guards a text -> uuid cast so a non-uuid reference never errors.
+const uuidText = `'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'`
+
+// beanPosted is the host's Bean-affecting journal entries: per entry, the
+// signed postings to each Bean account. Everything on the history screen is
+// derived from this, so it reconciles to ledger.balances by construction.
+const beanPosted = `
+	select je.id, je.entry_type, coalesce(je.reference, '') as ref, je.occurred_at,
+	       coalesce(sum(p.amount) filter (where a.kind = 'bean_held'), 0)::bigint as held_d,
+	       coalesce(sum(p.amount) filter (where a.kind = 'bean_available'), 0)::bigint as avail_d,
+	       coalesce(sum(p.amount) filter (where a.kind = 'bean_payout_pending'), 0)::bigint as pend_d
+	  from ledger.accounts a
+	  join ledger.postings p on p.account_id = a.id
+	  join ledger.journal_entries je on je.id = p.entry_id
+	 where a.owner_user_id = $1 and p.currency = 'BEAN'
+	 group by je.id, je.entry_type, je.reference, je.occurred_at`
+
+// BeanHistory pages the host's Bean entries newest first with a running
+// balance (held + available) and the call / gift / release details.
+func (r WalletRepo) BeanHistory(ctx context.Context, userID string, types []string, cursor string, limit int) ([]wallet.BeanRow, string, error) {
+	cur, err := DecodeCursor(cursor)
+	if err != nil {
+		return nil, "", wallet.ErrBadCursor
+	}
+	args := []any{userID, limit + 1}
+	where := "true"
+	if types != nil {
+		args = append(args, types)
+		where += fmt.Sprintf(" and entry_type = any($%d)", len(args))
+	}
+	if cur != nil {
+		if !isUUIDString(cur.ID) {
+			return nil, "", wallet.ErrBadCursor
+		}
+		args = append(args, cur.At, cur.ID)
+		where += fmt.Sprintf(" and (occurred_at, id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	rows, err := r.Pool.Query(ctx, `
+		with posted as (`+beanPosted+`),
+		run as (
+			select *, sum(held_d + avail_d) over (order by occurred_at, id) as balance_after from posted
+		),
+		pg as (
+			select *, case when ref ~ `+uuidText+` then ref::uuid end as ref_uuid
+			  from run
+			 where `+where+`
+			 order by occurred_at desc, id desc
+			 limit $2
+		)
+		select r.id::text, r.entry_type, r.occurred_at, r.held_d, r.avail_d, r.pend_d, r.balance_after::bigint,
+		       coalesce(pp.display_name, ''), coalesce(c.id::text, t.call_id::text, c2.id::text, t2.call_id::text, ''),
+		       coalesce(c.billed_seconds, c2.billed_seconds), coalesce(c.rate_per_minute, c2.rate_per_minute),
+		       coalesce(t.gift_name, t2.gift_name, ''), coalesce(t.emoji, t2.emoji, ''),
+		       coalesce(src.entry_type, ''), rl.occurred_at
+		  from pg r
+		  left join calls.calls c on r.entry_type = 'call_settlement' and c.id = r.ref_uuid
+		  left join gifts.transactions t on r.entry_type = 'gift_send' and t.id = r.ref_uuid
+		  left join ledger.journal_entries src on r.entry_type = 'bean_release' and src.id = r.ref_uuid
+		  left join calls.calls c2 on src.entry_type = 'call_settlement'
+		       and c2.id = case when src.reference ~ `+uuidText+` then src.reference::uuid end
+		  left join gifts.transactions t2 on src.entry_type = 'gift_send'
+		       and t2.id = case when src.reference ~ `+uuidText+` then src.reference::uuid end
+		  left join identity.profiles pp on pp.user_id = coalesce(c.caller_id, t.sender_id, c2.caller_id, t2.sender_id)
+		  left join lateral (
+		        select rel.occurred_at from ledger.journal_entries rel
+		         where rel.entry_type = 'bean_release' and rel.reference = r.id::text
+		         order by rel.occurred_at limit 1) rl
+		       on r.entry_type in ('call_settlement', 'gift_send', 'free_call_compensation')
+		 order by r.occurred_at desc, r.id desc`, args...)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+	var out []wallet.BeanRow
+	for rows.Next() {
+		var b wallet.BeanRow
+		if err := rows.Scan(&b.EntryID, &b.EntryType, &b.OccurredAt, &b.HeldDelta, &b.AvailableDelta, &b.PendingDelta,
+			&b.BalanceAfter, &b.PeerName, &b.CallID, &b.CallSeconds, &b.CallRate, &b.GiftName, &b.GiftEmoji,
+			&b.SourceType, &b.ReleasedAt); err != nil {
+			return nil, "", err
+		}
+		out = append(out, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", err
+	}
+	next := ""
+	if len(out) > limit {
+		out = out[:limit]
+		last := out[len(out)-1]
+		next = EncodeCursor(last.OccurredAt, last.EntryID)
+	}
+	return out, next, nil
+}
+
+// BeanTotals sums the host's Bean earnings by source and by recent window.
+func (r WalletRepo) BeanTotals(ctx context.Context, userID string, todayStart, since7, since30 time.Time) (wallet.BeanTotals, error) {
+	var t wallet.BeanTotals
+	err := r.Pool.QueryRow(ctx, `
+		with posted as (`+beanPosted+`)
+		select
+		  coalesce(sum(held_d) filter (where entry_type = 'call_settlement'), 0)::bigint,
+		  coalesce(sum(held_d) filter (where entry_type = 'gift_send'), 0)::bigint,
+		  coalesce(sum(held_d) filter (where entry_type = 'free_call_compensation'), 0)::bigint,
+		  count(*) filter (where entry_type = 'call_settlement'),
+		  count(*) filter (where entry_type = 'gift_send'),
+		  coalesce(-sum(held_d + avail_d) filter (where entry_type = 'bean_clawback'), 0)::bigint,
+		  coalesce(sum(held_d + avail_d) filter (where entry_type = 'adjustment'), 0)::bigint,
+		  coalesce(-sum(pend_d) filter (where entry_type = 'payout_paid'), 0)::bigint,
+		  coalesce(sum(held_d) filter (where entry_type in ('call_settlement','gift_send','free_call_compensation') and occurred_at >= $2), 0)::bigint,
+		  coalesce(sum(held_d) filter (where entry_type in ('call_settlement','gift_send','free_call_compensation') and occurred_at >= $3), 0)::bigint,
+		  coalesce(sum(held_d) filter (where entry_type in ('call_settlement','gift_send','free_call_compensation') and occurred_at >= $4), 0)::bigint
+		from posted`, userID, todayStart, since7, since30).
+		Scan(&t.FromCalls, &t.FromGifts, &t.FromFreeCalls, &t.CallCount, &t.GiftCount, &t.Reversed, &t.Adjustments,
+			&t.PaidOut, &t.Today, &t.Last7Days, &t.Last30Days)
+	return t, err
 }
 
 func isUUIDString(s string) bool {

@@ -13,6 +13,9 @@ import (
 // Deps are the ports this module needs; wired in internal/app/wire_wallet.go.
 type Deps struct {
 	Repo Repository // nil → 503 database_unavailable
+	// HoldPeriod is how long earned Beans stay on hold (economy rule); zero
+	// uses the founder rule. Only used to say when a line becomes withdrawable.
+	HoldPeriod time.Duration
 }
 
 // Balances are the user's ledger projection rows (by account kind) plus
@@ -41,6 +44,11 @@ type Repository interface {
 	Balances(ctx context.Context, userID string) (Balances, error)
 	// Entries pages the user's entries newest first (keyset on occurred_at, entry id).
 	Entries(ctx context.Context, userID, cursor string, limit int) (rows []EntryRow, next string, err error)
+	// BeanHistory pages the host's Bean-affecting entries newest first; types
+	// nil = all (beans_history.go).
+	BeanHistory(ctx context.Context, userID string, types []string, cursor string, limit int) (rows []BeanRow, next string, err error)
+	// BeanTotals sums the host's Bean earnings; since* bound the recent windows.
+	BeanTotals(ctx context.Context, userID string, todayStart, since7, since30 time.Time) (BeanTotals, error)
 }
 
 // PageRequest is a parsed cursor page request.

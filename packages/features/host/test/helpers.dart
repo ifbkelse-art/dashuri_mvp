@@ -42,10 +42,15 @@ class MockListHostCalls extends Mock implements ListHostCalls {}
 
 class MockHostRepository extends Mock implements HostRepository {}
 
+class MockGetBeanHistory extends Mock implements GetBeanHistory {}
+
+class MockGetBeanSummary extends Mock implements GetBeanSummary {}
+
 void registerHostFallbacks() {
   registerFallbackValue(const NoInput());
   registerFallbackValue(IdempotencyKey.generate());
   registerFallbackValue(const PageRequest());
+  registerFallbackValue(const BeanHistoryQuery(BeanFilter.all, PageRequest()));
   registerFallbackValue(samplePhoto);
   registerFallbackValue((beans: 0, idempotencyKey: IdempotencyKey.generate()));
   registerFallbackValue((

@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 
 import '../application/arrival_photo_cubit.dart';
 import '../application/host_application_cubit.dart';
+import '../application/host_beans_history_cubit.dart';
 import '../application/host_calls_cubit.dart';
 import '../application/host_dashboard_cubit.dart';
 import '../application/host_earnings_cubit.dart';
@@ -16,19 +17,23 @@ import '../application/host_session_bloc.dart';
 import '../application/host_verification_cubit.dart';
 import '../application/host_withdraw_cubit.dart';
 import '../application/verified_host_cubit.dart';
+import '../data/datasources/host_beans_remote_data_source.dart';
 import '../data/datasources/host_profile_remote_data_source.dart';
 import '../data/datasources/host_remote_data_source.dart';
 import '../data/datasources/host_session_remote_data_source.dart';
 import '../data/datasources/host_verification_remote_data_source.dart';
 import '../data/datasources/photo_upload_data_source.dart';
+import '../data/repositories/host_beans_repository_impl.dart';
 import '../data/repositories/host_repository_impl.dart';
 import '../data/repositories/host_session_repository_impl.dart';
 import '../data/repositories/host_verification_repository_impl.dart';
 import '../domain/ports/arrival_camera.dart';
+import '../domain/repositories/host_beans_repository.dart';
 import '../domain/repositories/host_repository.dart';
 import '../domain/repositories/host_session_repository.dart';
 import '../domain/repositories/host_verification_repository.dart';
 import '../domain/usecases/apply_as_host.dart';
+import '../domain/usecases/beans_usecases.dart';
 import '../domain/usecases/get_earnings.dart';
 import '../domain/usecases/get_host_status.dart';
 import '../domain/usecases/get_my_host_profile.dart';
@@ -135,6 +140,21 @@ void registerHostFeature(GetIt sl) {
     )
     ..registerFactory<HostEarningsCubit>(
       () => HostEarningsCubit(sl<GetEarnings>()),
+    )
+    ..registerLazySingleton<HostBeansRemoteDataSource>(
+      () => HostBeansRemoteDataSource(sl<ApiClient>()),
+    )
+    ..registerLazySingleton<HostBeansRepository>(
+      () => HostBeansRepositoryImpl(sl<HostBeansRemoteDataSource>()),
+    )
+    ..registerFactory<GetBeanHistory>(
+      () => GetBeanHistory(sl<HostBeansRepository>()),
+    )
+    ..registerFactory<GetBeanSummary>(
+      () => GetBeanSummary(sl<HostBeansRepository>()),
+    )
+    ..registerFactory<HostBeansHistoryCubit>(
+      () => HostBeansHistoryCubit(sl<GetBeanHistory>(), sl<GetBeanSummary>()),
     )
     ..registerFactory<HostWithdrawCubit>(
       () => HostWithdrawCubit(

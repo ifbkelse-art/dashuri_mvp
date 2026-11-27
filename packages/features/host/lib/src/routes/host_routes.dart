@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 
 import '../application/arrival_photo_cubit.dart';
 import '../application/host_application_cubit.dart';
+import '../application/host_beans_history_cubit.dart';
 import '../application/host_calls_cubit.dart';
 import '../application/host_dashboard_cubit.dart';
 import '../application/host_earnings_cubit.dart';
@@ -24,6 +25,7 @@ import '../presentation/host_paths.dart';
 import '../presentation/pages/beans_explainer_page.dart';
 import '../presentation/pages/host_agreement_page.dart';
 import '../presentation/pages/host_availability_page.dart';
+import '../presentation/pages/host_beans_history_page.dart';
 import '../presentation/pages/host_calls_page.dart';
 import '../presentation/pages/host_dashboard_page.dart';
 import '../presentation/pages/host_earnings_page.dart';
@@ -125,6 +127,13 @@ final class HostRoutes implements TabFeatureRoutes {
         GoRoute(
           path: 'beans',
           builder: (context, state) => const BeansExplainerPage(),
+        ),
+        GoRoute(
+          path: 'history',
+          builder: (context, state) => BlocProvider(
+            create: (_) => _sl<HostBeansHistoryCubit>()..load(),
+            child: const HostBeansHistoryPage(),
+          ),
         ),
       ],
     ),

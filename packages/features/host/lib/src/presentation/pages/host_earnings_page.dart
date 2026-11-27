@@ -221,6 +221,11 @@ class _Links extends StatelessWidget {
   Widget build(BuildContext context) => HostLinkGroup(
     tiles: [
       HostLinkTile(
+        icon: Icons.history_rounded,
+        title: 'Beans history',
+        onTap: () => context.push(HostPaths.beansHistory),
+      ),
+      HostLinkTile(
         icon: Icons.calculate_outlined,
         title: 'How Beans work',
         onTap: () => context.push(HostPaths.beansExplainer),
