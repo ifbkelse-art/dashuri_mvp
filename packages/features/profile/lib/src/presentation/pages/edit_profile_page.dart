@@ -91,6 +91,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           body: switch (state.status) {
             EditProfileStatus.loading => const LoadingView(),
             EditProfileStatus.failed => ErrorStateView(
+              title: "Couldn't load your profile",
               message: failureMessage(state.loadFailure!),
               onRetry: cubit.load,
             ),

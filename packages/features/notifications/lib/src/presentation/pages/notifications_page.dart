@@ -100,6 +100,7 @@ class NotificationsPage extends StatelessWidget {
             InboxStateInitial() ||
             InboxStateLoading() => const SkeletonList(avatar: false),
             InboxStateFailed(:final failure) => ErrorStateView(
+              title: "Couldn't load your notifications",
               message: failureMessage(failure),
               onRetry: cubit.load,
             ),

@@ -53,6 +53,7 @@ class EnforcementPage extends StatelessWidget {
         builder: (context, state) => switch (state.status) {
           EnforcementStatus.loading => const LoadingView(),
           EnforcementStatus.failed => ErrorStateView(
+            title: "Couldn't load your account status",
             message: failureMessage(state.failure!),
             onRetry: context.read<EnforcementCubit>().load,
           ),

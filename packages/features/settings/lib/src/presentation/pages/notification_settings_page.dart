@@ -32,6 +32,7 @@ class NotificationSettingsPage extends StatelessWidget {
           if (state.loading) return const LoadingView();
           if (state.data == null) {
             return ErrorStateView(
+              title: "Couldn't load these settings",
               message: failureMessage(state.failure!),
               onRetry: cubit.load,
             );

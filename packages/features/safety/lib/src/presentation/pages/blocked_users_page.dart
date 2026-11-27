@@ -50,6 +50,7 @@ class BlockedUsersPage extends StatelessWidget {
           BlockedUsersStateInitial() ||
           BlockedUsersStateLoading() => const SkeletonList(),
           BlockedUsersStateFailed(:final failure) => ErrorStateView(
+            title: "Couldn't load blocked users",
             message: safetyFailureMessage(failure),
             onRetry: context.read<BlockedUsersCubit>().load,
           ),

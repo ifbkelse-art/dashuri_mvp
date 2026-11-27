@@ -47,6 +47,7 @@ class MyProfilePage extends StatelessWidget {
               MyProfileStateInitial() ||
               MyProfileStateLoading() => const LoadingView(),
               MyProfileStateFailed(:final failure) => ErrorStateView(
+                title: "Couldn't load your profile",
                 message: failureMessage(failure),
                 onRetry: cubit.load,
               ),

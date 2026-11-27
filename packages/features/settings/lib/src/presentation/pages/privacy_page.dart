@@ -33,6 +33,7 @@ class PrivacyPage extends StatelessWidget {
           return switch (state.status) {
             PrivacyStatus.loading => const LoadingView(),
             PrivacyStatus.failed => ErrorStateView(
+              title: "Couldn't load these settings",
               message: failureMessage(state.failure!),
               onRetry: cubit.load,
             ),
