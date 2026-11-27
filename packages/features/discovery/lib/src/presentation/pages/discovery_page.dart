@@ -230,9 +230,10 @@ class _Header extends StatelessWidget {
                   for (final s in DiscoverySort.values)
                     PopupMenuItem(value: s, child: Text(s.label)),
                 ],
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: DashuriTokens.space2,
+                // 48-pt minimum tap target (Phase 9 accessibility).
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: DashuriTokens.minTapTarget,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

@@ -154,6 +154,38 @@ void main() {
           );
         });
 
+        // Phase 9 accessibility: call controls, accept/decline.
+        for (final (name, state) in [
+          (
+            'active',
+            CallState(
+              status: CallUiStatus.active,
+              mediaJoined: true,
+              session: session(startedAt: DateTime.now().toUtc()),
+            ),
+          ),
+          (
+            'incoming',
+            CallState(
+              status: CallUiStatus.incoming,
+              session: session(
+                role: CallRole.receiver,
+                phase: CallPhase.ringing,
+              ),
+            ),
+          ),
+        ]) {
+          testWidgets('$name call meets tap-target and label guidelines', (
+            t,
+          ) async {
+            final handle = t.ensureSemantics();
+            await pump(t, state);
+            await expectLater(t, meetsGuideline(androidTapTargetGuideline));
+            await expectLater(t, meetsGuideline(labeledTapTargetGuideline));
+            handle.dispose();
+          });
+        }
+
         testWidgets('V04/V05 active with safety chip and low balance', (
           t,
         ) async {

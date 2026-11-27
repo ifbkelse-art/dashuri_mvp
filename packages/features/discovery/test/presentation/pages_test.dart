@@ -55,6 +55,19 @@ void main() {
           return g;
         }
 
+        // Phase 9 accessibility: Android tap-target size and a label on
+        // every tappable element.
+        testWidgets('C01 meets tap-target and label guidelines', (t) async {
+          final handle = t.ensureSemantics();
+          await pump(
+            t,
+            DiscoveryStateLoaded(Page(items: [host('a'), host('b')])),
+          );
+          await expectLater(t, meetsGuideline(androidTapTargetGuideline));
+          await expectLater(t, meetsGuideline(labeledTapTargetGuideline));
+          handle.dispose();
+        });
+
         testWidgets('C01 header, chips and grid', (t) async {
           final g = await pump(
             t,
@@ -166,6 +179,10 @@ void main() {
             scrollable: _vertical,
           );
           expect(find.text("Couldn't load hosts"), findsOneWidget);
+          // The 48-pt sort target (Phase 9) made the header taller: bring
+          // the button fully on screen (scrollUntilVisible stops at its edge).
+          await t.ensureVisible(find.text('Try again'));
+          await t.pumpAndSettle();
           await t.tap(find.text('Try again'));
           verify(g.load).called(1);
         });
@@ -229,6 +246,14 @@ void main() {
           balance: 12480,
           approxPaisePerDiamondMilli: 2200,
         ));
+
+        testWidgets('C07 meets tap-target and label guidelines', (t) async {
+          final handle = t.ensureSemantics();
+          await pump(t, loaded('available'));
+          await expectLater(t, meetsGuideline(androidTapTargetGuideline));
+          await expectLater(t, meetsGuideline(labeledTapTargetGuideline));
+          handle.dispose();
+        });
 
         testWidgets('C07 online: call goes to pre-call', (t) async {
           await pump(t, loaded('available'));

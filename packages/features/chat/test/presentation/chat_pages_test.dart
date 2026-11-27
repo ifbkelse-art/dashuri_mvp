@@ -59,6 +59,20 @@ void main() {
   for (final size in [phone, tablet]) {
     final expanded = size.width >= 840;
     group('at ${size.width.toInt()}x${size.height.toInt()}', () {
+      // Phase 9 accessibility.
+      testWidgets('CH01 meets tap-target and label guidelines', (tester) async {
+        final handle = tester.ensureSemantics();
+        final cubit = InboxCubitMock();
+        when(() => cubit.state).thenReturn(
+          ConversationsStateLoaded(Page(items: [meera, kavya]), myUserId: 'me'),
+        );
+        when(cubit.loadMore).thenAnswer((_) async {});
+        await pumpPage(tester, inbox(cubit), size: size);
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        handle.dispose();
+      });
+
       testWidgets('CH01 inbox rows, unread badge, "You:" prefix and open', (
         tester,
       ) async {

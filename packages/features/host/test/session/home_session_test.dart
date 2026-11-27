@@ -494,6 +494,28 @@ void main() {
     expect(goOffline.onPressed, isNotNull);
   });
 
+  // Phase 9 accessibility: Android tap targets and labels on Host Home,
+  // offline and online.
+  for (final online in [false, true]) {
+    testWidgets('Host Home meets tap-target and label guidelines '
+        '(online: $online)', (t) async {
+      final handle = t.ensureSemantics();
+      when(
+        () => status(any()),
+      ).thenAnswer((_) async => Success(online ? _online() : approvedOffline));
+      await pumpHostPage(
+        t,
+        page(arrival: false),
+        size: const Size(390, 844),
+        settle: false,
+      );
+      await pumpFor(t, const Duration(milliseconds: 500));
+      await expectLater(t, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(t, meetsGuideline(labeledTapTargetGuideline));
+      handle.dispose();
+    });
+  }
+
   testWidgets('go offline: session ended with duration', (t) async {
     when(() => status(any())).thenAnswer((_) async => Success(_online()));
     when(

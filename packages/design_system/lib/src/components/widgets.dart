@@ -17,43 +17,62 @@ class BalancePill extends StatelessWidget {
     final theme = Theme.of(context);
     // A compact header chip: its number must never truncate, so its text
     // grows with the system size only up to 1.5x (still clearly larger).
+    // Accessibility (Phase 9): one clean label (children excluded, so the
+    // number isn't read twice) and a 48-pt tap target around the 40-pt
+    // pill, like Material's padded tap targets.
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.5,
       child: Semantics(
         button: onTap != null,
         label: diamonds == null ? 'Wallet' : '${diamonds!} Diamonds. Buy more',
-        child: Material(
-          color: theme.colorScheme.surfaceContainerLow,
-          shape: StadiumBorder(
-            side: BorderSide(color: theme.colorScheme.outlineVariant),
-          ),
-          child: InkWell(
-            customBorder: const StadiumBorder(),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const DiamondIcon(),
-                  const SizedBox(width: 8),
-                  Text(
-                    diamonds == null ? '—' : DashuriFormat.count(diamonds!),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontFeatures: const [FontFeature.tabularFigures()],
+        onTap: onTap,
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: DashuriTokens.minTapTarget,
+            ),
+            child: Center(
+              widthFactor: 1,
+              child: Material(
+                color: theme.colorScheme.surfaceContainerLow,
+                shape: StadiumBorder(
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+                child: InkWell(
+                  customBorder: const StadiumBorder(),
+                  onTap: onTap,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const DiamondIcon(),
+                        const SizedBox(width: 8),
+                        Text(
+                          diamonds == null
+                              ? '—'
+                              : DashuriFormat.count(diamonds!),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: theme.colorScheme.primary,
+                          child: Icon(
+                            Icons.add,
+                            size: 18,
+                            color: theme.colorScheme.onPrimary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: theme.colorScheme.primary,
-                    child: Icon(
-                      Icons.add,
-                      size: 18,
-                      color: theme.colorScheme.onPrimary,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

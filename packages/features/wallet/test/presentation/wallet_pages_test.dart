@@ -79,6 +79,30 @@ void main() {
         },
       );
 
+      // Phase 9 accessibility.
+      testWidgets('W01 meets tap-target and label guidelines', (tester) async {
+        final handle = tester.ensureSemantics();
+        final cubit = _WalletCubit();
+        when(() => cubit.state).thenReturn(
+          WalletStateLoaded(
+            summary: hostSummary,
+            recent: entries,
+            isHost: true,
+          ),
+        );
+        await pumpPage(
+          tester,
+          BlocProvider<WalletCubit>.value(
+            value: cubit,
+            child: const WalletPage(),
+          ),
+          size: size,
+        );
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        handle.dispose();
+      });
+
       testWidgets('W01 hides Beans for customers and shows error with retry', (
         tester,
       ) async {

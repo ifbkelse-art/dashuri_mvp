@@ -13,6 +13,29 @@ void main() {
   setUpAll(() => registerFallbackValue(WhoCanMessage.everyone));
 
   group('SettingsPage (S03)', () {
+    // Phase 9 accessibility.
+    testWidgets('meets tap-target and label guidelines', (tester) async {
+      final handle = tester.ensureSemantics();
+      final cubit = MockSettingsCubit();
+      whenListen(
+        cubit,
+        const Stream<SettingsState>.empty(),
+        initialState: const SettingsState(
+          whoCanMessage: WhoCanMessage.everyone,
+        ),
+      );
+      await pumpPage(
+        tester,
+        BlocProvider<SettingsCubit>.value(
+          value: cubit,
+          child: const SettingsPage(),
+        ),
+      );
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      handle.dispose();
+    });
+
     testResponsive('groups and danger zone', (tester, size, scale) async {
       final cubit = MockSettingsCubit();
       when(cubit.signOut).thenAnswer((_) async {});

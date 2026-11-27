@@ -38,6 +38,24 @@ void main() {
 
   for (final size in [phone, tablet]) {
     group('at ${size.width.toInt()}x${size.height.toInt()}', () {
+      // Phase 9 accessibility.
+      testWidgets('W02 meets tap-target and label guidelines', (tester) async {
+        final handle = tester.ensureSemantics();
+        final b = _Bloc();
+        when(() => b.state).thenReturn(ready);
+        await pumpPage(
+          tester,
+          withBloc(
+            b,
+            const BuyDiamondsPage(ratePerMinute: 2400, hostName: 'Ananya'),
+          ),
+          size: size,
+        );
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        handle.dispose();
+      });
+
       testWidgets('W02 packages, hint, provisional note and Continue', (
         tester,
       ) async {

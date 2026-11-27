@@ -1,6 +1,6 @@
 # Phase 9 redesign plan
 
-Started 27 Nov 2026 on `feat/calls-720p-and-app-icon` after `867f6b8`. Status: **in progress**. This file is updated as work lands. Inventory: `PHASE_9_UI_INVENTORY.md`. Ideas that are out of scope: `PHASE_9_FUTURE_IMPROVEMENTS.md`.
+Started 27 Nov 2026 on `feat/calls-720p-and-app-icon` after `867f6b8`. Status: **mobile redesign batches complete (27 Nov 2026)**; device review pending. This file is updated as work lands. Inventory: `PHASE_9_UI_INVENTORY.md`. Ideas that are out of scope: `PHASE_9_FUTURE_IMPROVEMENTS.md`.
 
 ## 1. Audit findings (summary)
 
@@ -75,7 +75,8 @@ Source: `packages/design_system` (tokens `dashuri_tokens.dart`, tones `dashuri_c
 | 9B-9 (`56895c7`) | Settings, profile, safety, notifications: reviewed; specific one-line error titles | **Done** |
 | 9B-10 (`cd4e732`) | Onboarding: reviewed screen by screen, no change needed; city picker and Free Call Card error titles | **Done** |
 | 9B-11 (`dea665d`) | Every `ErrorStateView` in the app now has a specific title (wallet, calls, Buy Diamonds, Reels creator) | **Done** |
-| 9C-2 | Full sweep at 320/360/tablet and text ×1.3/×2.0, contrast audit | pending |
+| 9C-2 (`3cf7f95`) | Sweep: 320×568 @2.0×, 360×800 @1.3× with and without a keyboard, landscape and tablet, with real fonts. No overflows or rendering exceptions. WCAG AA audit in light and dark. Fixed: profile back/More legibility over photos and on wide windows; call top scrim over bright video. | **Done** |
+| 9C-3 | Accessibility guideline tests (Android 48-pt tap targets and labelled tap targets) added on Discovery, host profile, Host Home (offline and online), Wallet, Buy Diamonds, Chat inbox, Settings, active and incoming call. Fixed: the balance pill (40-pt target, label read twice) and the sort control (under 48 pt). | **Done** |
 
 Each batch:
 1. Read the page, its BLoC and data.
@@ -109,6 +110,11 @@ Fresh `scripts/validate.sh`: passes (1,443 Flutter tests).
 - app: `injector.dart`.
 - `discovery`: `host_profile_page.dart` + test.
 - `purchases`: `package_card.dart`, `buy_diamonds_page.dart`.
+
+**Final run (end of Phase 9):**
+- `scripts/validate.sh` passes: 1,467 Flutter tests in 21 packages; Go format, vet, race tests and build; 33 migration invariants.
+- The Android debug APK builds.
+- No backend, API, financial or flag defaults changed (the payouts gate is UI-only and defaults off).
 
 **Known issues:**
 - Legal page draft banner (founder decision).
