@@ -107,7 +107,8 @@ type Config struct {
 	ArrivalPhotosEnabled bool
 	// ArrivalPhotoAutoApproveUnscanned publishes a validated arrival photo
 	// without an automated nudity scan when no classifier is configured.
-	// Default false: such photos wait for a moderator. FOUNDER DECISION.
+	// Default false: such photos wait for a moderator. Refused in production
+	// by Validate (2026-11-27).
 	ArrivalPhotoAutoApproveUnscanned bool
 
 	// AdminOrigins are the browser origins of the admin web console allowed
@@ -188,6 +189,12 @@ func (c Config) Validate() error {
 	}
 	if c.GiftsEnabled && !c.ChatMessageContextEnabled {
 		return fmt.Errorf("config: GIFTS_ENABLED requires CHAT_MESSAGE_CONTEXT_ENABLED (gift lines are call-session chat messages)")
+	}
+	// Arrival photos are shown to customers. In production nothing may be
+	// published without moderation (classifier or staff), so publishing
+	// unscanned photos is a development/staging convenience only.
+	if c.Env == "production" && c.ArrivalPhotoAutoApproveUnscanned {
+		return fmt.Errorf("config: ARRIVAL_PHOTO_AUTO_APPROVE_UNSCANNED is not allowed in production (photos must be moderated)")
 	}
 	if c.Env == "development" {
 		return nil

@@ -179,6 +179,12 @@ func TestPhotoSlotsDeleteAndModeration(t *testing.T) {
 			break
 		}
 	}
+	// Regression (2026-11-27): a moderator could approve their OWN photo.
+	selfMod := auth.Principal{UserID: u, Roles: []auth.Role{auth.RoleModerator}, Status: "active", AgeEligible: true}
+	if _, err := s.DecidePhoto(ctx, selfMod, oldUploaded, accounts.PhotoDecisionRequest{Decision: "approve"}); apperr.As(err) == nil ||
+		apperr.As(err).Kind != apperr.KindForbidden || apperr.As(err).Code != "self_review" {
+		t.Fatalf("self review: %v", err)
+	}
 	if _, err := s.DecidePhoto(ctx, pm, notUploaded, accounts.PhotoDecisionRequest{Decision: "approve"}); rule(err) != "photo_not_uploaded" {
 		t.Fatalf("approve missing object: %v", err)
 	}

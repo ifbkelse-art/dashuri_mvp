@@ -143,6 +143,11 @@ func (s *Service) DecidePhoto(ctx context.Context, p auth.Principal, photoID str
 	case err != nil:
 		return PhotoDecision{}, internal(err)
 	}
+	// Never your own photo (a moderator who is also a host or customer
+	// could otherwise approve their own profile photo).
+	if ph.UserID == p.UserID {
+		return PhotoDecision{}, apperr.Forbidden("self_review", "you cannot decide your own photo")
+	}
 	approve := in.Decision == "approve"
 	if approve {
 		if s.deps.Storage == nil || !s.deps.Storage.Configured() {

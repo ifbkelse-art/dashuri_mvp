@@ -100,6 +100,8 @@ var (
 	ErrNotOnline       = errors.New("hosts: no open online session")
 	ErrArrivalNotFound = errors.New("hosts: arrival photo not found")
 	ErrArrivalState    = errors.New("hosts: arrival photo is not in a state for this action")
+	// ErrArrivalSelfReview: staff may not decide their own arrival photo.
+	ErrArrivalSelfReview = errors.New("hosts: staff cannot decide their own arrival photo")
 )
 
 // ArrivalRepository persists online sessions and arrival photos.
@@ -284,6 +286,8 @@ func mapArrivalErr(err error) error {
 		return apperr.NotFound("arrival_photo")
 	case errors.Is(err, ErrArrivalState):
 		return apperr.BusinessRule("arrival_photo_state", "this photo can no longer be changed")
+	case errors.Is(err, ErrArrivalSelfReview):
+		return apperr.Forbidden("self_review", "you cannot decide your own arrival photo")
 	}
 	return mapErr(err)
 }
@@ -540,6 +544,11 @@ func (s *Service) DecideArrivalPhotoStaff(ctx context.Context, p auth.Principal,
 	now := s.arrivalNow()
 	got, err := a.Repo.DecideArrivalPhoto(ctx, photoID, func(cur ArrivalPhoto) (ArrivalDecision, error) {
 		d := ArrivalDecision{Reason: strings.TrimSpace(in.Reason), DecidedBy: p.UserID, At: now, ModerationSource: "staff"}
+		// Same rule as every other staff decision: never your own content
+		// (a moderator who is also a host could approve their own photo).
+		if cur.HostID == p.UserID {
+			return d, ErrArrivalSelfReview
+		}
 		switch in.Decision {
 		case "approve":
 			if cur.Status != ArrivalPendingReview {

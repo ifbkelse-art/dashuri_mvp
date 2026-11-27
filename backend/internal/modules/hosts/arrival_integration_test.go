@@ -316,6 +316,32 @@ func TestArrivalCaptureModerationAndDiscovery(t *testing.T) {
 	}
 }
 
+// Regression (2026-11-27): a moderator who is also a host could approve
+// their own arrival photo (no self-review guard), bypassing moderation.
+func TestArrivalPhotoSelfReviewRefused(t *testing.T) {
+	e := newAEnv(t, nil)
+	id, p := e.offlineHost(t)
+	e.online(t, p, true)
+	v, err := e.capture(t, p, jpegBytes(t, 480, 640))
+	if err != nil || v.Status != hosts.ArrivalPendingReview {
+		t.Fatalf("confirm %+v %v", v, err)
+	}
+	self := callstest.Principal(id, auth.RoleHost, auth.RoleModerator)
+	for _, d := range []string{"approve", "reject", "remove"} {
+		_, err := e.svc.DecideArrivalPhotoStaff(e.ctx, self, v.PhotoId, hosts.ArrivalDecisionRequest{Decision: d, Reason: "own photo"})
+		if ae := apperr.As(err); ae == nil || ae.Kind != apperr.KindForbidden || ae.Code != "self_review" {
+			t.Fatalf("%s own photo: %v", d, err)
+		}
+	}
+	if card := e.card(t, id); card.ArrivalPhoto != nil {
+		t.Fatal("self-approved photo reached discovery")
+	}
+	// Another moderator can still decide it.
+	if _, err := e.svc.DecideArrivalPhotoStaff(e.ctx, e.staff, v.PhotoId, hosts.ArrivalDecisionRequest{Decision: "approve"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestArrivalClassifierAndAutoApprove(t *testing.T) {
 	clean := newAEnv(t, func(c *hosts.ArrivalConfig) { c.Scanner = scanner{0.05} })
 	_, p := clean.offlineHost(t)
