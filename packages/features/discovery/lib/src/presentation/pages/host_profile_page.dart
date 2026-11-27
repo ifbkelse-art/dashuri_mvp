@@ -124,15 +124,29 @@ class _Loaded extends StatelessWidget {
     final actions = _Actions(host: host);
     return Scaffold(
       extendBodyBehindAppBar: true,
+      // Back and More sit on a translucent dark circle: over a light photo
+      // (or the light details pane on wide windows) white icons alone were
+      // nearly invisible (Phase 9 contrast sweep).
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        leading: Navigator.of(context).canPop()
+            ? Center(
+                child: _OnPhotoButton(
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: const BackButtonIcon(),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+              )
+            : null,
         actions: [
-          IconButton(
+          _OnPhotoButton(
             tooltip: 'More actions',
             onPressed: () => _showActions(context, host),
             icon: const Icon(Icons.more_vert_rounded),
           ),
+          const SizedBox(width: DashuriTokens.space2),
         ],
       ),
       body: LayoutBuilder(
@@ -530,4 +544,26 @@ class _ArrivalPhotoSection extends StatelessWidget {
       ],
     );
   }
+}
+
+/// An app-bar icon button that stays legible over any photo.
+class _OnPhotoButton extends StatelessWidget {
+  const _OnPhotoButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final Widget icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    icon: icon,
+    color: DashuriColors.onMedia,
+    style: IconButton.styleFrom(backgroundColor: DashuriColors.mediaScrim),
+  );
 }

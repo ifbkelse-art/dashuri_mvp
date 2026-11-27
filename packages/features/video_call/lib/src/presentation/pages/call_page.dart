@@ -655,6 +655,33 @@ class _CallCanvas extends StatelessWidget {
               Positioned.fill(
                 child: _WaitingOverlay(state: state, session: session),
               ),
+            // Soft top scrim over live video so the name, call type and
+            // pills stay readable on bright frames (text shadows alone don't
+            // guarantee it). Never hit-testable; faces stay unobscured.
+            // Always in the tree (only its opacity changes): adding or
+            // removing it when the keyboard hides the top bar would shift
+            // the chat column below and rebuild it, dropping focus.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: padding.top + 140,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: !isWaiting && showTopBar ? 1 : 0,
+                  child: const DecoratedBox(
+                    key: Key('call-top-scrim'),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x8C000000), Color(0x00000000)],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             // Hidden while chatting so it never covers the conversation.
             if (_live && state.mediaJoined && !showChat)
               DraggableCornerTile(

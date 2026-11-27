@@ -69,7 +69,12 @@ Source: `packages/design_system` (tokens `dashuri_tokens.dart`, tones `dashuri_c
 | 9B-4 | Buy Diamonds: talk-time hint wraps instead of truncating; balance shown as a plain labelled row. | **Done** |
 | 9B-5 | Transaction detail. The screenshot was the 1.3× text-scale variant, which is correct large-text behaviour. | **No change** |
 | 9C-1 | Visual review of every changed screen, light and dark, at 390×844 | **Done** |
-| 9B next | Discovery card polish, specific error copy, Host Home hierarchy, chat, settings, onboarding | pending |
+| 9B-6 (`01f98ac`) | Discovery: one rate format ("2,400 / min") everywhere; specific error titles; a removed profile (404) says "Profile not available" with no dead-end retry | **Done** |
+| 9B-7 (`975cc2c`) | Host Home: removed the "Free calls on/off" chip that duplicated the switch below it; specific error titles on all host screens | **Done** |
+| 9B-8 (`c6a7b08`) | Chat: reviewed (bubbles, sending, not sent/retry, filters, composer already met the bar); specific error titles | **Done** |
+| 9B-9 (`56895c7`) | Settings, profile, safety, notifications: reviewed; specific one-line error titles | **Done** |
+| 9B-10 (`cd4e732`) | Onboarding: reviewed screen by screen, no change needed; city picker and Free Call Card error titles | **Done** |
+| 9B-11 (`dea665d`) | Every `ErrorStateView` in the app now has a specific title (wallet, calls, Buy Diamonds, Reels creator) | **Done** |
 | 9C-2 | Full sweep at 320/360/tablet and text ×1.3/×2.0, contrast audit | pending |
 
 Each batch:
