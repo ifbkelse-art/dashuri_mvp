@@ -121,8 +121,18 @@ final class ApiClient {
     JsonMap? body,
     IdempotencyKey? idempotencyKey,
   }) async {
+    // Refreshing an expired session can throw (offline, or a revoked
+    // refresh token). That must come back as a Result like every other
+    // failure, not escape to the caller as an exception: screens waiting on
+    // the Result would otherwise never leave their loading state. A revoked
+    // session is also signalled by the auth state stream, which signs out.
+    final String? token;
     try {
-      final token = await _tokens.accessToken();
+      token = await _tokens.accessToken();
+    } on Object catch (e) {
+      return Err(NetworkFailure(message: 'Could not refresh the session: $e'));
+    }
+    try {
       final response = await _dio.request<Object?>(
         path,
         data: body,
