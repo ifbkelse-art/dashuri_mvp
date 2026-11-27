@@ -53,6 +53,7 @@ class _ChatInboxViewState extends State<ChatInboxView> {
           ConversationsStateInitial() ||
           ConversationsStateLoading() => const SkeletonList(),
           ConversationsStateFailed(:final failure) => ErrorStateView(
+            title: "Couldn't load your chats",
             message: ChatFormat.failure(failure),
             onRetry: cubit.load,
           ),

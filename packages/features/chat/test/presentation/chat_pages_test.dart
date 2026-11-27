@@ -136,6 +136,7 @@ void main() {
         ).thenReturn(const ConversationsStateFailed(NetworkFailure()));
         when(failed.load).thenAnswer((_) async {});
         await pumpPage(tester, inbox(failed), size: size);
+        expect(find.text("Couldn't load your chats"), findsOneWidget);
         await tester.tap(find.text('Try again'));
         verify(failed.load).called(1);
       });
@@ -275,6 +276,7 @@ void main() {
           ),
           size: size,
         );
+        expect(find.text("Couldn't load this conversation"), findsOneWidget);
         await tester.tap(find.text('Try again'));
         verify(c.retry).called(1);
 

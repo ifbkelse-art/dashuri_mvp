@@ -128,6 +128,7 @@ class _ConversationPageState extends State<ConversationPage> {
                 ConversationStatus.starting ||
                 ConversationStatus.loading => const LoadingView(),
                 ConversationStatus.failed => ErrorStateView(
+                  title: "Couldn't load this conversation",
                   message: ChatFormat.failure(state.failure!),
                   onRetry: cubit.retry,
                 ),
