@@ -15,6 +15,11 @@ abstract interface class StoreBilling {
 
   Stream<PurchaseUpdate> updates();
 
+  /// Asks the store to re-deliver purchases that were paid but never
+  /// finished (still owned). They arrive on [updates] like new purchases.
+  /// Best effort: never throws.
+  Future<void> recoverUnfinished();
+
   /// Acknowledge/complete with the store AFTER the server has answered
   /// `credited` or `rejected`, so a crash in between never loses a paid purchase.
   Future<Result<void>> complete(String purchaseToken);

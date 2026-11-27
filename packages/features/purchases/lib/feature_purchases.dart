@@ -4,6 +4,7 @@ library;
 
 export 'src/application/payment_result_cubit.dart';
 export 'src/application/purchase_bloc.dart';
+export 'src/application/purchase_recovery.dart';
 export 'src/data/datasources/store_billing.dart';
 export 'src/di/purchases_module.dart';
 export 'src/domain/entities/cashfree_checkout_outcome.dart';

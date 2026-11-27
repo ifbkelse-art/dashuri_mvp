@@ -94,9 +94,8 @@ const hostTabs = [
 ];
 
 /// Host tabs, with the Reels tab (after Home) only when [reels] is true.
-List<ShellTab> hostTabsFor({required bool reels}) => reels
-    ? [hostTabs.first, hostReelsTab, ...hostTabs.skip(1)]
-    : hostTabs;
+List<ShellTab> hostTabsFor({required bool reels}) =>
+    reels ? [hostTabs.first, hostReelsTab, ...hostTabs.skip(1)] : hostTabs;
 
 bool _under(String path, String root) =>
     path == root || path.startsWith('$root/');

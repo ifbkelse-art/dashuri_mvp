@@ -171,6 +171,49 @@ void main() {
       },
       verify: (c) => expect(c.state.showFreeCall, isFalse),
     );
+
+    // Regression (2026-11-27): the header lives in an IndexedStack shell and
+    // loaded once, so after buying Diamonds (or a call/gift) the balance pill
+    // kept the old number. A wallet.updated hint now re-reads it.
+    test(
+      're-reads the balance when the server says the wallet changed',
+      () async {
+        final h = _Home();
+        final repo = _Repo();
+        final hints = StreamController<void>.broadcast();
+        when(repo.walletUpdates).thenAnswer((_) => hints.stream);
+        var balance = 100;
+        when(() => h(true)).thenAnswer(
+          (_) async => Success(DiscoveryHome(availableDiamonds: balance)),
+        );
+        final c = DiscoveryHeaderCubit(
+          h,
+          freeCallSupported: true,
+          watchBalance: WatchBalanceChanges(repo),
+        );
+        await c.load();
+        expect(c.state.home.availableDiamonds, 100);
+
+        balance = 4100;
+        final next = c.stream.firstWhere(
+          (s) => s.home.availableDiamonds == 4100,
+        );
+        hints.add(null);
+        await next.timeout(const Duration(seconds: 1));
+        expect(c.state.home.availableDiamonds, 4100);
+
+        // Loading again does not stack a second subscription.
+        await c.load();
+        clearInteractions(h);
+        hints.add(null);
+        await Future<void>.delayed(Duration.zero);
+        verify(() => h(true)).called(1);
+
+        await c.close();
+        expect(hints.hasListener, isFalse);
+        await hints.close();
+      },
+    );
   });
 
   group('GetDiscoveryHome', () {

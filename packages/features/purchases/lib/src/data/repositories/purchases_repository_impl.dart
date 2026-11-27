@@ -73,6 +73,9 @@ final class PurchasesRepositoryImpl implements PurchasesRepository {
   Stream<PurchaseUpdate> purchaseUpdates() => _store.updates();
 
   @override
+  Future<void> recoverUnfinished() => _store.recoverUnfinished();
+
+  @override
   Future<Result<PurchaseVerification>> verify(
     PurchaseNeedsVerification purchase,
     IdempotencyKey key,

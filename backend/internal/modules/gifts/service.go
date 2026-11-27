@@ -41,6 +41,9 @@ const (
 	// EventChatMessage mirrors chat.message so open chat panels show the
 	// gift line at once (payload shape of chat.ChatMessageHint).
 	EventChatMessage = "chat.message"
+	// EventWalletUpdated goes to user:<id> of both participants: balances
+	// changed, re-read GET /v1/wallet.
+	EventWalletUpdated = "wallet.updated"
 )
 
 // Service implements gifting.
@@ -222,6 +225,12 @@ func (s *Service) announce(ctx context.Context, tx Transaction, ev GiftEvent) {
 	}
 	if err := s.deps.Realtime.Publish(ctx, "call:"+tx.CallID, EventGift, ev); err != nil {
 		slog.WarnContext(ctx, "gift realtime publish failed", "err", err)
+	}
+	// The sender's Diamonds and the host's held Beans changed.
+	for _, u := range []string{tx.SenderID, tx.RecipientID} {
+		if err := s.deps.Realtime.Publish(ctx, "user:"+u, EventWalletUpdated, map[string]any{"reason": "gift", "gift_transaction_id": tx.ID}); err != nil {
+			slog.WarnContext(ctx, "gift wallet hint publish failed", "err", err)
+		}
 	}
 	if tx.ChatMessageID == nil || tx.ConversationID == nil {
 		return

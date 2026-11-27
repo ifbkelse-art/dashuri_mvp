@@ -277,3 +277,67 @@ func TestPlayTokenWithoutAccountBindingRefused(t *testing.T) {
 		t.Fatalf("unbound token: %v", err)
 	}
 }
+
+// Regression (2026-11-27): a credited purchase whose first server-side
+// consume failed stayed "owned" at Google forever, because a replayed
+// verification returned early without consuming. The pack could not be
+// bought again. A replay now retries the consume, and still credits once.
+func TestPlayReplayRetriesFailedConsumeWithoutRecrediting(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	m := newMoneyEnv(t, api, admin)
+	user := pgtest.NewUser(t, admin, true)
+	token := "tok" + pgtest.UUID()[:8]
+	m.play.set(token, 0, map[string]any{"obfuscatedExternalAccountId": purchases.SHA256Hex(user)})
+	m.play.mu.Lock()
+	m.play.failConsume = 1
+	m.play.mu.Unlock()
+	ctx := context.Background()
+	req := purchases.VerifyGooglePlayRequest{ProductId: "diamonds_4000", PurchaseToken: token}
+
+	first, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), req)
+	if err != nil || first.Status != "credited" || first.DiamondsCredited != 4000 {
+		t.Fatalf("first verify: %+v %v", first, err)
+	}
+	m.play.mu.Lock()
+	acks := m.play.acks[token]
+	m.play.mu.Unlock()
+	if acks != 0 {
+		t.Fatalf("consume should have failed once, acks=%d", acks)
+	}
+
+	again, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), req)
+	if err != nil || again.Status != "credited" || again.PurchaseId != first.PurchaseId {
+		t.Fatalf("replay: %+v %v", again, err)
+	}
+	m.play.mu.Lock()
+	acks = m.play.acks[token]
+	m.play.mu.Unlock()
+	if acks != 1 {
+		t.Fatalf("replay did not retry the consume, acks=%d", acks)
+	}
+	// A third replay sees consumptionState=1 and does not consume again.
+	if _, err := m.svc.VerifyGooglePlayPurchase(ctx, principal(user), req); err != nil {
+		t.Fatal(err)
+	}
+	m.play.mu.Lock()
+	acks = m.play.acks[token]
+	m.play.mu.Unlock()
+	if acks != 1 {
+		t.Fatalf("consumed twice, acks=%d", acks)
+	}
+	if b := balance(t, api, user, ledger.UserDiamondPurchased); b != 4000 {
+		t.Fatalf("balance %d, want 4000 (credited once)", b)
+	}
+	// Regression (2026-11-27): the purchase row now records what was paid.
+	var price int64
+	var source string
+	if err := admin.QueryRow(ctx, `select p.price_paise, p.price_source from commerce.purchases p
+		join economy.diamond_packages k on k.product_id = p.product_id
+		where p.id = $1 and p.price_paise = k.price_paise`, first.PurchaseId).Scan(&price, &source); err != nil || source != "catalogue" || price <= 0 {
+		t.Fatalf("price snapshot %d %q %v", price, source, err)
+	}
+	if n := count(t, admin, `select count(*) from ledger.journal_entries where idempotency_key = $1`,
+		"purchase_credit:"+purchases.SHA256Hex(token)); n != 1 {
+		t.Fatalf("%d credit entries", n)
+	}
+}

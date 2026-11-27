@@ -42,6 +42,8 @@ type fakePlay struct {
 	purchase map[string]map[string]any // token → ProductPurchase JSON
 	acks     map[string]int
 	voided   []map[string]any
+	// failConsume makes the next N consume calls answer 503.
+	failConsume int
 }
 
 func newFakePlay(t *testing.T) *fakePlay {
@@ -65,7 +67,15 @@ func newFakePlay(t *testing.T) *fakePlay {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		if tok, ok := strings.CutSuffix(rest, ":consume"); ok && r.Method == http.MethodPost {
+			if f.failConsume > 0 {
+				f.failConsume--
+				w.WriteHeader(503)
+				return
+			}
 			f.acks[tok]++
+			if p, ok := f.purchase[tok]; ok {
+				p["consumptionState"] = 1
+			}
 			w.WriteHeader(204)
 			return
 		}

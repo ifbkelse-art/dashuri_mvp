@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -122,6 +123,13 @@ func isUUIDString(s string) bool {
 // live call (active reservation) is skipped and retried on the next run.
 // Each grant is processed once (ledger.promo_grant_expiries + entry key).
 func ExpirePromoGrants(ctx context.Context, pool *pgxpool.Pool, tm db.TxManager, cutoff, at time.Time, limit int) (grants int, expired int64, err error) {
+	grants, expired, _, err = ExpirePromoGrantsFor(ctx, pool, tm, cutoff, at, limit)
+	return grants, expired, err
+}
+
+// ExpirePromoGrantsFor is ExpirePromoGrants that also returns the users whose
+// promotional balance actually dropped (deduplicated), for wallet hints.
+func ExpirePromoGrantsFor(ctx context.Context, pool *pgxpool.Pool, tm db.TxManager, cutoff, at time.Time, limit int) (grants int, expired int64, users []string, err error) {
 	rows, err := pool.Query(ctx, `
 		select je.id::text, a.owner_user_id::text, p.amount, je.occurred_at
 		  from ledger.journal_entries je
@@ -131,7 +139,7 @@ func ExpirePromoGrants(ctx context.Context, pool *pgxpool.Pool, tm db.TxManager,
 		   and not exists (select 1 from ledger.promo_grant_expiries x where x.grant_entry_id = je.id)
 		 order by je.occurred_at limit $2`, cutoff, limit)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	type grant struct {
 		id, user string
@@ -143,13 +151,13 @@ func ExpirePromoGrants(ctx context.Context, pool *pgxpool.Pool, tm db.TxManager,
 		var g grant
 		if err := rows.Scan(&g.id, &g.user, &g.amount, &g.at); err != nil {
 			rows.Close()
-			return 0, 0, err
+			return 0, 0, nil, err
 		}
 		gs = append(gs, g)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return 0, 0, err
+		return 0, 0, nil, err
 	}
 	for _, g := range gs {
 		var removed int64
@@ -189,10 +197,13 @@ func ExpirePromoGrants(ctx context.Context, pool *pgxpool.Pool, tm db.TxManager,
 			return err
 		})
 		if err != nil {
-			return grants, expired, err
+			return grants, expired, users, err
 		}
 		grants++
 		expired += removed
+		if removed > 0 && !slices.Contains(users, g.user) {
+			users = append(users, g.user)
+		}
 	}
-	return grants, expired, nil
+	return grants, expired, users, nil
 }

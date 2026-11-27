@@ -205,3 +205,11 @@ select pg_temp.expect_error($q$
 set role authenticated;
 select pg_temp.expect_error($q$ select * from gifts.transactions $q$, 'authenticated role cannot read gift transactions');
 reset role;
+-- Gift catalogue names (2026-11-27): recognisable names, prices unchanged.
+select case when (select count(*) from gifts.catalogue where name ilike '%gift%') = 0
+             and (select string_agg(id || '=' || name || ':' || diamond_price, ',' order by sort_order) from gifts.catalogue)
+               = 'rose=Rose:1500,teddy=Teddy Bear:5000,watch=Watch:10000,gold_ring=Gold Ring:15000,'
+                 'diamond_ring=Diamond Ring:25000,luxury_gift=Sports Car:50000,royal_gift=Crown:100000,'
+                 'premium_gift=Yacht:150000,super_gift=Rocket:200000,elite_gift=Castle:300000'
+            then 'PASS gift catalogue has recognisable names and unchanged prices'
+            else 'FAIL gift catalogue names/prices: ' || (select string_agg(id || '=' || name || ':' || diamond_price, ',' order by sort_order) from gifts.catalogue) end;

@@ -129,7 +129,11 @@ type Credit struct {
 	Diamonds  int64
 	Rail      string
 	XP        int64
-	Entry     func(purchaseID string) ledger.Entry
+	// PricePaise/PriceSource snapshot what was paid (catalogue list price
+	// for Play, order amount for Cashfree). Zero leaves the columns null.
+	PricePaise  int64
+	PriceSource string
+	Entry       func(purchaseID string) ledger.Entry
 	// CashfreeOrderID, when set, locks that order first and moves it to
 	// credited in the same transaction; an order already final in another
 	// state aborts with ErrNotCreditable.

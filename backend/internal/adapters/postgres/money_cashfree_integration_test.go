@@ -89,6 +89,12 @@ func TestCashfreeWebhookAndPollRaceCreditOnce(t *testing.T) {
 	if n := count(t, admin, `select count(*) from ledger.journal_entries where idempotency_key = $1`, "purchase_credit:cashfree:"+o.OrderId); n != 1 {
 		t.Fatalf("credit entries %d", n)
 	}
+	// Regression (2026-11-27): the purchase row records the order amount.
+	if n := count(t, admin, `select count(*) from commerce.purchases p join commerce.cashfree_orders o on o.order_id = $1
+		where p.purchase_token_hash = $2 and p.price_paise = o.amount_paise and p.price_source = 'gateway_order'`,
+		o.OrderId, purchases.CashfreeTokenHash(o.OrderId)); n != 1 {
+		t.Fatalf("cashfree price snapshot rows %d", n)
+	}
 	if n := count(t, admin, `select count(*) from commerce.purchases where purchase_token_hash = $1 and rail = 'cashfree' and state = 'credited'`,
 		purchases.CashfreeTokenHash(o.OrderId)); n != 1 {
 		t.Fatalf("purchase rows %d", n)

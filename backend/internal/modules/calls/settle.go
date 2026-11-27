@@ -10,6 +10,10 @@ import (
 	"dashuri/backend/internal/modules/ledger"
 )
 
+// EventWalletUpdated tells a user's app that its balances changed and the
+// wallet should be re-read from GET /v1/wallet (a hint, never a balance).
+const EventWalletUpdated = "wallet.updated"
+
 // terminate moves a call to a terminal phase and settles it, in ONE
 // transaction: lock the call row, compute billable seconds from the
 // provider timeline, charge (capped by reservation and balance), post the
@@ -54,6 +58,10 @@ func (s *Service) terminate(ctx context.Context, id string, to Phase, reason str
 			}
 		}
 		s.publishCall(ctx, out)
+		// Settlement moved Diamonds and Beans (and released the
+		// reservation): both wallets must re-read the ledger.
+		s.publish(ctx, "user:"+out.CallerID, EventWalletUpdated, map[string]any{"reason": "call_settled", "call_id": out.ID})
+		s.publish(ctx, "user:"+out.ReceiverID, EventWalletUpdated, map[string]any{"reason": "call_settled", "call_id": out.ID})
 		if s.deps.OnTerminated != nil {
 			s.deps.OnTerminated(ctx, out.ID)
 		}

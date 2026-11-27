@@ -22,6 +22,9 @@ abstract interface class PurchasesRepository {
   /// that were never verified.
   Stream<PurchaseUpdate> purchaseUpdates();
 
+  /// Asks the store to re-deliver unfinished purchases on [purchaseUpdates].
+  Future<void> recoverUnfinished();
+
   /// Sends the token to the server, which verifies it with Google and credits
   /// the ledger. On `credited` or `rejected` the repository completes the
   /// purchase with Play; on `pending` it does not.

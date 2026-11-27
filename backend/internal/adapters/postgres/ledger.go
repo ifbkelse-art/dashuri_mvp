@@ -44,8 +44,16 @@ func PostEntry(ctx context.Context, tx pgx.Tx, e ledger.Entry) (entryID string, 
 		on conflict (idempotency_key) do nothing
 		returning id`, string(e.Type), e.IdempotencyKey, rule, e.Reference, e.OccurredAt, meta).Scan(&entryID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `select id from ledger.journal_entries where idempotency_key = $1`, e.IdempotencyKey).Scan(&entryID)
-		return entryID, true, err
+		var storedType string
+		err = tx.QueryRow(ctx, `select id, entry_type from ledger.journal_entries where idempotency_key = $1`, e.IdempotencyKey).
+			Scan(&entryID, &storedType)
+		if err != nil {
+			return "", false, err
+		}
+		if err := sameEntry(ctx, tx, entryID, storedType, e); err != nil {
+			return "", false, err
+		}
+		return entryID, true, nil
 	}
 	if err != nil {
 		return "", false, err
@@ -72,6 +80,58 @@ func PostEntry(ctx context.Context, tx pgx.Tx, e ledger.Entry) (entryID string, 
 		}
 	}
 	return entryID, false, nil
+}
+
+// ErrIdempotencyConflict means an idempotency key was reused for a different
+// money movement (other entry type, accounts or amounts). The first entry
+// stands; the second is refused loudly instead of being treated as a replay,
+// so a mis-keyed posting can never silently disappear.
+var ErrIdempotencyConflict = errors.New("ledger: idempotency key reused with a different payload")
+
+// sameEntry compares a replayed entry with the stored one: same type and
+// the same multiset of (account, currency, amount) postings. Timestamps,
+// references and metadata may legitimately differ between attempts.
+func sameEntry(ctx context.Context, tx pgx.Tx, entryID, storedType string, e ledger.Entry) error {
+	if storedType != string(e.Type) {
+		return fmt.Errorf("%w: key %s stored as %s, replayed as %s", ErrIdempotencyConflict, e.IdempotencyKey, storedType, e.Type)
+	}
+	type leg struct {
+		account  string
+		currency string
+		amount   int64
+	}
+	want := map[leg]int{}
+	for _, p := range e.Postings {
+		want[leg{p.Account.String(), string(p.Currency), p.Amount}]++
+	}
+	rows, err := tx.Query(ctx, `
+		select coalesce('user:' || a.owner_user_id::text || ':' || a.kind, 'system:' || a.kind), p.currency, p.amount
+		  from ledger.postings p join ledger.accounts a on a.id = p.account_id
+		 where p.entry_id = $1`, entryID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	got := map[leg]int{}
+	for rows.Next() {
+		var l leg
+		if err := rows.Scan(&l.account, &l.currency, &l.amount); err != nil {
+			return err
+		}
+		got[l]++
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(got) != len(want) {
+		return fmt.Errorf("%w: key %s", ErrIdempotencyConflict, e.IdempotencyKey)
+	}
+	for l, n := range want {
+		if got[l] != n {
+			return fmt.Errorf("%w: key %s", ErrIdempotencyConflict, e.IdempotencyKey)
+		}
+	}
+	return nil
 }
 
 // ErrInsufficientBalance means a user bucket would have gone negative.

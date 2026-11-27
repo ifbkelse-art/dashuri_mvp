@@ -164,8 +164,9 @@ func (r PurchasesRepo) CreditPurchase(ctx context.Context, c purchases.Credit) (
 		}
 		if _, err := tx.Exec(ctx, `
 			update commerce.purchases set state = 'credited', credit_entry_id = $2, diamonds = $3, verified_at = now(),
-			       order_id = coalesce(order_id, $4)
-			 where id = $1`, p.ID, entryID, c.Diamonds, nullIfEmpty(c.OrderID)); err != nil {
+			       order_id = coalesce(order_id, $4),
+			       price_paise = nullif($5::bigint, 0), price_source = case when $5::bigint > 0 then nullif($6, '') end
+			 where id = $1`, p.ID, entryID, c.Diamonds, nullIfEmpty(c.OrderID), c.PricePaise, c.PriceSource); err != nil {
 			return err
 		}
 		if c.XP > 0 {

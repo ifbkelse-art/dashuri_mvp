@@ -185,9 +185,9 @@ void main() {
     });
 
     test('a later verify of the same token is sent again', () async {
-      when(() => remote.verifyGooglePlay(any(), any())).thenAnswer(
-        (_) async => const Err(NetworkFailure()),
-      );
+      when(
+        () => remote.verifyGooglePlay(any(), any()),
+      ).thenAnswer((_) async => const Err(NetworkFailure()));
       await repo.verify(purchase, IdempotencyKey.generate());
       await repo.verify(purchase, IdempotencyKey.generate());
       verify(() => remote.verifyGooglePlay(any(), any())).called(2);
@@ -250,6 +250,11 @@ void main() {
       );
       when(() => iap.isAvailable()).thenAnswer((_) async => true);
       when(() => iap.purchaseStream).thenAnswer((_) => stream.stream);
+      when(
+        () => iap.restorePurchases(
+          applicationUserName: any(named: 'applicationUserName'),
+        ),
+      ).thenAnswer((_) async {});
       when(() => iap.queryProductDetails(any())).thenAnswer(
         (_) async => ProductDetailsResponse(
           productDetails: [product],
@@ -302,6 +307,74 @@ void main() {
       );
       final r = await billing.launchPurchase('nope');
       expect((r as Err<void>).failure.code, 'product_not_found');
+    });
+
+    // Regression (2026-11-27): a purchase paid in Play but never verified
+    // (app killed in between) was never reported again, so the customer
+    // paid without getting Diamonds and the pack stayed "owned".
+    test('recoverUnfinished asks Play to re-deliver owned purchases', () async {
+      final d = _Details();
+      when(() => d.status).thenReturn(PurchaseStatus.restored);
+      when(() => d.productID).thenReturn('dia_1199');
+      when(() => d.purchaseID).thenReturn('GPA.7');
+      when(() => d.verificationData).thenReturn(
+        PurchaseVerificationData(
+          localVerificationData: '',
+          serverVerificationData: 'tok-stuck',
+          source: 'google_play',
+        ),
+      );
+      final got = <PurchaseUpdate>[];
+      final sub = billing.updates().listen(got.add);
+      await Future<void>.delayed(Duration.zero);
+      // Listening alone does not hit Play.
+      verifyNever(
+        () => iap.restorePurchases(
+          applicationUserName: any(named: 'applicationUserName'),
+        ),
+      );
+      await billing.recoverUnfinished();
+      verify(
+        () => iap.restorePurchases(applicationUserName: sha256Hex('user-1')),
+      ).called(1);
+      stream.add([d]);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        got.single,
+        const PurchaseNeedsVerification(
+          'dia_1199',
+          purchaseToken: 'tok-stuck',
+          orderId: 'GPA.7',
+        ),
+      );
+      await sub.cancel();
+    });
+
+    test(
+      'recoverUnfinished is a no-op when signed out or off Android',
+      () async {
+        when(() => session.currentSession).thenReturn(null);
+        await billing.recoverUnfinished();
+        await PlayStoreBilling(
+          session: session,
+          iap: iap,
+          isAndroid: () => false,
+        ).recoverUnfinished();
+        verifyNever(
+          () => iap.restorePurchases(
+            applicationUserName: any(named: 'applicationUserName'),
+          ),
+        );
+      },
+    );
+
+    test('recoverUnfinished swallows store errors', () async {
+      when(
+        () => iap.restorePurchases(
+          applicationUserName: any(named: 'applicationUserName'),
+        ),
+      ).thenThrow(Exception('billing disconnected'));
+      await billing.recoverUnfinished();
     });
 
     test('maps purchase updates and completes only on request', () async {

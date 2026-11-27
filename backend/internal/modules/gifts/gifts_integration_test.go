@@ -176,6 +176,10 @@ func TestSendGiftMovesMoneyOnceAndAppendsChat(t *testing.T) {
 	if e.rec.count(gifts.EventGift) != 1 || e.rec.count(gifts.EventChatMessage) != 2 {
 		t.Fatalf("realtime %v", e.rec.events)
 	}
+	// Regression (2026-11-27): both wallets changed; both get a hint.
+	if e.rec.count("user:"+e.customer+" "+gifts.EventWalletUpdated) != 1 || e.rec.count("user:"+e.host+" "+gifts.EventWalletUpdated) != 1 {
+		t.Fatalf("wallet hints %v", e.rec.events)
+	}
 	// The realtime payload is public: no balances or ledger data.
 	for _, k := range []string{"available_diamonds", "ledger_entry_id", "from_purchased", "host_beans", "rule_set_version"} {
 		if _, ok := e.rec.gifts[0][k]; ok {

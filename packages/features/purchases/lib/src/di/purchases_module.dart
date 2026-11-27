@@ -3,6 +3,7 @@ import 'package:dashuri_network/dashuri_network.dart';
 import 'package:get_it/get_it.dart';
 
 import '../application/purchase_bloc.dart';
+import '../application/purchase_recovery.dart';
 import '../data/datasources/cashfree_sdk_checkout.dart';
 import '../data/datasources/play_store_billing.dart';
 import '../data/datasources/purchases_remote_data_source.dart';
@@ -63,6 +64,9 @@ void registerPurchasesFeature(GetIt sl, {bool? cashfreeEnabled}) {
     )
     ..registerFactory<OpenCashfreeCheckout>(
       () => OpenCashfreeCheckout(sl<PurchasesRepository>()),
+    )
+    ..registerLazySingleton<PurchaseRecovery>(
+      () => PurchaseRecovery(sl<PurchasesRepository>()),
     )
     ..registerFactory<PurchaseBloc>(
       () => PurchaseBloc(

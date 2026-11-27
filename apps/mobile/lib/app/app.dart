@@ -4,12 +4,14 @@ import 'package:dashuri_design_system/dashuri_design_system.dart';
 import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:feature_auth/feature_auth.dart';
 import 'package:feature_host/feature_host.dart';
+import 'package:feature_purchases/feature_purchases.dart';
 import 'package:feature_video_call/feature_video_call.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'di/injector.dart';
 import 'experience/app_experience_controller.dart';
+import 'purchases/purchase_recovery_binding.dart';
 import 'router/app_router.dart';
 
 /// Root widget: app-wide BLoCs, theme and router. No pages here.
@@ -35,19 +37,31 @@ class _DashuriAppState extends State<DashuriApp> {
   /// made elsewhere (e.g. host approval) apply without a restart. Quiet: a
   /// failure keeps the current account.
   late final AppLifecycleListener _lifecycle = AppLifecycleListener(
-    onResume: () => unawaited(_session.refreshAccountQuietly()),
+    onResume: () {
+      unawaited(_session.refreshAccountQuietly());
+      _purchaseRecovery?.onResume();
+    },
   );
+
+  /// Finishes Play purchases paid but never verified (e.g. the app was
+  /// killed mid-purchase), at sign-in and on every resume.
+  late final PurchaseRecoveryBinding? _purchaseRecovery =
+      sl.isRegistered<PurchaseRecovery>()
+      ? PurchaseRecoveryBinding(sl<PurchaseRecovery>().run)
+      : null;
 
   @override
   void initState() {
     super.initState();
     _experience.bind(_session);
+    _purchaseRecovery?.bind(_session.stream, _session.state);
     _session.start();
     _lifecycle; // start listening
   }
 
   @override
   void dispose() {
+    unawaited(_purchaseRecovery?.dispose());
     _lifecycle.dispose();
     _router.dispose();
     super.dispose();

@@ -148,3 +148,47 @@ func TestValidDebitSettlesCall(t *testing.T) {
 		t.Fatalf("balances after settlement: diamonds=%d beans=%d", d, b)
 	}
 }
+
+// Regression (2026-11-27): a reused idempotency key with a different payload
+// used to be reported as a successful replay, so the second movement was
+// silently lost. It is now refused, and the first entry stays untouched.
+func TestPostEntryReplayWithDifferentPayloadRefused(t *testing.T) {
+	api, admin := pgtest.Pools(t)
+	ctx := context.Background()
+	user := pgtest.NewUser(t, admin, true)
+	other := pgtest.NewUser(t, admin, true)
+	store := postgres.LedgerStore{Pool: api}
+	purchaseID := pgtest.UUID()
+	first := ledger.PurchaseCredit(user, purchaseID, "tok-"+user, 4000, "2026-11-17-founder", time.Now())
+	if _, replayed, err := store.Post(ctx, first); err != nil || replayed {
+		t.Fatalf("first post: replayed=%v err=%v", replayed, err)
+	}
+
+	// Exact replay (later timestamp, same money) is still a replay.
+	same := ledger.PurchaseCredit(user, purchaseID, "tok-"+user, 4000, "2026-11-17-founder", time.Now().Add(time.Minute))
+	if _, replayed, err := store.Post(ctx, same); err != nil || !replayed {
+		t.Fatalf("exact replay: replayed=%v err=%v", replayed, err)
+	}
+	// Same key, different amount.
+	more := ledger.PurchaseCredit(user, purchaseID, "tok-"+user, 12500, "2026-11-17-founder", time.Now())
+	if _, _, err := store.Post(ctx, more); !errors.Is(err, postgres.ErrIdempotencyConflict) {
+		t.Fatalf("different amount: want ErrIdempotencyConflict, got %v", err)
+	}
+	// Same key, different account.
+	elsewhere := ledger.PurchaseCredit(other, purchaseID, "tok-"+user, 4000, "2026-11-17-founder", time.Now())
+	if _, _, err := store.Post(ctx, elsewhere); !errors.Is(err, postgres.ErrIdempotencyConflict) {
+		t.Fatalf("different account: want ErrIdempotencyConflict, got %v", err)
+	}
+	// Same key, different entry type.
+	wrongType := first
+	wrongType.Type = ledger.EntryPromoGrant
+	if _, _, err := store.Post(ctx, wrongType); !errors.Is(err, postgres.ErrIdempotencyConflict) {
+		t.Fatalf("different type: want ErrIdempotencyConflict, got %v", err)
+	}
+	if bal, _ := store.Balance(ctx, ledger.User(user, ledger.UserDiamondPurchased), ledger.Diamond); bal != 4000 {
+		t.Fatalf("user balance %d, want 4000", bal)
+	}
+	if bal, _ := store.Balance(ctx, ledger.User(other, ledger.UserDiamondPurchased), ledger.Diamond); bal != 0 {
+		t.Fatalf("other balance %d, want 0", bal)
+	}
+}

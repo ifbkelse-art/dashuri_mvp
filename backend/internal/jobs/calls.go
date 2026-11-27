@@ -90,8 +90,9 @@ func ReleaseBeanHolds(ctx context.Context, env wiring.Env) error {
 	repo := postgres.HostsRepo{Pool: env.Pool, Tx: env.Tx}
 	total := 0
 	for i := 0; i < 20; i++ {
-		n, err := repo.ReleaseDueBeanHolds(ctx, now.Add(-env.Rules.BeanHoldPeriod), now, 500)
+		n, hosts, err := repo.ReleaseDueBeanHoldsFor(ctx, now.Add(-env.Rules.BeanHoldPeriod), now, 500)
 		total += n
+		walletsChanged(ctx, env, "bean_release", hosts)
 		if err != nil {
 			return err
 		}

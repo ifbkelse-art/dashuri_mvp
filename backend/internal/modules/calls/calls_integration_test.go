@@ -74,6 +74,32 @@ type env struct {
 	clock      *testClock
 	ledger     postgres.LedgerStore
 	terminated *terminations
+	events     *published
+}
+
+// published records realtime hints.
+type published struct {
+	mu  sync.Mutex
+	evs []string
+}
+
+func (p *published) Publish(_ context.Context, ch, ev string, _ any) error {
+	p.mu.Lock()
+	p.evs = append(p.evs, ch+" "+ev)
+	p.mu.Unlock()
+	return nil
+}
+
+func (p *published) count(s string) int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	n := 0
+	for _, e := range p.evs {
+		if e == s {
+			n++
+		}
+	}
+	return n
 }
 
 // terminations records OnTerminated (the in-call session chat hook).
@@ -91,11 +117,12 @@ func (r *terminations) record(_ context.Context, id string) {
 func setup(t *testing.T) env {
 	api, admin := pgtest.Pools(t)
 	e := env{api: api, admin: admin, video: &fakeVideo{}, clock: &testClock{t: time.Now().UTC()}, ledger: postgres.LedgerStore{Pool: api},
-		terminated: &terminations{}}
+		terminated: &terminations{}, events: &published{}}
 	e.svc = calls.NewService(calls.Deps{
 		Rules: economy.Founder(), Video: e.video, Clock: e.clock, ProviderName: "stream", APIKey: "pk",
 		Repo:         postgres.CallsRepo{Pool: api, Tx: db.TxManager{Pool: api}},
 		OnTerminated: e.terminated.record,
+		Realtime:     e.events,
 	})
 	return e
 }
@@ -219,6 +246,11 @@ func TestFullPaidCallSettlesExactAmounts(t *testing.T) {
 		where s.call_id = $1`, s.CallId).Scan(&beans, &status, &xp); err != nil || beans != 2599 || status != "settled" || xp != 2599 {
 		t.Fatalf("settlement row %d %s %d %v", beans, status, xp, err)
 	}
+	// Regression (2026-11-27): settlement changed both wallets without a
+	// wallet.updated hint, so open wallets kept showing old balances.
+	if e.events.count("user:"+cust+" wallet.updated") != 1 || e.events.count("user:"+host+" wallet.updated") != 1 {
+		t.Fatalf("wallet.updated hints: %v", e.events.evs)
+	}
 	// Idempotent replay: same result, no second charge.
 	e.clock.Set(t0.Add(500 * time.Second))
 	again, err := e.svc.EndCall(ctx, principal(host), s.CallId, calls.EndCallRequest{Reason: "hangup"})
@@ -227,6 +259,9 @@ func TestFullPaidCallSettlesExactAmounts(t *testing.T) {
 	}
 	if got := e.balance(t, cust, ledger.UserDiamondPurchased, ledger.Diamond); got != 5667 {
 		t.Fatalf("charged twice: %d", got)
+	}
+	if e.events.count("user:"+cust+" wallet.updated") != 1 {
+		t.Fatalf("replayed end must not re-announce: %v", e.events.evs)
 	}
 	// History lists it with peer info.
 	page, err := e.svc.ListCallHistory(ctx, principal(host), calls.PageRequest{Limit: 10})

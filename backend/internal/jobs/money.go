@@ -67,12 +67,29 @@ func ReconcileLedger(ctx context.Context, env wiring.Env) error {
 // ExpirePromoDiamonds is a no-op while no promotional grants exist.
 func ExpirePromoDiamonds(ctx context.Context, env wiring.Env) error {
 	now := env.Clock.Now()
-	grants, expired, err := postgres.ExpirePromoGrants(ctx, env.Pool, env.Tx, now.Add(-env.Rules.PromoDiamondTTL), now, 1000)
+	grants, expired, users, err := postgres.ExpirePromoGrantsFor(ctx, env.Pool, env.Tx, now.Add(-env.Rules.PromoDiamondTTL), now, 1000)
+	// Hint every wallet that changed, even when a later grant failed: those
+	// expiries are committed.
+	walletsChanged(ctx, env, "promo_expiry", users)
 	if err != nil {
 		return err
 	}
 	slog.Info("promo expiry", "grants_processed", grants, "diamonds_expired", expired)
 	return nil
+}
+
+// walletsChanged sends wallet.updated to each user whose balances a job
+// changed, so an open wallet or balance pill re-reads GET /v1/wallet.
+// Hints only: failures are logged, never returned.
+func walletsChanged(ctx context.Context, env wiring.Env, reason string, users []string) {
+	if env.Realtime == nil {
+		return
+	}
+	for _, u := range users {
+		if err := env.Realtime.Publish(ctx, "user:"+u, "wallet.updated", map[string]any{"reason": reason}); err != nil {
+			slog.WarnContext(ctx, "wallet.updated publish failed", "reason", reason, "err", err)
+		}
+	}
 }
 
 func skipUnavailable(job string, err error) error {

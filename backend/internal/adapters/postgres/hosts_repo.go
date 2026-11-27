@@ -302,6 +302,14 @@ func (r HostsRepo) openSessionColumns() string {
 // current held balance (clawbacks may have reduced it). Bounded batch;
 // replays are no-ops through the ledger idempotency key.
 func (r HostsRepo) ReleaseDueBeanHolds(ctx context.Context, olderThan, at time.Time, limit int) (int, error) {
+	n, _, err := r.ReleaseDueBeanHoldsFor(ctx, olderThan, at, limit)
+	return n, err
+}
+
+// ReleaseDueBeanHoldsFor is ReleaseDueBeanHolds that also returns the hosts
+// whose balances changed (a fresh release committed), deduplicated, so the
+// caller can tell their apps to re-read the wallet.
+func (r HostsRepo) ReleaseDueBeanHoldsFor(ctx context.Context, olderThan, at time.Time, limit int) (int, []string, error) {
 	rows, err := r.Pool.Query(ctx, `
 		select p.entry_id, a.owner_user_id, p.amount
 		  from ledger.postings p
@@ -311,7 +319,7 @@ func (r HostsRepo) ReleaseDueBeanHolds(ctx context.Context, olderThan, at time.T
 		   and not exists (select 1 from ledger.journal_entries r where r.idempotency_key = 'bean_release:' || p.entry_id::text)
 		 order by e.occurred_at limit $2`, olderThan, limit)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	type due struct {
 		entry, host string
@@ -322,16 +330,19 @@ func (r HostsRepo) ReleaseDueBeanHolds(ctx context.Context, olderThan, at time.T
 		var d due
 		if err := rows.Scan(&d.entry, &d.host, &d.beans); err != nil {
 			rows.Close()
-			return 0, err
+			return 0, nil, err
 		}
 		items = append(items, d)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	released := 0
+	var hosts []string
+	seen := map[string]bool{}
 	for _, d := range items {
+		fresh := false
 		err := r.Tx.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 			bal, err := LockUserBalances(ctx, tx, d.host, ledger.UserBeanHeld, ledger.UserBeanAvailable)
 			if err != nil {
@@ -342,14 +353,19 @@ func (r HostsRepo) ReleaseDueBeanHolds(ctx context.Context, olderThan, at time.T
 				return nil
 			}
 			_, replayed, err := PostEntry(ctx, tx, ledger.BeanRelease(d.host, d.entry, beans, at))
-			if err == nil && !replayed {
-				released++
-			}
+			fresh = err == nil && !replayed
 			return err
 		})
 		if err != nil {
-			return released, err
+			return released, hosts, err
+		}
+		if fresh {
+			released++
+			if !seen[d.host] {
+				seen[d.host] = true
+				hosts = append(hosts, d.host)
+			}
 		}
 	}
-	return released, nil
+	return released, hosts, nil
 }

@@ -108,6 +108,25 @@ final class PlayStoreBilling implements StoreBilling {
     return _iap.purchaseStream.expand((list) => list.map(_toUpdate));
   }
 
+  /// Play only re-delivers a purchase that was paid but never finished (the
+  /// app died before the server verified it, or the server's consume
+  /// failed) when asked. On Android `restorePurchases` returns the purchases
+  /// still owned (not consumed), each as `restored`, on [updates]. They go
+  /// through the normal server verification, which credits a token once and
+  /// consumes it, so a recovered purchase is never credited twice.
+  @override
+  Future<void> recoverUnfinished() async {
+    if (!_isAndroid()) return;
+    final userId = _session.currentSession?.userId;
+    if (userId == null) return;
+    try {
+      if (!await _iap.isAvailable()) return;
+      await _iap.restorePurchases(applicationUserName: sha256Hex(userId));
+    } on Object {
+      // Best effort; the next start or resume retries.
+    }
+  }
+
   PurchaseUpdate _toUpdate(PurchaseDetails d) {
     switch (d.status) {
       case PurchaseStatus.pending:

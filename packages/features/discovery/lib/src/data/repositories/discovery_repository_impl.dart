@@ -1,4 +1,5 @@
 import 'package:dashuri_core/dashuri_core.dart';
+import 'package:dashuri_network/dashuri_network.dart';
 
 import '../../domain/entities/discovery_filter.dart';
 import '../../domain/entities/host_card.dart';
@@ -7,9 +8,27 @@ import '../datasources/discovery_remote_data_source.dart';
 
 /// Default [DiscoveryRepository]: delegates to the API.
 final class DiscoveryRepositoryImpl implements DiscoveryRepository {
-  const DiscoveryRepositoryImpl(this._remote);
+  const DiscoveryRepositoryImpl(
+    this._remote, {
+    RealtimeGateway? realtime,
+    SessionGateway? session,
+  }) : _realtime = realtime,
+       _session = session;
 
   final DiscoveryRemoteDataSource _remote;
+  final RealtimeGateway? _realtime;
+  final SessionGateway? _session;
+
+  @override
+  Stream<void> walletUpdates() {
+    final realtime = _realtime;
+    final userId = _session?.currentSession?.userId;
+    if (realtime == null || userId == null) return const Stream.empty();
+    return realtime
+        .subscribe('user:$userId')
+        .where((e) => e.type == 'wallet.updated')
+        .map((_) {});
+  }
 
   @override
   Future<Result<Page<HostCard>>> listAvailableHosts({

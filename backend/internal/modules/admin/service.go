@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 
 	"dashuri/backend/internal/modules/ledger"
@@ -142,6 +143,12 @@ func (s *Service) DecideAdjustment(ctx context.Context, p auth.Principal, propos
 	out := AdjustmentProposal{ProposalId: pr.ID, Status: pr.Status}
 	if pr.EntryID != "" {
 		out.EntryId = &pr.EntryID
+		if s.deps.Events != nil && pr.Account.UserID != "" {
+			if err := s.deps.Events.Publish(ctx, "user:"+pr.Account.UserID, "wallet.updated",
+				map[string]any{"reason": "adjustment"}); err != nil {
+				slog.WarnContext(ctx, "wallet.updated publish failed", "err", err)
+			}
+		}
 	}
 	return out, nil
 }

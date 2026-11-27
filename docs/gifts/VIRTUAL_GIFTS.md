@@ -39,15 +39,17 @@ Table `gifts.catalogue`. Seed values are founder-proposed product decisions:
 | id | Name | Diamonds | Tier |
 |---|---|---:|---|
 | rose | Rose 🌹 | 1,500 | common |
-| teddy | Teddy 🧸 | 5,000 | common |
+| teddy | Teddy Bear 🧸 | 5,000 | common |
 | watch | Watch ⌚ | 10,000 | rare |
 | gold_ring | Gold Ring 💍 | 15,000 | rare |
 | diamond_ring | Diamond Ring 💎 | 25,000 | epic |
-| luxury_gift | Luxury Gift 🎁 | 50,000 | epic |
-| royal_gift | Royal Gift 👑 | 100,000 | legendary |
-| premium_gift | Premium Gift 🏆 | 150,000 | legendary |
-| super_gift | Super Gift 🌟 | 200,000 | mythic |
-| elite_gift | Elite Gift 🚀 | 300,000 | mythic |
+| luxury_gift | Sports Car 🏎️ | 50,000 | epic |
+| royal_gift | Crown 👑 | 100,000 | legendary |
+| premium_gift | Yacht 🛥️ | 150,000 | legendary |
+| super_gift | Rocket 🚀 | 200,000 | mythic |
+| elite_gift | Castle 🏰 | 300,000 | mythic |
+
+Names were changed on 2026-11-27 (migration `20261127000300_gift_catalogue_names.sql`, founder decision). Ids and prices did not change. Heart, Ice Cream and Bouquet are not in the catalogue yet; adding them needs founder-set prices.
 
 Each gift has these fields:
 

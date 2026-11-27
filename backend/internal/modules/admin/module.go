@@ -20,6 +20,13 @@ type Deps struct {
 	PayoutsEnabled bool // PAYOUTS_ENABLED (R3-7)
 	// Console is the read model for the admin web console (nil → 503).
 	Console ConsoleRepository
+	// Events pushes wallet.updated to the adjusted user (optional).
+	Events Publisher
+}
+
+// Publisher sends realtime hints (satisfied by wiring.Publisher).
+type Publisher interface {
+	Publish(ctx context.Context, channel, event string, payload any) error
 }
 
 // Reconciliation is the raw result of a reconciliation run.

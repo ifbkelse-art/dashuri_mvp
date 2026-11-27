@@ -194,6 +194,10 @@ func (s *Service) verifyPlay(ctx context.Context, userID string, pkg Package, to
 		}
 		switch existing.State {
 		case "credited":
+			// Credited once already. If the first consume failed, the pack
+			// is still "owned" at Google and cannot be bought again; the app
+			// re-reports such tokens (restorePurchases), so retry here.
+			s.consumeIfOwned(ctx, existing.ID, pkg.ProductID, token)
 			return PurchaseVerification{PurchaseId: existing.ID, Status: "credited", DiamondsCredited: existing.Diamonds}, nil
 		case "reversed":
 			return PurchaseVerification{}, apperr.BusinessRule("purchase_token_invalid", "this purchase was refunded")
@@ -223,6 +227,7 @@ func (s *Service) verifyPlay(ctx context.Context, userID string, pkg Package, to
 		got, replayed, err := s.deps.Repo.CreditPurchase(ctx, Credit{
 			UserID: userID, ProductID: pkg.ProductID, TokenHash: hash, OrderID: gp.OrderID, Diamonds: diamonds,
 			Rail: railPlay, XP: s.deps.Rules.XP(diamonds, 0),
+			PricePaise: pkg.PricePaise * int64(max(gp.Quantity, 1)), PriceSource: "catalogue",
 			Entry: func(purchaseID string) ledger.Entry {
 				return ledger.PurchaseCredit(userID, purchaseID, hash, diamonds, s.deps.Rules.Version, now)
 			},
@@ -260,6 +265,23 @@ func (s *Service) verifyPlay(ctx context.Context, userID string, pkg Package, to
 		return PurchaseVerification{PurchaseId: saved.ID, Status: "credited", DiamondsCredited: saved.Diamonds}, nil
 	}
 	return PurchaseVerification{PurchaseId: saved.ID, Status: saved.State, DiamondsCredited: 0}, nil
+}
+
+// consumeIfOwned consumes an already-credited token that Google still
+// reports as unconsumed. Best effort: failures are logged, never returned,
+// because the credit itself is already final.
+func (s *Service) consumeIfOwned(ctx context.Context, purchaseID, productID, token string) {
+	gp, err := s.deps.Play.GetProductPurchase(ctx, s.deps.PackageName, productID, token)
+	if err != nil {
+		slog.WarnContext(ctx, "play consume retry: lookup failed", "purchase_id", purchaseID, "err", err)
+		return
+	}
+	if gp.Consumed || gp.PurchaseState != PlayStatePurchased {
+		return
+	}
+	if err := s.deps.Play.Consume(ctx, s.deps.PackageName, productID, token); err != nil {
+		slog.WarnContext(ctx, "play consume retry failed", "purchase_id", purchaseID, "err", err)
+	}
 }
 
 // pushEnvelope is a Pub/Sub push delivery.
@@ -650,6 +672,7 @@ func (s *Service) creditCashfree(ctx context.Context, rec CashfreeOrderRecord) e
 	_, replayed, err := s.deps.Repo.CreditPurchase(ctx, Credit{
 		UserID: rec.UserID, ProductID: rec.ProductID, TokenHash: CashfreeTokenHash(rec.OrderID), OrderID: rec.OrderID,
 		Diamonds: rec.Diamonds, Rail: railCashfree, XP: s.deps.Rules.XP(rec.Diamonds, 0), CashfreeOrderID: rec.OrderID,
+		PricePaise: rec.AmountPaise, PriceSource: "gateway_order",
 		Entry: func(purchaseID string) ledger.Entry {
 			// Ledger key purchase_credit:cashfree:<order_id> (MVP contract §2.4).
 			return ledger.PurchaseCredit(rec.UserID, purchaseID, "cashfree:"+rec.OrderID, rec.Diamonds, s.deps.Rules.Version, now)

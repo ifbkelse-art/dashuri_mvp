@@ -28,4 +28,8 @@ abstract interface class DiscoveryRepository {
 
   /// GET /v1/me/profile → display_name (greeting).
   Future<Result<String>> myDisplayName();
+
+  /// `wallet.updated` hints on `user:<id>` (purchase, call settlement,
+  /// gift, refund, adjustment). A hint only: re-read the balance from the API.
+  Stream<void> walletUpdates();
 }

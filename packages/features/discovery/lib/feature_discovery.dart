@@ -15,6 +15,7 @@ export 'src/domain/repositories/discovery_repository.dart';
 export 'src/domain/usecases/get_discovery_home.dart';
 export 'src/domain/usecases/get_host_profile.dart';
 export 'src/domain/usecases/list_available_hosts.dart';
+export 'src/domain/usecases/watch_balance_changes.dart';
 export 'src/presentation/pages/discovery_filters_page.dart';
 export 'src/presentation/pages/discovery_page.dart';
 export 'src/presentation/pages/host_profile_page.dart';
