@@ -12,7 +12,7 @@ During an **active** one-to-one video call, the **customer** (the caller) can se
 - The host earns Beans under the **existing economy rule set**.
 - Both participants see a celebration and a line in the call's chat.
 
-Hosts never send gifts. Host accounts also cannot send gifts when they call another host. This blocks host-to-host value transfer.
+The role in the call decides, not the account. Whoever places the call is the customer and can send gifts, even if they also have an approved host profile. Whoever receives the call is the host and can never send gifts in it (`hosts_cannot_send_gifts`). Changed 28 Nov 2026 (founder); before, any approved host account was blocked everywhere.
 
 Gifts never unlock content and never override any safety rule.
 
@@ -82,7 +82,7 @@ Everything runs in **one Postgres transaction** (`postgres.GiftsRepo.Send`). The
    - The sender is the call's caller. If the host tries: `hosts_cannot_send_gifts`.
    - The recipient is the call's receiver: `recipient_user_id: not_call_host`.
    - The call phase is `active` (not ringing, paused or ended): `call_not_giftable`.
-   - The sender is an active, 18+ account that is not an approved host: `account_restricted` / `not_age_eligible` / `hosts_cannot_send_gifts`.
+   - The sender is an active, 18+ account: `account_restricted` / `not_age_eligible`. Whether the account also hosts does not matter.
    - The host is approved and active: `host_cannot_receive_gifts`.
    - No block either way: `blocked`.
    - The gift exists, is active, not retired and inside its window: `not_found` / `gift_unavailable`.
@@ -187,7 +187,7 @@ A price change applies only to gifts sent afterwards. Completed transactions kee
 ## 8. Abuse prevention and safety
 
 - **Authorisation.** Customer only, in their own active call, to that call's host. Blocked pairs, restricted or suspended accounts and under-18 accounts are refused.
-- **Self-gifting.** It is structurally impossible inside one call. Host accounts cannot send gifts at all, so one host cannot route value to another through a second account.
+- **Self-gifting.** It is structurally impossible inside one call (caller and receiver differ). Since 28 Nov 2026 an approved host who calls another host can send gifts, so one person with two accounts could route value between them. A plain customer account could always do the same, so the earlier account-level ban never closed this; linked-account detection (below) remains the open control.
 - **Shared devices.** There is no reliable signal for "same person, two accounts". Free Call Card device hashes are unique per account, and FCM tokens move between accounts. Linked-account detection is therefore listed as an open item, not claimed.
 - **Velocity and spend.** 6 gifts per call per minute; 1,000,000 Diamonds per 24 hours (§9: proposed values). There is also the general per-user API rate limit.
 - **Risk flags.** Recorded on the transaction and never blocking:

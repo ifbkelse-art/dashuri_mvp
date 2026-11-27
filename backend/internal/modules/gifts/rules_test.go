@@ -117,7 +117,6 @@ func TestDecideRefusals(t *testing.T) {
 		{"sender suspended", func(_ *SendRequest, st *SendState) { st.Sender.Status = "suspended" }, "account_restricted"},
 		{"sender restricted", func(_ *SendRequest, st *SendState) { st.Sender.Status = "restricted" }, "account_restricted"},
 		{"sender under age", func(_ *SendRequest, st *SendState) { st.Sender.AgeEligible = false }, "not_age_eligible"},
-		{"sender is a host account", func(_ *SendRequest, st *SendState) { st.Sender.HostState = "approved" }, "hosts_cannot_send_gifts"},
 		{"host suspended", func(_ *SendRequest, st *SendState) { st.Recipient.HostState = "suspended" }, "host_cannot_receive_gifts"},
 		{"host account banned", func(_ *SendRequest, st *SendState) { st.Recipient.Status = "banned" }, "host_cannot_receive_gifts"},
 		{"blocked", func(_ *SendRequest, st *SendState) { st.Blocked = true }, "blocked"},

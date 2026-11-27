@@ -124,10 +124,12 @@ func decide(r economy.Rules, l Limits, req SendRequest, st SendState, newID func
 	if !s.AgeEligible {
 		return SendPlan{}, apperr.BusinessRule("not_age_eligible", "confirm you are 18 or older first")
 	}
-	if s.HostState == "approved" {
-		// Host accounts never send gifts (no host-to-host value transfer).
-		return SendPlan{}, apperr.Forbidden("hosts_cannot_send_gifts", "host accounts cannot send gifts")
-	}
+	// The sender's account type does not matter: in this call they are the
+	// customer (they placed it), so a user who is also an approved host may
+	// send gifts when they are the one calling. Founder decision 28 Nov 2026:
+	// the role in the call decides, not the account. The receiver side is
+	// refused above (hosts_cannot_send_gifts); self-gifting is impossible
+	// because the caller and the receiver differ (calls.calls check).
 	h := st.Recipient
 	if !h.Exists || h.Status != "active" || !h.AgeEligible || h.HostState != "approved" {
 		return SendPlan{}, apperr.BusinessRule("host_cannot_receive_gifts", "this host cannot receive gifts right now")

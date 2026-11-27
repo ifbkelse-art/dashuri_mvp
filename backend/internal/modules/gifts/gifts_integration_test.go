@@ -354,14 +354,16 @@ func TestSendRefusals(t *testing.T) {
 	}
 }
 
-func TestHostAccountCannotSendEvenAsCaller(t *testing.T) {
+// The role in the call decides, not the account: a user who is also an
+// approved host may send a gift when they are the caller (the customer).
+func TestHostAccountCanSendWhenTheyAreTheCaller(t *testing.T) {
 	e := setup(t)
 	hostCaller := callstest.Host(t, e.admin, 500)
 	callee := callstest.Host(t, e.admin, 500)
 	callstest.Fund(t, e.api, hostCaller, 10_000)
 	call := identitytest.Call(t, e.admin, hostCaller, callee, "active", 0, 0)
-	if _, err := e.send(callstest.Principal(hostCaller, auth.RoleHost), call, "rose", callee, pgtest.UUID()); rule(err) != "hosts_cannot_send_gifts" {
-		t.Fatalf("host-to-host gift: %v", err)
+	if _, err := e.send(callstest.Principal(hostCaller, auth.RoleHost), call, "rose", callee, pgtest.UUID()); err != nil {
+		t.Fatalf("a host account calling another host should be able to send: %v", err)
 	}
 }
 
