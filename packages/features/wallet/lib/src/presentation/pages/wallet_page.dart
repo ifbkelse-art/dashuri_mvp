@@ -30,6 +30,7 @@ class WalletPage extends StatelessWidget {
           builder: (context, state) => switch (state) {
             WalletStateInitial() || WalletStateLoading() => const LoadingView(),
             WalletStateFailed(:final failure) => ErrorStateView(
+              title: "Couldn't load your wallet",
               message: WalletFormat.failureMessage(failure),
               onRetry: () => context.read<WalletCubit>().load(),
             ),

@@ -36,6 +36,7 @@ class PreCallPage extends StatelessWidget {
       body: switch (s) {
         PreCallLoading() || PreCallStarted() => const LoadingView(),
         PreCallFailed(:final failure) => ErrorStateView(
+          title: "Couldn't load this host",
           message: callFailureMessage(failure),
           onRetry: () => context.read<PreCallCubit>().load(hostUserId),
         ),

@@ -62,6 +62,7 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                 return const SkeletonList(avatar: false);
               case WalletHistoryStatus.failed:
                 return ErrorStateView(
+                  title: "Couldn't load your history",
                   message: WalletFormat.failureMessage(
                     state.failure!,
                     subject: 'your activity',

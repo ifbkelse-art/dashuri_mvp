@@ -23,6 +23,7 @@ class TransactionDetailPage extends StatelessWidget {
           builder: (context, state) => switch (state) {
             TransactionDetailLoading() => const LoadingView(),
             TransactionDetailFailed(:final failure) => ErrorStateView(
+              title: "Couldn't load this transaction",
               message: WalletFormat.failureMessage(
                 failure,
                 subject: 'this transaction',

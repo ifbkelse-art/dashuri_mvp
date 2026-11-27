@@ -31,6 +31,7 @@ class CallSummaryPage extends StatelessWidget {
       body: switch (s) {
         CallSummaryLoading() => const LoadingView(),
         CallSummaryFailed(:final failure) => ErrorStateView(
+          title: "Couldn't load this call",
           message: callFailureMessage(failure),
           onRetry: () => context.read<CallSummaryCubit>().load(callId),
         ),

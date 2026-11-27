@@ -16,6 +16,7 @@ class SentGiftsPage extends StatelessWidget {
       builder: (context, s) => switch (s) {
         SentGiftsLoading() => const LoadingView(),
         SentGiftsFailed() => ErrorStateView(
+          title: "Couldn't load your gifts",
           message: "Your gifts couldn't load. Please try again.",
           onRetry: context.read<SentGiftsCubit>().load,
         ),

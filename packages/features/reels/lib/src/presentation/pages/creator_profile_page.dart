@@ -86,6 +86,7 @@ class CreatorProfilePage extends StatelessWidget {
           body: switch (s) {
             CreatorProfileLoading() => const LoadingView(),
             CreatorProfileFailed(:final failure) => ErrorStateView(
+              title: "Couldn't load this profile",
               message: reelsFailureMessage(failure),
               onRetry: () => context.read<CreatorProfileCubit>().load(userId),
             ),

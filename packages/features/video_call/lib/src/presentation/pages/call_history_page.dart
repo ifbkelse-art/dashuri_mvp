@@ -20,6 +20,7 @@ class CallHistoryPage extends StatelessWidget {
         return switch (s) {
           CallHistoryLoading() => const SkeletonList(),
           CallHistoryFailed(:final failure) => ErrorStateView(
+            title: "Couldn't load your calls",
             message: callFailureMessage(failure),
             onRetry: cubit.load,
           ),

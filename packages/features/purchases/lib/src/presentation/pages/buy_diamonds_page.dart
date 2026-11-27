@@ -60,6 +60,7 @@ class BuyDiamondsPage extends StatelessWidget {
             if (state.packages.isEmpty) {
               return state.failure != null
                   ? ErrorStateView(
+                      title: "Couldn't load Diamond packs",
                       message: PurchaseCopy.failure(state.failure!),
                       onRetry: () =>
                           bloc.add(const PurchasePackagesRequested()),
