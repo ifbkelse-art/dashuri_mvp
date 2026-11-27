@@ -22,6 +22,7 @@ export function Layout() {
   const { api, staff, has, signOut } = useAuth();
   const reviewer = has('moderator', 'admin');
   const finance = has('finance', 'admin');
+  const isAdmin = has('admin');
   const [counts, setCounts] = useState<Counts>({ hosts: null, photos: null, reports: null });
 
   const refresh = useCallback(() => {
@@ -73,8 +74,10 @@ export function Layout() {
             {reviewer && <NavLink to="/photos">Photo review {badge(counts.photos)}</NavLink>}
             {reviewer && <NavLink to="/reports">Reports &amp; appeals {badge(counts.reports)}</NavLink>}
             {reviewer && <NavLink to="/arrival-photos">Arrival photos</NavLink>}
+            {reviewer && <NavLink to="/reels">Reels moderation</NavLink>}
             {(finance || reviewer) && <NavLink to="/gifts">Gifts</NavLink>}
             {finance && <NavLink to="/finance">Finance</NavLink>}
+            {isAdmin && <NavLink to="/audit">Audit log</NavLink>}
           </nav>
           <div className="who">
             <strong>{staff?.display_name ?? 'Staff'}</strong>

@@ -5,6 +5,8 @@ import { Layout } from './components/Layout';
 import { Banner, Skeleton } from './components/ui';
 import type { Role } from './lib/types';
 import { ArrivalPhotos } from './pages/ArrivalPhotos';
+import { AuditLog } from './pages/AuditLog';
+import { ReelsModeration } from './pages/ReelsModeration';
 import { Finance } from './pages/Finance';
 import { Gifts } from './pages/Gifts';
 import { HostActivation } from './pages/HostActivation';
@@ -49,6 +51,8 @@ export function AppRoutes() {
         <Route path="finance" element={<Guard roles={['finance', 'admin']}><Finance /></Guard>} />
         <Route path="arrival-photos" element={<Guard roles={reviewers}><ArrivalPhotos /></Guard>} />
         <Route path="gifts" element={<Guard roles={['admin', 'finance', 'moderator']}><Gifts /></Guard>} />
+        <Route path="reels" element={<Guard roles={reviewers}><ReelsModeration /></Guard>} />
+        <Route path="audit" element={<Guard roles={['admin']}><AuditLog /></Guard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -17,6 +17,8 @@ import type {
   Page,
   PendingPhoto,
   PublicProfile,
+  ReelDecision,
+  ReelQueueItem,
   ReconciliationReport,
   StaffMe,
   UserName,
@@ -50,7 +52,7 @@ export function describeError(e: unknown): string {
   if (e.status === 0) return "Can't reach the server. Check your connection and try again.";
   if (e.status === 401) return 'Your session has ended. Please sign in again.';
   if (e.code === 'role_required') return "Your account doesn't have permission for this.";
-  if (e.code === 'self_review') return "You can't review your own account.";
+  if (e.code === 'self_review') return "You can't review your own account or content.";
   if (e.code === 'conflict_of_interest') return "You can't act on your own proposal or account.";
   const fields = Object.entries(e.fields);
   if (fields.length) return 'Please check: ' + fields.map(([f, r]) => `${f.replace(/_/g, ' ')} (${r.replace(/_/g, ' ')})`).join(', ');
@@ -175,6 +177,18 @@ export class AdminApi {
   arrivalQueue = () => this.request<Items<ArrivalQueueItem>>('GET', '/v1/admin/arrival-photos?limit=50');
   decideArrival = (photoId: string, decision: 'approve' | 'reject' | 'remove', reason?: string) =>
     this.request<ArrivalQueueItem>('POST', `/v1/admin/arrival-photos/${encodeURIComponent(photoId)}/decision`, { decision, reason: reason ?? '' }, true);
+
+  // Reels moderation (EXPERIMENT; empty while Reels is off). Playback links
+  // in the queue are short-lived (15 min).
+  reelsQueue = (cursor?: string) =>
+    this.request<Page<ReelQueueItem>>('GET', `/v1/admin/reels/queue?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+  decideReel = (reelId: string, decision: ReelDecision, reasonCode: string, note?: string) =>
+    this.request<{ reel_id: string; status: string }>(
+      'POST',
+      `/v1/admin/reels/${encodeURIComponent(reelId)}/decision`,
+      { decision, reason_code: reasonCode, ...(note ? { note } : {}) },
+      true,
+    );
 
   // Audit.
   audit = (limit = 30) => this.request<Items<AuditItem>>('GET', `/v1/admin/audit?limit=${limit}`);

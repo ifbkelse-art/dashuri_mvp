@@ -256,3 +256,26 @@ export interface ArrivalQueueItem {
   session_open: boolean;
   photo_url: string | null;
 }
+
+/** Reels moderation queue entry (GET /v1/admin/reels/queue). */
+export interface ReelQueueItem {
+  case_id: string;
+  source: string; // automated | report | appeal
+  priority: number;
+  scores: Record<string, number> | null;
+  report_count: number;
+  appeal_statement: string | null;
+  created_at: string;
+  reel: {
+    id: string;
+    creator: { user_id: string; display_name: string };
+    caption: string;
+    duration_ms: number | null;
+    status: string;
+    rejection_code: string | null;
+    playback: { url: string; format: string; thumbnail_url: string; expires_at: string } | null;
+    created_at: string;
+  };
+}
+
+export type ReelDecision = 'approve' | 'reject' | 'remove' | 'restore';
