@@ -142,6 +142,7 @@ class CityPickerPage extends StatelessWidget {
       CityListStatus.loading => const SliverFillRemaining(child: LoadingView()),
       CityListStatus.failed => SliverFillRemaining(
         child: ErrorStateView(
+          title: "Couldn't load cities",
           message: failureMessage(state.listFailure!),
           onRetry: cubit.retry,
         ),

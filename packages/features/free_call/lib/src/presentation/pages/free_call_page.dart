@@ -105,6 +105,7 @@ class _Flow extends StatelessWidget {
           FreeCallCardStateInitial() ||
           FreeCallCardStateLoading() => const LoadingView(),
           FreeCallCardStateFailed(:final failure) => ErrorStateView(
+            title: "Couldn't load your Free Call Card",
             message: freeCallFailureMessage(failure),
             onRetry: context.read<FreeCallCardCubit>().load,
           ),
