@@ -26,6 +26,7 @@ class _FakePlayer implements ReelPlayerFactory {
     required bool muted,
     required bool paused,
     required ReelPlayerCallbacks callbacks,
+    bool preload = false,
   }) => ColoredBox(color: Colors.black, child: Text('player ${playback.url}'));
 }
 
@@ -420,6 +421,40 @@ void main() {
       await pumpPage(t, page(), size: size, textScale: scale);
       expect(find.text('Your reel was not published'), findsOneWidget);
       expect(find.textContaining('graphic or offensive'), findsOneWidget);
+    });
+
+    // Regression (2026-11-27): an upload the server had not confirmed was
+    // shown as "Uploaded" with a ticked first step.
+    testResponsive('an unconfirmed upload is not shown as uploaded', (
+      t,
+      size,
+      scale,
+    ) async {
+      when(() => c.state).thenReturn(
+        UploadTracking(
+          reel('n', mine: true, status: ReelStatus.awaitingUpload),
+          polling: true,
+        ),
+      );
+      await pumpPage(t, page(), size: size, textScale: scale);
+      expect(t.takeException(), isNull);
+      expect(find.text('Confirming your upload'), findsOneWidget);
+      expect(
+        find.text('Confirming your upload with the server…'),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.check_circle), findsNothing);
+      when(() => c.state).thenReturn(
+        UploadTracking(
+          reel('n', mine: true, status: ReelStatus.awaitingUpload),
+          polling: false,
+        ),
+      );
+      await pumpPage(t, page(), size: size, textScale: scale);
+      expect(
+        find.textContaining("couldn't confirm the upload"),
+        findsOneWidget,
+      );
     });
   });
 }

@@ -34,9 +34,11 @@ UI fixes in this pass:
   full responsive matrix, block confirmed/cancelled, contrast audit of
   feed/empty/error in both themes). 235 Reels tests pass.
 
-**Still blocked:** real video playback needs the `video_player` package
-(new dependency, needs approval) **and** Mux credentials; until then the
-honest poster view is shown. Moderation needs Sightengine keys.
+**Update 27 Nov 2026 (second closed-testing prep):** playback is built.
+`VideoPlayerReelFactory` (`video_player`, approved by the founder) plays the
+R2 MP4 URLs; see §5. Mux is no longer needed (R2 + own processing,
+`DASHURI_REELS_R2_MIGRATION.md`). **Still blocked:** Cloudflare R2
+credentials and Sightengine keys; nothing has played against real R2 yet.
 
 ## 1. Summary
 
@@ -44,7 +46,7 @@ honest poster view is shown. Moderation needs Sightengine keys.
 |---|---|
 | 1. Audit, architecture, PRD, provider research, financial model | Done |
 | 2. Database, Go API, media provider abstraction | Done (Mux adapter written against the documented API; **no credentials, never called live**) |
-| 3. Flutter Reels and creator experience | Done, except **video playback**, which needs the `video_player` package (founder approval) |
+| 3. Flutter Reels and creator experience | Done, including playback (`video_player`, 27 Nov). Not yet played against real R2 |
 | 4. Moderation, analytics, integration | Done (Sightengine frame adapter; **no live calls made**) |
 | 5. Tests, local demo, docs | Done. All suites pass (§3) |
 
@@ -126,7 +128,7 @@ P0 responsiveness audit that fixed overflows in Reels too. See
 
 ## 4. Known defects and risks
 
-1. **No playback in this build.** The feed shows posters with "Video playback isn't available in this build" until `video_player` is approved (§5).
+1. ~~No playback in this build.~~ Fixed 27 Nov (§5). Remaining: a presigned URL lives 6 h, so a feed left open longer fails to play; "Try again" re-opens the same URL and fails again until the feed is refreshed.
 2. **Shared links point to a page that does not exist** (`dashuri.app/r/<id>`).
 3. **Large files are read fully into memory** before upload (a limit of 150 MB applies). Streaming or resumable upload (tus) is better for long clips on low-end phones.
 4. **The device duration check reads MP4/MOV `mvhd` only.** Other containers are refused with a clear message; the server re-checks the duration anyway.
@@ -137,17 +139,17 @@ P0 responsiveness audit that fixed overflows in Reels too. See
 9. **Mux is US-processed.** Disclose this in the privacy policy (DPDP) and confirm Mux's acceptable-use policy for an 18+ product.
 10. **Financial impact is entirely assumed.** On base assumptions Reels lowers six-month profit by about ₹32k (see the financial analysis).
 
-## 5. Approval needed: video playback
+## 5. Video playback (built 27 Nov 2026)
 
-Playback needs [`video_player`](https://pub.dev/packages/video_player), from the Flutter team (HLS on Android via ExoPlayer). Once approved:
-1. Add `video_player` to `apps/mobile/pubspec.yaml`.
-2. Implement `ReelPlayerFactory` in `apps/mobile/lib/app/platform/` with a `VideoPlayerController.networkUrl(Uri.parse(playback.hlsUrl))` per active reel:
-   - play when `active && !paused`;
-   - set volume to `muted ? 0 : 1`;
-   - call `callbacks.onStarted` on first frame, `onCompleted` at the end, and `onStopped` when the reel is deactivated.
-3. Register it in `injector.dart` when the flag is on.
+`packages/features/reels/lib/src/presentation/widgets/video_reel_player.dart`, registered by `registerReelsFeature` as the `ReelPlayerFactory`.
 
-No feature code changes: the routes look up `ReelPlayerFactory` if it is registered, and the reel view then shows the player plus the mute and pause controls.
+- **At most two players:** the active reel and the next one (preloaded paused and muted, so a swipe starts instantly). Every other reel holds none; swiping away disposes the player.
+- **Stops** when the user pauses, when swiping away (rewinds and reports watch time), when the app goes to the background, and when the feed is not on screen. Another tab, or a route pushed on top such as an incoming call or a creator profile, both turn `TickerMode` off.
+- **States:** poster until the first frame; a spinner while loading or buffering; on a network error, "Couldn't play this reel" with **Try again**.
+- **Analytics:** `onStarted` once per activation, `onCompleted` once even though the reel loops, `onStopped` with the watched time when it is left early.
+- **Reduce motion** (system setting): reels start paused; a tap plays them.
+- **Tests:** `test/presentation/video_reel_player_test.dart` (9, with a fake controller), plus the cubit's reduced-motion test. The Android debug APK builds with the plugin.
+- **Not verified:** playback on a device against real R2 URLs (no bucket yet).
 
 ## 6. Every changed file
 

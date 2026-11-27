@@ -20,4 +20,5 @@ export 'src/presentation/pages/reel_upload_page.dart';
 export 'src/presentation/pages/reels_feed_page.dart';
 export 'src/presentation/widgets/reel_player.dart';
 export 'src/presentation/widgets/reel_view.dart';
+export 'src/presentation/widgets/video_reel_player.dart';
 export 'src/routes/reels_routes.dart';

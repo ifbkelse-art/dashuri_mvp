@@ -239,6 +239,67 @@ func (r ReelsRepo) StaleVideos(ctx context.Context, status string, olderThan tim
 		rlNilViewer, status, olderThan, limit)
 }
 
+func (r ReelsRepo) ClaimProcessing(ctx context.Context, providers []string, now time.Time, lease time.Duration, limit int) ([]reels.ProcessingClaim, error) {
+	if len(providers) == 0 || limit <= 0 {
+		return nil, nil
+	}
+	rows, err := r.Pool.Query(ctx, `
+		with due as (
+		  select id from reels.videos
+		   where status = 'processing' and provider = any($1)
+		     and (processing_lease_until is null or processing_lease_until <= $2)
+		     and (processing_next_attempt_at is null or processing_next_attempt_at <= $2)
+		   order by processing_next_attempt_at nulls first, updated_at, id
+		   for update skip locked
+		   limit $4)
+		update reels.videos v set processing_lease_until = $2 + $3::interval,
+		       processing_attempts = v.processing_attempts + 1,
+		       processing_started_at = coalesce(v.processing_started_at, $2)
+		  from due where v.id = due.id
+		returning v.id::text, v.processing_attempts, v.processing_started_at`,
+		providers, now, lease.String(), limit)
+	if err != nil {
+		return nil, err
+	}
+	type claim struct {
+		attempts int
+		started  time.Time
+	}
+	byID := map[string]claim{}
+	var ids []string
+	for rows.Next() {
+		var id string
+		var c claim
+		if err := rows.Scan(&id, &c.attempts, &c.started); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		byID[id] = c
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(ids) == 0 {
+		return nil, err
+	}
+	vs, err := r.videos(ctx, rlVideoSelect(`where v.id = any($2::uuid[]) order by v.updated_at`), rlNilViewer, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]reels.ProcessingClaim, 0, len(vs))
+	for _, v := range vs {
+		c := byID[v.ID]
+		out = append(out, reels.ProcessingClaim{Video: v, Attempts: c.attempts, StartedAt: c.started})
+	}
+	return out, nil
+}
+
+func (r ReelsRepo) ReleaseProcessing(ctx context.Context, videoID string, nextAttempt *time.Time, uncount bool) error {
+	_, err := r.Pool.Exec(ctx, `update reels.videos set processing_lease_until = null, processing_next_attempt_at = $2,
+	       processing_attempts = greatest(processing_attempts - case when $3 then 1 else 0 end, 0)
+	 where id = $1 and status = 'processing'`, videoID, nextAttempt, uncount)
+	return err
+}
+
 func (r ReelsRepo) PurgeCandidates(ctx context.Context, now time.Time, limit int) ([]reels.VideoRow, error) {
 	// Account joins are not required here (deleted accounts must be purged too).
 	rows, err := r.Pool.Query(ctx, `select id, provider, provider_asset_id from reels.videos

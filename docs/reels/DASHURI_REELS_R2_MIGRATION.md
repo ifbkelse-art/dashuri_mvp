@@ -15,7 +15,7 @@ once nothing depends on it (§5).
 |---|---|---|
 | Direct upload URL | Presigned R2 `PUT` with **Content-Length and Content-Type signed in**, so R2 refuses any other file (e.g. a 5 GB upload). Valid 1 h. | `adapters/r2/provider.go` `CreateUpload`, `sigv4.go` |
 | Upload webhook | App calls `POST /v1/reels/{id}/upload-complete`. The server HEADs the object itself and never trusts the call. `reels-reconcile-uploads` is the fallback when the app never calls. | `modules/reels/service.go` `CompleteUpload` |
-| Validation | Size (HEAD, then a bounded download). ffprobe checks: container in an allow-list, a video stream, ≤ 4096 px, 14.1–60.9 s. Rejections get a reason code: `file_too_large`, `invalid_media`, `unsupported_format`, `no_video_stream`, `duration_out_of_range`, `upload_missing`. | `adapters/r2` `Process`, `adapters/ffmpeg` |
+| Validation | Size (HEAD, then a bounded download). ffprobe checks: container in an allow-list, a video stream, 240–4096 px on the short/long side, 14.1–60.9 s. Rejections get a reason code: `file_too_large`, `invalid_media`, `unsupported_format`, `no_video_stream`, `resolution_too_low`, `duration_out_of_range`, `upload_missing`. | `adapters/r2` `Process`, `adapters/ffmpeg` |
 | Transcoding | ffmpeg to H.264 High, 720p short side (never upscaled), CRF 26 capped at 2.5 Mb/s, AAC 96 kb/s, `+faststart`. Files already within that policy are only remuxed (no re-encode, near-zero CPU). | `adapters/ffmpeg` `Transcode` |
 | Thumbnail | Poster JPEG at 1 s, ≤ 720 px. | `Still` |
 | Moderation frames | One JPEG still every `REELS_MODERATION_FRAME_SECONDS` (2 s), ≤ 31 stills, ≤ 512 px, stored under `frames/`. Moderation gets presigned URLs, exactly as it got Mux frame URLs. | `FrameTimes`, `FrameURLs` |
@@ -60,6 +60,26 @@ somewhere without ffmpeg, reels **wait**; they are never failed for it.
 Transient errors (timeouts, storage hiccups) are retried for 2 h, then the
 reel fails as `processing_failed`. Failed reels' media is purged by
 `reels-purge-media`, so nothing is orphaned.
+
+### Claims, retries and expiry (added 27 Nov 2026, migration `20261127000400`)
+
+- **One worker per reel.** `reels-process-media` claims due reels with
+  `FOR UPDATE SKIP LOCKED` and a 20-minute lease
+  (`processing_lease_until`), so overlapping executions never transcode the
+  same reel twice. Tested with 8 concurrent runs over 4 reels: 4 `Process`
+  calls.
+- **Backoff, not a retry on every run.** A transient failure releases the
+  claim with a wait of 2, 4, 8, 16, then 32 minutes
+  (`processing_next_attempt_at`), so one flaky reel never blocks newer
+  uploads. The reel fails as `processing_failed` after 6 attempts or 2 h from
+  the first claim (`processing_started_at`), whichever comes first.
+- **No ffmpeg on this instance:** claims are handed back without counting an
+  attempt.
+- **Uploads that never arrive** fail as `upload_expired` after 3 h. If the
+  storage cannot be asked (an outage, or the provider is no longer
+  configured), they fail after 24 h instead of waiting forever.
+- **The app** explains each processing code in plain language. Processing
+  failures are never shown as rule violations.
 
 ### Untrusted-input hardening (ffmpeg)
 
@@ -111,7 +131,7 @@ schema. There is no media to migrate today.
   be checked first once a bucket exists; if it doesn't, the HEAD size check
   in `Process` still deletes oversized files, but storage would be used
   until then.
-- `Dockerfile.media` build: Docker was not running on the dev Mac.
+- ~~`Dockerfile.media` build~~ **Built locally 27 Nov** (`dashuri-media-worker:local`, 330 MB): ffmpeg 7.1 with libx264 and AAC; a 1080×1920 → 720p H.264 encode works as the non-root user in `/tmp`; the worker refuses to start without production config (`SUPABASE_URL`, `SIGHTENGINE_API_SECRET`). Not pushed to any registry.
 - Cloud Run CPU time (only measured on an Apple M4, §4).
 - App playback: `video_player` isn't integrated yet (next phase).
 
@@ -180,19 +200,122 @@ deleted on takedown. Not built.
 Not dependencies, despite the name: `http.ServeMux` (`mux` variables in
 handlers) and ffmpeg "remux".
 
-## 6. Before turning R2 on (each needs founder approval)
+## 6. Go-live requirements (each step needs founder approval)
 
-1. Create a Cloudflare account and a private R2 bucket, plus an API token
-   scoped to that bucket (Object Read & Write). Find out whether a card is
-   required.
-2. Test against the real bucket first: is the signed `Content-Length`
-   enforced? Do presigned GETs play in ExoPlayer?
-3. Build `Dockerfile.media`; create the Cloud Run job `reels-process-media`
-   (1 vCPU, 1 GiB, max 1 task, timeout about 15 min). The trigger is an open
-   decision (§4).
-4. Apply migrations `20261123000100` and `20261127000100` to hosted Supabase.
-5. Set `R2_*` secrets, `REELS_VIDEO_PROVIDER=r2`, and then `REELS_ENABLED`.
-6. App: integrate `video_player` for MP4 playback (next phase).
+**Current state (27 Nov 2026):** complete and tested locally; **switched off**.
+`REELS_ENABLED=false` (server) and `DASHURI_REELS_ENABLED` unset (app). No
+Cloudflare account, credentials, bucket, registry image, Cloud Run job or
+hosted migration exists. With R2 unconfigured, the server reports uploads
+unavailable (`GET /v1/reels/config`), and the app shows "Video uploads aren't
+set up on this server yet" instead of failing after recording.
+
+### 6.1 R2 credentials
+
+- A Cloudflare account. Check whether a payment method is required even for
+  the free tier, and ask before adding one.
+- One **R2 API token** scoped to the single bucket, permission *Object Read &
+  Write*. No account-wide token.
+- Stored only as Cloud Run secrets (Secret Manager), never in the repo or the
+  app:
+  - `R2_ACCOUNT_ID`
+  - `R2_ACCESS_KEY_ID`
+  - `R2_SECRET_ACCESS_KEY`
+  - `R2_BUCKET`
+- Both the API service (presigning) and the media job (processing) need them.
+  `R2_ENDPOINT` stays empty (it exists only for local S3-compatible fakes).
+
+### 6.2 Bucket configuration
+
+- **Private** bucket. No public access, no `r2.dev` URL, no custom domain (§4,
+  "Delivery choice").
+- Location hint: Asia-Pacific (users are in India).
+- **CORS: none needed.** The Android app uploads with plain HTTPS PUT, not
+  from a browser. Add CORS only if a web client ever uploads.
+- **Lifecycle rule:** delete objects under `reels/*/original` older than 2
+  days. This is a safety net; processing deletes originals, and
+  `reels-purge-media` deletes everything else.
+- Object keys are `reels/<reel_id>/…` (§1). Nothing else should be written to
+  the bucket.
+
+### 6.3 Real uploads: verify first, with a test account
+
+1. **Signed size and type.** A presigned PUT whose body is larger than the
+   signed `Content-Length`, or whose `Content-Type` differs, must be refused
+   by R2. The local fake enforces this; R2 itself is unverified. If R2 does
+   not enforce it, the HEAD size check in processing still deletes oversized
+   files, but storage is used until then.
+2. A 1-hour URL expires: a PUT after expiry is refused.
+3. Upload from a real Android phone on mobile data (the app streams the body
+   from memory; files up to 150 MB).
+4. `POST /v1/reels/{id}/upload-complete` moves the reel to `processing`.
+   Killing the app before that call must still reach `processing` through
+   `reels-reconcile-uploads` within 10–15 minutes.
+
+### 6.4 Processing
+
+- Push `backend/Dockerfile.media` to Artifact Registry (built and
+  smoke-tested locally on 27 Nov, not pushed).
+- Create a Cloud Run **job** `reels-process-media`:
+  - 1 vCPU, 1 GiB, max 1 parallel task;
+  - task timeout 20 minutes (the per-reel deadline is 15 minutes and the claim
+    lease 20 minutes);
+  - the same secrets as the API, plus `SIGHTENGINE_*` for moderation.
+- **Trigger** (open decision): every 5 minutes via Cloud Scheduler, or
+  started on demand by `upload-complete` (cheaper when idle). Each scheduled
+  run is a container start.
+- Apply hosted migrations **in order**:
+  1. `20261123000100_reels_experiment`
+  2. `20261127000100_reels_r2_media`
+  3. `20261127000400_reels_processing_claims`
+- Verify on real media:
+  - a 1080p phone clip becomes 720p MP4 + poster + stills + manifest;
+  - re-running is a no-op;
+  - two overlapping job runs process each reel once;
+  - a corrupt file fails with a reason code;
+  - CPU time per reel (estimate: 30–60 vCPU-seconds).
+
+### 6.5 Playback
+
+- Presigned GET URLs (6 h for viewers, 15 min for moderators) for
+  `playback.mp4` and `thumbnail.jpg`.
+- Verify on Android with `video_player` (ExoPlayer):
+  - first frame within about 1 s on 4G;
+  - seeking and looping work (needs HTTP range requests, which R2 supports);
+  - the next reel is preloaded;
+  - playback stops on background or an incoming call;
+  - "Try again" appears offline.
+- **Known limit:** a feed left open more than 6 h holds expired URLs, and
+  "Try again" fails until the feed is refreshed. Fix before launch if it
+  matters: refresh the reel on a 403.
+
+### 6.6 CDN and delivery
+
+- **Today:** private bucket plus presigned URLs, with no edge cache. Egress is
+  free on R2; every view costs a few Class B operations (about 2–5).
+  Takedowns are immediate.
+- **Later, only if views grow:** a second, public bucket holding only
+  *published* `playback.mp4`/`thumbnail.jpg` behind a custom domain with
+  Cloudflare cache, deleted on takedown (with a cache purge). This needs:
+  - a domain;
+  - a cache-purge token;
+  - a change to `Playback()`.
+  Not built.
+
+### 6.7 Production configuration
+
+| Setting | Value |
+|---|---|
+| `REELS_VIDEO_PROVIDER` | `r2` |
+| `REELS_ENABLED` | `true`, **only after** 6.3–6.5 pass on staging |
+| `R2_KEEP_ORIGINALS` | `false` |
+| `REELS_MODERATION_FRAME_SECONDS` | `2` |
+| `SIGHTENGINE_*` | Required. Without them every reel goes to human review, which is safe but needs staff. |
+| App build | `--dart-define=DASHURI_REELS_ENABLED=true` in the same release |
+| Mux | Leave every `MUX_*` empty (no Mux account is needed) |
+
+- **Rollback:** set `REELS_ENABLED=false`. Media and rows stay; nothing is
+  deleted.
+- **Policy:** disclose Cloudflare as a processor in the privacy policy (DPDP).
 
 ## 7. Files
 

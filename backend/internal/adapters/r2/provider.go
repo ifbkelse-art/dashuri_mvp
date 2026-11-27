@@ -262,6 +262,8 @@ func (p *Provider) Process(ctx context.Context, assetID string, lim reels.MediaL
 		return reels.AssetInfo{}, &reels.MediaError{Code: "no_video_stream"}
 	case in.Width > 4096 || in.Height > 4096:
 		return reels.AssetInfo{}, &reels.MediaError{Code: "unsupported_format"}
+	case lim.MinShortSide > 0 && min(in.Width, in.Height) < lim.MinShortSide:
+		return reels.AssetInfo{}, &reels.MediaError{Code: "resolution_too_low"}
 	case in.DurationMs < lim.MinDurationMs || in.DurationMs > lim.MaxDurationMs:
 		return reels.AssetInfo{}, &reels.MediaError{Code: "duration_out_of_range"}
 	}

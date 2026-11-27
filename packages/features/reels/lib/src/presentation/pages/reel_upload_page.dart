@@ -177,7 +177,15 @@ class _ReelUploadPageState extends State<ReelUploadPage> {
               children: [
                 _Timeline(reel: reel),
                 const SizedBox(height: DashuriTokens.space4),
-                if (polling && reel.status.isInFlight)
+                if (reel.status == ReelStatus.awaitingUpload)
+                  Text(
+                    polling
+                        ? 'Confirming your upload with the server…'
+                        : "We couldn't confirm the upload yet. If it arrived, "
+                              'it will appear in My reels; otherwise post it '
+                              'again.',
+                  )
+                else if (polling && reel.status.isInFlight)
                   const Text(
                     'You can leave this screen. Your reel keeps processing.',
                   )
@@ -278,8 +286,11 @@ class _Timeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = reel.status;
+    // awaiting_upload: the server has not confirmed the file, so "Uploaded"
+    // is not ticked yet.
     final step = switch (s) {
-      ReelStatus.awaitingUpload || ReelStatus.processing => 1,
+      ReelStatus.awaitingUpload => 0,
+      ReelStatus.processing => 1,
       ReelStatus.pendingModeration || ReelStatus.inReview => 2,
       _ => 3,
     };
@@ -324,6 +335,8 @@ class _Timeline extends StatelessWidget {
               ? 'Your reel was not published'
               : s == ReelStatus.published
               ? 'Your reel is live'
+              : s == ReelStatus.awaitingUpload
+              ? 'Confirming your upload'
               : 'Uploaded',
           style: Theme.of(context).textTheme.titleLarge,
         ),

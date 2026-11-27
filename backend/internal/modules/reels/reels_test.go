@@ -159,3 +159,15 @@ func TestDecisionAndReportValidation(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestProcessingTimingInvariants(t *testing.T) {
+	if ProcessingDeadline >= ProcessingLease {
+		t.Fatalf("deadline %v must be below the lease %v", ProcessingDeadline, ProcessingLease)
+	}
+	want := []time.Duration{2, 4, 8, 16, 32, 32, 32}
+	for i, w := range want {
+		if got := ProcessingBackoff(i + 1); got != w*time.Minute {
+			t.Fatalf("backoff(%d) = %v, want %v", i+1, got, w*time.Minute)
+		}
+	}
+}

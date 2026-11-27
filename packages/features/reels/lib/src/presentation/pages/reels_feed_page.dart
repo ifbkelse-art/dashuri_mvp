@@ -26,6 +26,15 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
   final _pages = PageController();
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduce motion: reels start paused; a tap plays them.
+    context.read<ReelsFeedCubit>().setAutoplay(
+      !MediaQuery.disableAnimationsOf(context),
+    );
+  }
+
+  @override
   void dispose() {
     _pages.dispose();
     super.dispose();
@@ -139,6 +148,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage> {
                 reel: r,
                 player: widget.player,
                 active: i == loaded.index,
+                preload: i == loaded.index + 1,
                 muted: loaded.muted,
                 paused: loaded.paused,
                 actions: _actions(context, r),

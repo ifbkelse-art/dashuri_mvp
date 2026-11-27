@@ -66,6 +66,7 @@ class ReelView extends StatelessWidget {
     required this.paused,
     super.key,
     this.player,
+    this.preload = false,
   });
 
   final Reel reel;
@@ -74,6 +75,9 @@ class ReelView extends StatelessWidget {
   final bool muted;
   final bool paused;
   final ReelPlayerFactory? player;
+
+  /// The next reel after the active one (the player may preload it).
+  final bool preload;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -87,6 +91,7 @@ class ReelView extends StatelessWidget {
         reel: reel,
         player: player,
         active: active,
+        preload: preload,
         muted: muted,
         paused: paused,
         actions: actions,
@@ -130,6 +135,7 @@ class _Video extends StatelessWidget {
     required this.reel,
     required this.player,
     required this.active,
+    required this.preload,
     required this.muted,
     required this.paused,
     required this.actions,
@@ -138,7 +144,7 @@ class _Video extends StatelessWidget {
 
   final Reel reel;
   final ReelPlayerFactory? player;
-  final bool active, muted, paused, showActionsInside;
+  final bool active, preload, muted, paused, showActionsInside;
   final ReelActions actions;
 
   @override
@@ -154,6 +160,7 @@ class _Video extends StatelessWidget {
             child: player!.build(
               playback: pb,
               active: active,
+              preload: preload,
               muted: muted,
               paused: paused,
               callbacks: actions.callbacks,

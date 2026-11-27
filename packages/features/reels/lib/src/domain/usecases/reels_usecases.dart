@@ -91,6 +91,15 @@ class GetReel implements UseCase<Reel, String> {
   Future<Result<Reel>> call(String id) => _r.reel(id);
 }
 
+/// POST /v1/reels/{id}/upload-complete (idempotent): asks the server to
+/// check that the file arrived. 409 while it has not.
+class CompleteReelUpload implements UseCase<Reel, String> {
+  const CompleteReelUpload(this._r);
+  final ReelsRepository _r;
+  @override
+  Future<Result<Reel>> call(String id) => _r.completeUpload(id);
+}
+
 class GetCreatorProfile implements UseCase<CreatorProfile, String> {
   const GetCreatorProfile(this._r);
   final ReelsRepository _r;

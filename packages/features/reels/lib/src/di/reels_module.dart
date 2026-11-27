@@ -8,11 +8,19 @@ import '../data/datasources/reels_remote_data_source.dart';
 import '../domain/ports/reel_video_picker.dart';
 import '../domain/repositories/reels_repository.dart';
 import '../domain/usecases/reels_usecases.dart';
+import '../presentation/widgets/reel_player.dart';
+import '../presentation/widgets/video_reel_player.dart';
 
 /// Registers the EXPERIMENTAL Reels feature. Requires `ApiClient`.
-/// Optional: a [ReelVideoPicker] (enables record/gallery) and a
-/// `ReelPlayerFactory` (enables playback), registered before routes build.
+/// Optional: a [ReelVideoPicker] (enables record/gallery). Playback uses
+/// [VideoPlayerReelFactory] unless the app registered another
+/// [ReelPlayerFactory] first.
 void registerReelsFeature(GetIt sl) {
+  if (!sl.isRegistered<ReelPlayerFactory>()) {
+    sl.registerLazySingleton<ReelPlayerFactory>(
+      () => const VideoPlayerReelFactory(),
+    );
+  }
   sl
     ..registerLazySingleton<ReelsRepository>(
       () => ReelsRemoteDataSource(sl<ApiClient>()),
@@ -59,6 +67,7 @@ void registerReelsFeature(GetIt sl) {
         picker: sl.isRegistered<ReelVideoPicker>()
             ? sl<ReelVideoPicker>()
             : null,
+        confirmUpload: CompleteReelUpload(sl<ReelsRepository>()),
       ),
     );
 }

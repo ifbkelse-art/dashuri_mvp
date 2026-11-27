@@ -288,6 +288,10 @@ func TestProcessRejectsBadMedia(t *testing.T) {
 		{"too short", func(t *testing.T) []byte { return makeVideo(t, 5, "320x568") }, limits, "duration_out_of_range", false},
 		{"too large", func(t *testing.T) []byte { return makeVideo(t, 15, "320x568") },
 			reels.MediaLimits{MaxBytes: 1000, MinDurationMs: 1, MaxDurationMs: 60900, FrameInterval: 2 * time.Second}, "file_too_large", true},
+		// Regression (2026-11-27): there was a maximum resolution but no minimum.
+		{"tiny resolution", func(t *testing.T) []byte { return makeVideo(t, 15, "128x228") },
+			reels.MediaLimits{MaxBytes: 50 << 20, MinDurationMs: 14100, MaxDurationMs: 60900, FrameInterval: 2 * time.Second,
+				MinShortSide: reels.MinShortSidePx}, "resolution_too_low", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

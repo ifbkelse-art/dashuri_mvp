@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -120,11 +121,22 @@ func (s *Service) ReconcileUploads(ctx context.Context, limit int) (int, error) 
 	}
 	for _, v := range waiting {
 		prov := s.providerFor(v.Provider)
+		age := now.Sub(v.CreatedAt)
 		if v.ProviderUploadID == nil || prov == nil {
+			// Nobody can ever confirm this upload (provider removed or
+			// unconfigured): expire it instead of leaving it forever.
+			if age > UploadExpiryUnconfirmed && repo.MarkFailed(ctx, v.ID, "upload_expired") == nil {
+				n++
+			}
 			continue
 		}
 		st, err := prov.UploadStatus(ctx, *v.ProviderUploadID)
 		if err != nil {
+			// A storage outage must not keep a reel waiting forever either,
+			// but give a file that did arrive a long chance to be seen.
+			if age > UploadExpiryUnconfirmed && repo.MarkFailed(ctx, v.ID, "upload_expired") == nil {
+				n++
+			}
 			continue
 		}
 		switch st.State {
@@ -137,7 +149,7 @@ func (s *Service) ReconcileUploads(ctx context.Context, limit int) (int, error) 
 				n++
 			}
 		default:
-			if now.Sub(v.CreatedAt) > 3*time.Hour && repo.MarkFailed(ctx, v.ID, "upload_expired") == nil {
+			if age > UploadExpiry && repo.MarkFailed(ctx, v.ID, "upload_expired") == nil {
 				n++
 			}
 		}
@@ -168,44 +180,66 @@ func (s *Service) ReconcileUploads(ctx context.Context, limit int) (int, error) 
 // ProcessMedia validates and transcodes uploads stored with a
 // self-processing provider (R2) and extracts thumbnail and moderation frames
 // (job reels-process-media; needs ffmpeg, so it runs in the media worker
-// image). Invalid files fail with a reason code; transient errors retry until
-// ProcessingGiveUp, then the reel fails as processing_failed. A processed
-// reel goes to pending_moderation exactly like a Mux reel, so moderation is
-// unchanged and never skipped.
+// image). Each reel is claimed first (lease, SKIP LOCKED), so overlapping
+// worker runs never process the same reel twice. Invalid files fail with a
+// reason code. Transient errors release the claim with a growing backoff,
+// so one flaky reel never blocks newer uploads, and the reel fails as
+// processing_failed after ProcessingGiveUp or MaxProcessingAttempts. A
+// processed reel goes to pending_moderation exactly like a Mux reel, so
+// moderation is unchanged and never skipped.
 func (s *Service) ProcessMedia(ctx context.Context, limit int) (int, error) {
 	repo, err := s.repo()
 	if err != nil {
 		return 0, err
 	}
 	now := s.deps.Clock.Now()
-	rows, err := repo.StaleVideos(ctx, "processing", now, limit)
+	claims, err := repo.ClaimProcessing(ctx, s.selfProcessingProviders(), now, ProcessingLease, limit)
 	if err != nil {
 		return 0, err
 	}
 	limits := MediaLimits{MaxBytes: MaxUploadBytes, MinDurationMs: MinDurationMs - DurationToleranceMs,
-		MaxDurationMs: MaxDurationMs + DurationToleranceMs, FrameInterval: s.deps.FrameInterval}
+		MaxDurationMs: MaxDurationMs + DurationToleranceMs, FrameInterval: s.deps.FrameInterval,
+		MinShortSide: MinShortSidePx}
+	release := func(id string, next *time.Time, uncount bool) {
+		if err := repo.ReleaseProcessing(ctx, id, next, uncount); err != nil {
+			slog.WarnContext(ctx, "reels processing release failed; the lease expires instead", "reel", id, "err", err)
+		}
+	}
 	n := 0
-	for _, v := range rows {
-		prov := s.providerFor(v.Provider)
-		proc, ok := prov.(SelfProcessing)
+	for i, c := range claims {
+		v := c.Video
+		proc, ok := s.providerFor(v.Provider).(SelfProcessing)
 		if !ok || v.ProviderAssetID == nil {
+			release(v.ID, nil, true)
 			continue
 		}
-		a, err := proc.Process(ctx, *v.ProviderAssetID, limits)
+		// The deadline stays below the lease, so the claim cannot expire
+		// (and another worker start the same reel) while this one runs.
+		pctx, cancel := context.WithTimeout(ctx, ProcessingDeadline)
+		a, err := proc.Process(pctx, *v.ProviderAssetID, limits)
+		cancel()
 		var me *MediaError
 		switch {
 		case errors.Is(err, ErrProcessorUnavailable):
 			slog.WarnContext(ctx, "reels media processing needs the media worker (ffmpeg); nothing failed")
+			for _, rest := range claims[i:] { // hand every claim back untouched
+				release(rest.Video.ID, nil, true)
+			}
 			return n, nil
 		case errors.As(err, &me):
 			if repo.MarkFailed(ctx, v.ID, me.Code) == nil {
 				n++
 			}
 		case err != nil:
-			slog.WarnContext(ctx, "reels media processing failed", "reel", v.ID, "err", err)
-			if now.Sub(v.UpdatedAt) > ProcessingGiveUp && repo.MarkFailed(ctx, v.ID, "processing_failed") == nil {
-				n++
+			slog.WarnContext(ctx, "reels media processing failed", "reel", v.ID, "attempt", c.Attempts, "err", err)
+			if now.Sub(c.StartedAt) >= ProcessingGiveUp || c.Attempts >= MaxProcessingAttempts {
+				if repo.MarkFailed(ctx, v.ID, "processing_failed") == nil {
+					n++
+				}
+				continue
 			}
+			next := now.Add(ProcessingBackoff(c.Attempts))
+			release(v.ID, &next, false)
 		default:
 			a.State = "ready"
 			if s.applyAsset(ctx, repo, v.ID, a) == nil {
@@ -214,6 +248,18 @@ func (s *Service) ProcessMedia(ctx context.Context, limit int) (int, error) {
 		}
 	}
 	return n, nil
+}
+
+// selfProcessingProviders names the configured providers whose media this
+// server processes itself (R2).
+func (s *Service) selfProcessingProviders() []string {
+	var out []string
+	for _, p := range append([]VideoProvider{s.deps.Provider}, s.deps.Legacy...) {
+		if _, ok := p.(SelfProcessing); ok && p.Configured() && !slices.Contains(out, p.Name()) {
+			out = append(out, p.Name())
+		}
+	}
+	return out
 }
 
 func (s *Service) applyAsset(ctx context.Context, repo Repository, videoID string, a AssetInfo) error {

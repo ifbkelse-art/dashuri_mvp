@@ -23,6 +23,8 @@ dependencies:
     sdk: flutter
   flutter_bloc: ^9.1.1
   get_it: ^9.2.1
+  # Reels MP4 playback (R2 presigned URLs). Approved by the founder 2026-11-27.
+  video_player: ^2.11.1
 
 dev_dependencies:
   bloc_test: ^10.0.0

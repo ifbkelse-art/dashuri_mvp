@@ -34,6 +34,14 @@ String rejectionMessage(String? code) => switch (code) {
   'graphic_or_offensive' =>
     'It appears to contain graphic or offensive content.',
   'duration_out_of_range' => 'Reels must be 15 to 60 seconds long.',
+  // Processing (file) problems: never a rules violation.
+  'file_too_large' => 'The video file is too large. Reels can be up to 150 MB.',
+  'resolution_too_low' =>
+    'The video resolution is too low. Record at 480p or higher.',
+  'unsupported_format' || 'no_video_stream' || 'invalid_media' =>
+    "This file isn't a video we can play. Record or choose an MP4 or MOV video.",
+  'upload_missing' =>
+    "The video didn't finish uploading. Try uploading it again.",
   'copyright' => 'It appears to use music or video you do not have rights to.',
   'privacy' => "It shares someone's private information.",
   'minor_safety' => 'It may show someone under 18.',

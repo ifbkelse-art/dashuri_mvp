@@ -36,7 +36,32 @@ const (
 	AttributionWindow   = 30 // minutes from a reel CTA click to a call start
 	ModerationGiveUp    = 30 * time.Minute
 	ProcessingGiveUp    = 2 * time.Hour // transient processing errors, then failed
+	// MaxProcessingAttempts also ends retries (whichever comes first).
+	MaxProcessingAttempts = 6
+	// UploadExpiry: an upload URL lives 1 h; a reel still waiting for its
+	// file after this is failed as upload_expired.
+	UploadExpiry = 3 * time.Hour
+	// UploadExpiryUnconfirmed is used when the storage cannot be asked.
+	UploadExpiryUnconfirmed = 24 * time.Hour
+	// MinShortSidePx: below this the video is unwatchable full screen.
+	MinShortSidePx = 240
+	// ProcessingLease must exceed one reel's worst-case processing time
+	// (ffmpeg timeouts) so a live worker never loses its claim.
+	ProcessingLease = 20 * time.Minute
+	// ProcessingDeadline bounds one reel's processing (all ffmpeg runs and
+	// transfers); it must stay below ProcessingLease.
+	ProcessingDeadline = 15 * time.Minute
 )
+
+// ProcessingBackoff is the wait before retrying after the n-th transient
+// failure: 2, 4, 8, 16, 32 min, capped at 32.
+func ProcessingBackoff(attempt int) time.Duration {
+	d := 2 * time.Minute
+	for i := 1; i < attempt && d < 32*time.Minute; i++ {
+		d *= 2
+	}
+	return min(d, 32*time.Minute)
+}
 
 // Moderation thresholds on frame maxima (docs/reels/DASHURI_REELS_SAFETY_AND_MODERATION.md).
 type Thresholds struct {

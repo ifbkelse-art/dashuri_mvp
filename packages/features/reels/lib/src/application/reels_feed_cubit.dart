@@ -137,6 +137,20 @@ class ReelsFeedCubit extends Cubit<ReelsFeedState> {
   final Set<String> _impressed = {};
   bool _uploadsAvailable = false;
 
+  /// False when the user asked the system to reduce motion: reels then start
+  /// paused (a tap plays them) instead of auto-playing.
+  bool _autoplay = true;
+
+  /// Applies the reduced-motion preference (called by the page).
+  void setAutoplay(bool autoplay) {
+    if (_autoplay == autoplay) return;
+    _autoplay = autoplay;
+    final s = state;
+    if (s is ReelsFeedLoaded && !autoplay && !s.paused) {
+      emit(s.copyWith(paused: true));
+    }
+  }
+
   static const flushAt = 10;
 
   Future<void> load([FeedTab tab = FeedTab.forYou]) async {
@@ -164,6 +178,7 @@ class ReelsFeedCubit extends Cubit<ReelsFeedState> {
             items: value.items,
             nextCursor: value.nextCursor,
             uploadsAvailable: _uploadsAvailable,
+            paused: !_autoplay,
           ),
         );
         if (value.items.isNotEmpty) _impression(value.items.first);
@@ -179,7 +194,14 @@ class ReelsFeedCubit extends Cubit<ReelsFeedState> {
       case Err(:final failure):
         emit(ReelsFeedFailed(FeedTab.forYou, failure));
       case Success(:final value):
-        emit(ReelsFeedLoaded(FeedTab.forYou, items: [value], nextCursor: null));
+        emit(
+          ReelsFeedLoaded(
+            FeedTab.forYou,
+            items: [value],
+            nextCursor: null,
+            paused: !_autoplay,
+          ),
+        );
         _impression(value);
     }
   }
@@ -222,7 +244,7 @@ class ReelsFeedCubit extends Cubit<ReelsFeedState> {
   void onPageChanged(int index) {
     final s = state;
     if (s is! ReelsFeedLoaded || index < 0 || index >= s.items.length) return;
-    emit(s.copyWith(index: index, paused: false));
+    emit(s.copyWith(index: index, paused: !_autoplay));
     _impression(s.items[index]);
     if (index >= s.items.length - 3) loadMore();
   }

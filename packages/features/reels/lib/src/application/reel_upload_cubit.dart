@@ -82,15 +82,18 @@ class ReelUploadCubit extends Cubit<ReelUploadState> {
     this._upload,
     this._getReel, {
     ReelVideoPicker? picker,
+    CompleteReelUpload? confirmUpload,
     this.pollInterval = const Duration(seconds: 4),
     this.maxPolls = 45,
   }) : _picker = picker,
+       _confirmUpload = confirmUpload,
        super(const UploadLoading());
 
   final GetReelsConfig _config;
   final UploadReel _upload;
   final GetReel _getReel;
   final ReelVideoPicker? _picker;
+  final CompleteReelUpload? _confirmUpload;
   final Duration pollInterval;
   final int maxPolls;
   IdempotencyKey _key = IdempotencyKey.generate();
@@ -199,7 +202,17 @@ class ReelUploadCubit extends Cubit<ReelUploadState> {
   Future<void> _poll(String id) async {
     if (isClosed) return;
     _polls++;
-    final res = await _getReel(id);
+    final before = state;
+    // The server has not confirmed the file yet (the confirm call after the
+    // upload failed, e.g. the network dropped): ask it to check again
+    // instead of waiting for the server's slower fallback job.
+    final confirm = _confirmUpload;
+    final res =
+        before is UploadTracking &&
+            before.reel.status == ReelStatus.awaitingUpload &&
+            confirm != null
+        ? await confirm(id)
+        : await _getReel(id);
     if (isClosed) return;
     final cur = state;
     if (cur is! UploadTracking) return;

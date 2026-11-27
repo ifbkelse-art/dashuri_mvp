@@ -116,11 +116,14 @@ type MediaLimits struct {
 	MinDurationMs int
 	MaxDurationMs int
 	FrameInterval time.Duration
+	// MinShortSide rejects tiny videos (pixels on the shorter side; 0 = off).
+	MinShortSide int
 }
 
 // MediaError is a permanent rejection of an uploaded file. Code becomes the
 // reel's rejection_code (file_too_large, invalid_media, no_video_stream,
-// duration_out_of_range, unsupported_format, upload_missing).
+// duration_out_of_range, unsupported_format, resolution_too_low,
+// upload_missing).
 type MediaError struct{ Code string }
 
 func (e *MediaError) Error() string { return "media rejected: " + e.Code }
@@ -191,6 +194,13 @@ type VideoRow struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	Creator          CreatorRow
+}
+
+// ProcessingClaim is a reel leased to this worker for media processing.
+type ProcessingClaim struct {
+	Video     VideoRow
+	Attempts  int       // including this one
+	StartedAt time.Time // first claim
 }
 
 type NewVideo struct {
@@ -270,6 +280,15 @@ type Repository interface {
 	MarkFailed(ctx context.Context, videoID, code string) error
 	DeleteVideo(ctx context.Context, creatorID, videoID string, hold time.Time) error
 	StaleVideos(ctx context.Context, status string, olderThan time.Time, limit int) ([]VideoRow, error)
+	// ClaimProcessing atomically claims up to limit 'processing' reels of the
+	// given providers that are not leased and are due, leases them until
+	// now+lease and counts one attempt each. Concurrent callers never get the
+	// same reel (FOR UPDATE SKIP LOCKED).
+	ClaimProcessing(ctx context.Context, providers []string, now time.Time, lease time.Duration, limit int) ([]ProcessingClaim, error)
+	// ReleaseProcessing drops the lease of a reel still 'processing' and
+	// schedules its next attempt (nil = now). uncount undoes the attempt
+	// (the work never ran, e.g. no ffmpeg on this instance).
+	ReleaseProcessing(ctx context.Context, videoID string, nextAttempt *time.Time, uncount bool) error
 	PurgeCandidates(ctx context.Context, now time.Time, limit int) ([]VideoRow, error)
 	MarkPurged(ctx context.Context, videoID string) error
 	CleanupDeletedAccounts(ctx context.Context, limit int) (int, error)

@@ -4,6 +4,7 @@ package reels_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -218,18 +219,9 @@ func TestR2ProcessingFailuresAndWaiting(t *testing.T) {
 	if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil || e.status(flaky) != "processing" {
 		t.Fatalf("transient: %s %v", e.status(flaky), err)
 	}
-	// Backdate past ProcessingGiveUp (bypassing the touch_updated_at trigger).
-	tx, err := e.adm.Begin(e.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tx.Exec(e.ctx, `set local session_replication_role = replica`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tx.Exec(e.ctx, `update reels.videos set updated_at = now() - interval '3 hours' where id = $1`, flaky); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(e.ctx); err != nil {
+	// Processing started more than ProcessingGiveUp ago and the backoff ended.
+	if _, err := e.adm.Exec(e.ctx, `update reels.videos set processing_started_at = now() - interval '3 hours',
+		processing_next_attempt_at = now() - interval '1 minute' where id = $1`, flaky); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil || e.status(flaky) != "failed" {
@@ -258,5 +250,161 @@ func TestLegacyMuxReelsStillServedDuringTransition(t *testing.T) {
 	r, err := e.svc.GetReel(e.ctx, viewer, id)
 	if err != nil || r.Playback == nil || r.Playback.Format != "hls" || r.Playback.HlsUrl == "" || r.Playback.HlsUrl != r.Playback.Url {
 		t.Fatalf("legacy playback: %+v %v", r.Playback, err)
+	}
+}
+
+// Regression (2026-11-27): reels-process-media did not claim rows, so two
+// overlapping worker runs processed the same reel twice; a transiently
+// failing reel was retried on every run with no backoff; and an upload the
+// storage could not confirm waited forever.
+func TestR2ProcessingClaimsBackoffAndExpiry(t *testing.T) {
+	e, self := setupR2(t, fakeClassifier{})
+	_, host := e.user("Meera", "host")
+	d := 20000
+	mk := func(upload bool) string {
+		tk, err := e.svc.CreateUpload(e.ctx, host, reels.CreateUploadRequest{DeclaredDurationMs: &d, SizeBytes: ptr(int64(1000)), ContentType: ptr("video/mp4")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if upload {
+			self.mu.Lock()
+			self.uploaded[tk.Reel.Id] = true
+			self.mu.Unlock()
+			if _, err := e.svc.CompleteUpload(e.ctx, host, tk.Reel.Id); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return tk.Reel.Id
+	}
+	calls := func() int { self.mu.Lock(); defer self.mu.Unlock(); return self.calls }
+
+	// 1. Concurrent workers: each reel is processed exactly once.
+	ids := []string{mk(true), mk(true), mk(true), mk(true)}
+	before := calls()
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := calls() - before; got != len(ids) {
+		t.Fatalf("Process ran %d times for %d reels", got, len(ids))
+	}
+	for _, id := range ids {
+		if st := e.status(id); st != "pending_moderation" {
+			t.Fatalf("%s: %s", id, st)
+		}
+	}
+	if _, err := e.svc.ModeratePending(e.ctx, 50); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Transient failure: backoff, not a retry on the very next run; the
+	// attempt cap ends it even before ProcessingGiveUp.
+	flaky := mk(true)
+	self.mu.Lock()
+	self.result[flaky] = context.DeadlineExceeded
+	self.mu.Unlock()
+	if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil {
+		t.Fatal(err)
+	}
+	n := calls()
+	if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil {
+		t.Fatal(err)
+	}
+	if calls() != n {
+		t.Fatal("retried inside the backoff window")
+	}
+	var next time.Time
+	var attempts int
+	if err := e.adm.QueryRow(e.ctx, `select processing_next_attempt_at, processing_attempts from reels.videos where id = $1`, flaky).
+		Scan(&next, &attempts); err != nil || attempts != 1 || time.Until(next) < time.Minute {
+		t.Fatalf("backoff: next=%v attempts=%d err=%v", next, attempts, err)
+	}
+	for i := 0; i < reels.MaxProcessingAttempts; i++ {
+		if _, err := e.adm.Exec(e.ctx, `update reels.videos set processing_next_attempt_at = now() - interval '1 second' where id = $1`, flaky); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if st := e.status(flaky); st != "failed" {
+		t.Fatalf("attempt cap: %s", st)
+	}
+
+	// 3. No ffmpeg on this instance: the claim is handed back uncounted.
+	idle := mk(true)
+	self.mu.Lock()
+	self.result[idle] = reels.ErrProcessorUnavailable
+	self.mu.Unlock()
+	if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil {
+		t.Fatal(err)
+	}
+	var lease *time.Time
+	if err := e.adm.QueryRow(e.ctx, `select processing_attempts, processing_lease_until from reels.videos where id = $1`, idle).
+		Scan(&attempts, &lease); err != nil || attempts != 0 || lease != nil {
+		t.Fatalf("unavailable: attempts=%d lease=%v err=%v", attempts, lease, err)
+	}
+	self.mu.Lock()
+	delete(self.result, idle)
+	self.mu.Unlock()
+	if _, err := e.svc.ProcessMedia(e.ctx, 10); err != nil || e.status(idle) != "pending_moderation" {
+		t.Fatalf("after worker: %s %v", e.status(idle), err)
+	}
+	if _, err := e.svc.ModeratePending(e.ctx, 50); err != nil {
+		t.Fatal(err)
+	}
+
+	// 4. Upload never confirmed because storage keeps erroring: expired
+	// after UploadExpiryUnconfirmed instead of waiting forever.
+	stuck := mk(false)
+	failing := &erroringStatus{selfProvider: self}
+	svc := reels.NewService(reels.Deps{Enabled: true, Repo: postgres.ReelsRepo{Pool: e.api, Tx: db.TxManager{Pool: e.api}},
+		Provider: failing, Classifier: fakeClassifier{}})
+	backdate(t, e, stuck, "4 hours")
+	if _, err := svc.ReconcileUploads(e.ctx, 100); err != nil || e.status(stuck) != "awaiting_upload" {
+		t.Fatalf("storage error within 24 h must not expire: %s %v", e.status(stuck), err)
+	}
+	backdate(t, e, stuck, "25 hours")
+	if _, err := svc.ReconcileUploads(e.ctx, 100); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := e.svc.GetReel(e.ctx, host, stuck)
+	if r.Status != "failed" || r.RejectionCode == nil || *r.RejectionCode != "upload_expired" {
+		t.Fatalf("unconfirmed upload: %+v", r)
+	}
+}
+
+// erroringStatus is the R2-like provider with a storage outage on HEAD.
+type erroringStatus struct{ *selfProvider }
+
+func (p *erroringStatus) UploadStatus(context.Context, string) (reels.UploadState, error) {
+	return reels.UploadState{}, errors.New("r2: 503 slow down")
+}
+
+// backdate ages a reel's created_at and updated_at, bypassing the
+// touch_updated_at trigger.
+func backdate(t *testing.T, e *env, id, interval string) {
+	t.Helper()
+	tx, err := e.adm.Begin(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(e.ctx) }()
+	if _, err := tx.Exec(e.ctx, `set local session_replication_role = replica`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(e.ctx, `update reels.videos set created_at = now() - $2::interval, updated_at = now() - $2::interval
+		where id = $1`, id, interval); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(e.ctx); err != nil {
+		t.Fatal(err)
 	}
 }

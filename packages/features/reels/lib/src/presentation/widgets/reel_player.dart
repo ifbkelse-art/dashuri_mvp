@@ -20,18 +20,21 @@ final class ReelPlayerCallbacks {
   final void Function(int watchedMs) onStopped;
 }
 
-/// Video playback port. The repo has no video playback dependency yet
-/// (`video_player` needs founder approval, see
-/// docs/reels/DASHURI_REELS_IMPLEMENTATION_STATUS.md). The app registers a
-/// factory once approved; until then [ReelPosterView] is used, which says
-/// clearly that playback is unavailable — no fake player, no dead controls.
+/// Video playback port. `VideoPlayerReelFactory` (video_player) is the
+/// real implementation, registered by `registerReelsFeature`. Without a
+/// factory, [ReelPosterView] says clearly that playback is unavailable: no
+/// fake player, no dead controls.
 abstract interface class ReelPlayerFactory {
+  /// [preload]: the reel right after the active one. Implementations may
+  /// open it paused and muted so swiping starts instantly; every other
+  /// inactive reel must hold no player.
   Widget build({
     required ReelPlayback playback,
     required bool active,
     required bool muted,
     required bool paused,
     required ReelPlayerCallbacks callbacks,
+    bool preload = false,
   });
 }
 

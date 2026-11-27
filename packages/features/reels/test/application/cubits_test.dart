@@ -86,6 +86,31 @@ void main() {
       ),
     );
 
+    // Phase 3 (2026-11-27): with "reduce motion" on, reels never auto-play.
+    test(
+      'reduced motion: reels start paused, including after a swipe',
+      () async {
+        when(
+          () => repo.feed(FeedTab.forYou, cursor: null, limit: 10),
+        ).thenAnswer((_) async => Success(page([reel('a'), reel('b')], 'n1')));
+        when(
+          () => repo.feed(FeedTab.forYou, cursor: 'n1', limit: 10),
+        ).thenAnswer((_) async => Success(page(const [])));
+        final c = feedCubit()..setAutoplay(false);
+        await c.load();
+        expect((c.state as ReelsFeedLoaded).paused, isTrue);
+        c.togglePause(); // the user taps to play
+        expect((c.state as ReelsFeedLoaded).paused, isFalse);
+        c.onPageChanged(1);
+        expect((c.state as ReelsFeedLoaded).paused, isTrue);
+
+        c.setAutoplay(true);
+        c.onPageChanged(0);
+        expect((c.state as ReelsFeedLoaded).paused, isFalse);
+        await c.close();
+      },
+    );
+
     test(
       'pagination appends without duplicates and stops at the end',
       () async {
@@ -457,6 +482,77 @@ void main() {
         );
         final last = c.state as UploadTracking;
         expect((last.reel.status, last.polling), (ReelStatus.published, false));
+        await c.close();
+      },
+    );
+
+    // Regression (2026-11-27): when the confirm call after the upload failed
+    // (network drop), polling only re-read the reel, which stayed
+    // awaiting_upload until the server's 10-minute fallback job, past the
+    // polling window. Polling now asks the server to confirm again.
+    test(
+      'polling re-confirms an upload the server has not confirmed',
+      () async {
+        final video = PickedVideo(bytes: mp4(22000), contentType: 'video/mp4');
+        when(() => picker.pick(any())).thenAnswer((_) async => video);
+        when(
+          () => repo.createUpload(
+            caption: '',
+            durationMs: 22000,
+            sizeBytes: video.bytes.length,
+            contentType: 'video/mp4',
+            idempotencyKey: any(named: 'idempotencyKey'),
+          ),
+        ).thenAnswer(
+          (_) async => Success(
+            ReelUploadTicket(
+              reel: reel('n', mine: true, status: ReelStatus.awaitingUpload),
+              uploadUrl: 'https://up',
+              uploadHeaders: const {},
+            ),
+          ),
+        );
+        when(
+          () => repo.uploadBytes(
+            uploadUrl: 'https://up',
+            bytes: video.bytes,
+            contentType: 'video/mp4',
+            headers: const {},
+            onProgress: any(named: 'onProgress'),
+          ),
+        ).thenAnswer((_) async => const Success(null));
+        final confirms = <Result<Reel>>[
+          const Err(NetworkFailure()), // right after the upload
+          const Err(NetworkFailure()), // first poll
+          Success(reel('n', mine: true, status: ReelStatus.processing)),
+        ];
+        when(
+          () => repo.completeUpload('n'),
+        ).thenAnswer((_) async => confirms.removeAt(0));
+        when(() => repo.reel('n')).thenAnswer(
+          (_) async =>
+              Success(reel('n', mine: true, status: ReelStatus.published)),
+        );
+        final c = ReelUploadCubit(
+          GetReelsConfig(repo),
+          UploadReel(repo),
+          GetReel(repo),
+          picker: picker,
+          confirmUpload: CompleteReelUpload(repo),
+          pollInterval: const Duration(milliseconds: 1),
+          maxPolls: 5,
+        );
+        await c.load();
+        await c.pick(ReelVideoSource.gallery);
+        await c.submit('');
+        expect(
+          (c.state as UploadTracking).reel.status,
+          ReelStatus.awaitingUpload,
+          reason: 'not shown as uploaded before the server confirms',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        verify(() => repo.completeUpload('n')).called(3);
+        expect((c.state as UploadTracking).reel.status, ReelStatus.published);
         await c.close();
       },
     );
