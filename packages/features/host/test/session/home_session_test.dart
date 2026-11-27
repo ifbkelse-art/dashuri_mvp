@@ -250,6 +250,7 @@ void main() {
     bool arrival = true,
     bool gifts = false,
     HostSessionStarted start = const HostSessionStarted(),
+    ValueNotifier<(bool, CallNotice)>? route,
   }) {
     final giftList = _Gifts();
     when(
@@ -289,7 +290,20 @@ void main() {
         if (gifts)
           BlocProvider(create: (_) => HostGiftsCubit(giftList, giftSummary)),
       ],
-      child: HostDashboardPage(arrivalEnabled: arrival, giftsEnabled: gifts),
+      child: route == null
+          ? HostDashboardPage(arrivalEnabled: arrival, giftsEnabled: gifts)
+          // (on screen?, ?after=) — how the shell shows the SAME page again.
+          : ValueListenableBuilder(
+              valueListenable: route,
+              builder: (_, v, _) => TickerMode(
+                enabled: v.$1,
+                child: HostDashboardPage(
+                  arrivalEnabled: arrival,
+                  giftsEnabled: gifts,
+                  after: v.$2,
+                ),
+              ),
+            ),
     );
   }
 
@@ -426,6 +440,58 @@ void main() {
     );
     await pumpFor(t, const Duration(milliseconds: 500));
     expect(find.text("Call declined. You're still online."), findsOneWidget);
+  });
+
+  // Regression (2026-11-27): Host Home is reused by the IndexedStack shell,
+  // so after the call screen sent the host back it stayed on "Incoming call"
+  // and never showed the after-call notice.
+  testWidgets('returning from a declined ring re-syncs Host Home', (t) async {
+    when(() => status(any())).thenAnswer((_) async => Success(_online()));
+    final route = ValueNotifier((true, CallNotice.none));
+    addTearDown(route.dispose);
+    await pumpHostPage(
+      t,
+      page(arrival: false, route: route),
+      size: const Size(390, 844),
+      settle: false,
+    );
+    await pumpFor(t, const Duration(milliseconds: 500));
+    presence.notifyIncomingCall('c1');
+    await pumpFor(t, const Duration(milliseconds: 300));
+    expect(find.text('Incoming call'), findsOneWidget);
+
+    route.value = (false, CallNotice.none); // the call screen covers Home
+    await pumpFor(t, const Duration(milliseconds: 200));
+    route.value = (true, CallNotice.declined); // go('/host?after=declined')
+    await pumpFor(t, const Duration(milliseconds: 500));
+    expect(find.text('Incoming call'), findsNothing);
+    expect(find.text("Call declined. You're still online."), findsOneWidget);
+  });
+
+  testWidgets('returning from an answered call leaves the ringing state', (
+    t,
+  ) async {
+    when(() => status(any())).thenAnswer((_) async => Success(_online()));
+    final route = ValueNotifier((true, CallNotice.none));
+    addTearDown(route.dispose);
+    await pumpHostPage(
+      t,
+      page(arrival: false, route: route),
+      size: const Size(390, 844),
+      settle: false,
+    );
+    await pumpFor(t, const Duration(milliseconds: 500));
+    presence.notifyIncomingCall('c1');
+    await pumpFor(t, const Duration(milliseconds: 300));
+    route.value = (false, CallNotice.none);
+    await pumpFor(t, const Duration(milliseconds: 200));
+    route.value = (true, CallNotice.none); // back from the call summary
+    await pumpFor(t, const Duration(milliseconds: 500));
+    expect(find.text('Incoming call'), findsNothing);
+    final goOffline = t.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, 'Go offline'),
+    );
+    expect(goOffline.onPressed, isNotNull);
   });
 
   testWidgets('go offline: session ended with duration', (t) async {

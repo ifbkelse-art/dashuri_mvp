@@ -29,6 +29,7 @@ class HostDashboardPage extends StatefulWidget {
     super.key,
     this.arrivalEnabled = false,
     this.giftsEnabled = false,
+    this.after = CallNotice.none,
   });
 
   /// An [ArrivalPhotoCubit] is provided (DASHURI_ARRIVAL_PHOTOS_ENABLED).
@@ -36,6 +37,10 @@ class HostDashboardPage extends StatefulWidget {
 
   /// A [HostGiftsCubit] is provided (DASHURI_GIFTS_ENABLED).
   final bool giftsEnabled;
+
+  /// What just happened, from `?after=` when the call screen sends the host
+  /// back (declined, missed).
+  final CallNotice after;
 
   @override
   State<HostDashboardPage> createState() => _HostDashboardPageState();
@@ -52,6 +57,38 @@ class _HostDashboardPageState extends State<HostDashboardPage> {
     context.read<HostDashboardCubit>().attachLifecycle();
     // Gifts are app-wide: load them whether or not the host is online.
     if (widget.giftsEnabled) unawaited(context.read<HostGiftsCubit>().load());
+  }
+
+  bool? _visible;
+
+  // Host Home lives in an IndexedStack shell, so returning from a call
+  // reuses this page: its blocs are NOT recreated. Without a re-sync the
+  // session stayed on "Incoming call" after the ring was declined, missed
+  // or answered, and the after-call notice never showed (2026-11-27).
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.valuesOf(context).enabled;
+    if (_visible == false &&
+        visible &&
+        context.read<HostSessionBloc>().state is HostSessionRinging) {
+      _resync();
+    }
+    _visible = visible;
+  }
+
+  @override
+  void didUpdateWidget(HostDashboardPage old) {
+    super.didUpdateWidget(old);
+    if (old.after != widget.after) _resync();
+  }
+
+  /// Re-reads the session from the server, with the after-call notice.
+  void _resync() {
+    context.read<HostSessionBloc>().add(
+      HostSessionStarted(after: widget.after),
+    );
+    unawaited(context.read<HostDashboardCubit>().refresh());
   }
 
   /// Go online: the optional arrival photo first, then online. Skipping the

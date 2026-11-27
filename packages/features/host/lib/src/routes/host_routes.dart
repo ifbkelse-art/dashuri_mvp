@@ -90,6 +90,9 @@ final class HostRoutes implements TabFeatureRoutes {
           child: HostDashboardPage(
             arrivalEnabled: arrival,
             giftsEnabled: gifts,
+            after: CallNotice.parse(
+              state.uri.queryParameters[HostPaths.afterParam],
+            ),
           ),
         );
       },

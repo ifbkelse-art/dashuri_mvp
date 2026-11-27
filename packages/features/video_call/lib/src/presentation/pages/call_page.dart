@@ -36,9 +36,14 @@ class CallPage extends StatefulWidget {
     this.manageSystemUi = true,
     this.chat,
     this.giftsEnabled = false,
+    this.incoming = false,
   });
 
   final VideoViewFactory views;
+
+  /// Opened for a ring to this user (the host side). Decides where the
+  /// screen goes when it closes before a call session could be loaded.
+  final bool incoming;
 
   /// Full-screen (immersive) while the page is open.
   final bool manageSystemUi;
@@ -146,6 +151,13 @@ class _CallPageState extends State<CallPage> {
     _chat?.setVisible(open);
   }
 
+  /// Where to go when the call screen closes without a session: a host
+  /// answering a ring goes back to Host Home (still in host mode), a
+  /// customer to Discovery. It used to be Discovery for both, which dropped
+  /// a host into the customer shell (2026-11-27).
+  String get _home =>
+      widget.incoming ? RoutePaths.hostDashboard : RoutePaths.discovery;
+
   void _onState(BuildContext context, CallState s) {
     _syncChat(s);
     _syncGifts(s);
@@ -156,7 +168,7 @@ class _CallPageState extends State<CallPage> {
       router.go(
         s.requestedEndReason == 'declined'
             ? '${RoutePaths.hostDashboard}?after=declined'
-            : RoutePaths.discovery,
+            : _home,
       );
       return;
     }
@@ -287,7 +299,7 @@ class _CallPageState extends State<CallPage> {
         ).withAction(
           label: session == null ? 'Close' : 'End call',
           onPressed: () => session == null
-              ? context.go(RoutePaths.discovery)
+              ? context.go(_home)
               : context.read<CallBloc>().add(const CallEndRequested()),
         );
       case CallUiStatus.ending || CallUiStatus.ended:

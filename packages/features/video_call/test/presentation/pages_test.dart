@@ -1,6 +1,7 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:dashuri_core/dashuri_core.dart';
 import 'package:dashuri_design_system/dashuri_design_system.dart';
+import 'package:dashuri_navigation/dashuri_navigation.dart';
 import 'package:feature_video_call/feature_video_call.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -305,6 +306,41 @@ void main() {
           await t.tap(find.text('End call'));
           verify(() => b.add(const CallEndRequested())).called(1);
         });
+
+        // Regression (2026-11-27): closing a ring that failed to load sent
+        // the host to Discovery, i.e. into the customer shell.
+        for (final (incoming, target) in [
+          (true, RoutePaths.hostDashboard),
+          (false, RoutePaths.discovery),
+        ]) {
+          testWidgets(
+            'failure without a session closes to $target (incoming: $incoming)',
+            (t) async {
+              final b = _Call();
+              when(() => b.state).thenReturn(
+                const CallState(
+                  status: CallUiStatus.failed,
+                  failure: NetworkFailure(),
+                ),
+              );
+              await pumpPage(
+                t,
+                BlocProvider<CallBloc>.value(
+                  value: b,
+                  child: CallPage(
+                    views: const FakeViews(),
+                    manageSystemUi: false,
+                    incoming: incoming,
+                  ),
+                ),
+                size: size,
+              );
+              await t.tap(find.text('Close'));
+              await t.pumpAndSettle();
+              expect(find.text('route:$target'), findsOneWidget);
+            },
+          );
+        }
 
         testWidgets('ended navigates to the summary', (t) async {
           final b = _Call();

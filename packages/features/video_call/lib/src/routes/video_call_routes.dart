@@ -69,6 +69,7 @@ final class VideoCallRoutes implements FeatureRoutes {
           // EXPERIMENT: in-call chat, when the app registered it.
           chat: _sl.isRegistered<InCallChat>() ? _sl<InCallChat>() : null,
           giftsEnabled: gifts,
+          incoming: incoming,
         );
         return MultiBlocProvider(
           providers: [
